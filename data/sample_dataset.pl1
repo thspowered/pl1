@@ -1,0 +1,66 @@
+# Pozitívny príklad 1: BMW Series 5 s dieselovým motorom a automatickou prevodovkou
+Ι(c₁, BMW) ∧ Ι(c₁, Series5) ∧
+Π(c₁, e₁) ∧ Ι(e₁, DieselEngine) ∧
+Α(e₁, power_kw, 190) ∧ Α(e₁, fuel_type, diesel) ∧
+Π(c₁, t₁) ∧ Ι(t₁, AutomaticTransmission) ∧
+Π(c₁, d₁) ∧ Ι(d₁, RWD)
+
+# Pozitívny príklad 2: BMW X5 s benzínovým motorom a xDrive
+Ι(c₂, BMW) ∧ Ι(c₂, X5) ∧
+Π(c₂, e₂) ∧ Ι(e₂, PetrolEngine) ∧
+Α(e₂, power_kw, 250) ∧ Α(e₂, fuel_type, petrol) ∧
+Π(c₂, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧
+Π(c₂, d₂) ∧ Ι(d₂, XDrive)
+
+# Pozitívny príklad 3: BMW Series 7 s výkonným dieselovým motorom
+Ι(c₃, BMW) ∧ Ι(c₃, Series7) ∧
+Π(c₃, e₃) ∧ Ι(e₃, DieselEngine) ∧
+Α(e₃, power_kw, 220) ∧ Α(e₃, fuel_type, diesel) ∧
+Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧
+Π(c₃, d₃) ∧ Ι(d₃, RWD)
+
+# Negatívny príklad 1: BMW Series 7 so slabým motorom (menej ako 200 kW)
+Ι(c₄, BMW) ∧ Ι(c₄, Series7) ∧
+Π(c₄, e₄) ∧ Ι(e₄, PetrolEngine) ∧
+Α(e₄, power_kw, 180) ∧ Α(e₄, fuel_type, petrol) ∧
+Π(c₄, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧
+Π(c₄, d₄) ∧ Ι(d₄, RWD)
+
+# Negatívny príklad 2: BMW X5 bez xDrive
+Ι(c₅, BMW) ∧ Ι(c₅, X5) ∧
+Π(c₅, e₅) ∧ Ι(e₅, DieselEngine) ∧
+Α(e₅, power_kw, 210) ∧ Α(e₅, fuel_type, diesel) ∧
+Π(c₅, t₅) ∧ Ι(t₅, AutomaticTransmission) ∧
+Π(c₅, d₅) ∧ Ι(d₅, RWD)
+
+# Negatívny príklad 3: BMW bez motora
+Ι(c₆, BMW) ∧ Ι(c₆, Series3) ∧
+Π(c₆, t₆) ∧ Ι(t₆, ManualTransmission) ∧
+Π(c₆, d₆) ∧ Ι(d₆, RWD)
+
+# Pozitívny príklad 4: BMW X7 s xDrive a výkonným motorom
+Ι(c₇, BMW) ∧ Ι(c₇, X7) ∧
+Π(c₇, e₇) ∧ Ι(e₇, PetrolEngine) ∧
+Α(e₇, power_kw, 280) ∧ Α(e₇, fuel_type, petrol) ∧
+Π(c₇, t₇) ∧ Ι(t₇, AutomaticTransmission) ∧
+Π(c₇, d₇) ∧ Ι(d₇, XDrive)
+
+# Negatívny príklad 4: BMW bez prevodovky
+Ι(c₈, BMW) ∧ Ι(c₈, Series5) ∧
+Π(c₈, e₈) ∧ Ι(e₈, DieselEngine) ∧
+Α(e₈, power_kw, 200) ∧ Α(e₈, fuel_type, diesel) ∧
+Π(c₈, d₈) ∧ Ι(d₈, RWD)
+
+# Pozitívny príklad 5: BMW Series 3 s manuálnou prevodovkou
+Ι(c₉, BMW) ∧ Ι(c₉, Series3) ∧
+Π(c₉, e₉) ∧ Ι(e₉, PetrolEngine) ∧
+Α(e₉, power_kw, 170) ∧ Α(e₉, fuel_type, petrol) ∧
+Π(c₉, t₉) ∧ Ι(t₉, ManualTransmission) ∧
+Π(c₉, d₉) ∧ Ι(d₉, RWD)
+
+# Negatívny príklad 5: Nie je BMW (Audi)
+Ι(c₁₀, Audi) ∧ Ι(c₁₀, A6) ∧
+Π(c₁₀, e₁₀) ∧ Ι(e₁₀, DieselEngine) ∧
+Α(e₁₀, power_kw, 200) ∧ Α(e₁₀, fuel_type, diesel) ∧
+Π(c₁₀, t₁₀) ∧ Ι(t₁₀, AutomaticTransmission) ∧
+Π(c₁₀, d₁₀) ∧ Ι(d₁₀, AWD) 
