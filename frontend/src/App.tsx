@@ -28,7 +28,8 @@ import {
   AccordionDetails,
   LinearProgress,
   Switch,
-  Tooltip
+  Tooltip,
+  ListItem
 } from '@mui/material';
 import { useDropzone } from 'react-dropzone';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -109,6 +110,7 @@ interface TrainingResult {
   success: boolean;
   message: string;
   model_updated: boolean;
+  model_hypothesis?: string; // Textová reprezentácia hypotézy modelu
   model_visualization?: {
     nodes: Array<{
       id: string;
@@ -131,6 +133,12 @@ interface TrainingResult {
     positive_example?: string;
     negative_example?: string;
     negative_examples?: string[];
+    heuristics?: Array<{
+      name: string;
+      description: string;
+      example_id?: number;
+      details?: Record<string, any>;
+    }>;
   }>;
   used_examples_count?: number;
   total_examples_count?: number;
@@ -695,6 +703,7 @@ function App() {
         success: trainingData.success,
         message: trainingData.message,
         model_updated: trainingData.model_updated,
+        model_hypothesis: trainingData.model_hypothesis,
         model_visualization: trainingData.model_visualization,
         training_steps: trainingData.training_steps,
         used_examples_count: trainingData.used_examples_count,
@@ -802,6 +811,7 @@ function App() {
         success: false,
         message: error instanceof Error ? error.message : 'Nastala chyba pri trénovaní modelu.',
         model_updated: false,
+        model_hypothesis: undefined,
         model_visualization: undefined,
         training_steps: undefined
       });
@@ -1395,12 +1405,110 @@ function App() {
                               {step.step === 'error' && 'Chyba pri trénovaní'}
                             </StepLabel>
                             <StepContent>
-                              <Typography>{step.description}</Typography>
+                              <Typography variant="body1">{step.description}</Typography>
+                              
+                              {/* Zobrazenie detailov o použitých príkladoch */}
+                              {step.example_name && (
+                                <Box sx={{ mt: 1, mb: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                    Použitý príklad: {step.example_name} ({step.is_positive ? 'pozitívny' : 'negatívny'})
+                                  </Typography>
+                                </Box>
+                              )}
+                              
+                              {step.negative_examples && step.negative_examples.length > 0 && (
+                                <Box sx={{ mt: 1, mb: 1 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                    Negatívne príklady:
+                                  </Typography>
+                                  <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+                                    {step.negative_examples.map((name, i) => (
+                                      <li key={i}>
+                                        <Typography variant="body2">{name}</Typography>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </Box>
+                              )}
+                              
+                              {/* Zobrazenie použitých heuristík */}
+                              {step.heuristics && step.heuristics.length > 0 && (
+                                <Box sx={{ mt: 2 }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                    Použité heuristiky, ktoré vykonali zmeny v modeli:
+                                  </Typography>
+                                  <Accordion sx={{ mt: 1, bgcolor: 'background.paper' }}>
+                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                      <Typography variant="body2">
+                                        {step.heuristics.length} aplikovaných heuristík v tomto kroku
+                                      </Typography>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                      <List dense>
+                                        {step.heuristics.map((heuristic, hIndex) => (
+                                          <ListItem key={hIndex} sx={{ mb: 1, flexDirection: 'column', alignItems: 'flex-start' }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                              {heuristic.description}
+                                            </Typography>
+                                            {heuristic.details && (
+                                              <Box sx={{ mt: 0.5, ml: 2 }}>
+                                                <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
+                                                  Spracované objekty: {heuristic.details.good_objects} (pozitívny príklad) 
+                                                  {heuristic.details.near_miss_objects !== undefined && `, ${heuristic.details.near_miss_objects} (negatívny príklad)`}
+                                                </Typography>
+                                                {heuristic.details.changes_made && (
+                                                  <Typography variant="caption" component="div" sx={{ color: 'success.main' }}>
+                                                    Pridaných spojení: {heuristic.details.changes_made}
+                                                  </Typography>
+                                                )}
+                                                {heuristic.details.links_removed && (
+                                                  <Typography variant="caption" component="div" sx={{ color: 'success.main' }}>
+                                                    Odstránených spojení: {heuristic.details.links_removed}
+                                                  </Typography>
+                                                )}
+                                              </Box>
+                                            )}
+                                          </ListItem>
+                                        ))}
+                                      </List>
+                                    </AccordionDetails>
+                                  </Accordion>
+                                </Box>
+                              )}
                             </StepContent>
                           </Step>
                         ))}
                       </Stepper>
                     </Box>
+                  )}
+                  
+                  {trainingResult && trainingResult.model_hypothesis && (
+                    <Accordion sx={{ mt: 3 }}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h6">
+                          Naučená hypotéza modelu
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box sx={{ p: 2, backgroundColor: '#112', borderRadius: 1, overflow: 'auto' }}>
+                          <Typography 
+                            variant="body2" 
+                            component="pre" 
+                            sx={{ 
+                              whiteSpace: 'pre-wrap', 
+                              fontFamily: 'monospace',
+                              fontSize: '0.85rem',
+                              color: '#66f'
+                            }}
+                          >
+                            {trainingResult.model_hypothesis}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+                          Toto je formálny zápis odvodenej hypotézy. Vyjadruje, čo sa model naučil o koncepte na základe poskytnutých príkladov.
+                        </Typography>
+                      </AccordionDetails>
+                    </Accordion>
                   )}
                   
                   {trainingResult && trainingResult.model_visualization && (
