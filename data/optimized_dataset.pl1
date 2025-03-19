@@ -1,0 +1,111 @@
+#---------- PÁR 1: X5 a pohon (XDrive vs RWD) ----------
+# Pozitívny príklad: BMW X5 s xDrive
+Ι(c₂, BMW) ∧ Ι(c₂, X5) ∧
+Π(c₂, e₂) ∧ Ι(e₂, PetrolEngine) ∧
+Α(e₂, power_kw, 250) ∧ Α(e₂, fuel_type, petrol) ∧
+Π(c₂, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧
+Π(c₂, d₂) ∧ Ι(d₂, XDrive)
+
+# Negatívny príklad: BMW X5 s RWD namiesto xDrive
+Ι(c₅, BMW) ∧ Ι(c₅, X5) ∧
+Π(c₅, e₅) ∧ Ι(e₅, DieselEngine) ∧
+Α(e₅, power_kw, 210) ∧ Α(e₅, fuel_type, diesel) ∧
+Π(c₅, t₅) ∧ Ι(t₅, AutomaticTransmission) ∧
+Π(c₅, d₅) ∧ Ι(d₅, RWD) ∧
+Ν(X5, RWD)
+
+#---------- PÁR 2: X7 a pohon (XDrive vs RWD) ----------
+# Pozitívny príklad: BMW X7 s xDrive
+Ι(c₇, BMW) ∧ Ι(c₇, X7) ∧
+Π(c₇, e₇) ∧ Ι(e₇, PetrolEngine) ∧
+Α(e₇, power_kw, 280) ∧ Α(e₇, fuel_type, petrol) ∧
+Π(c₇, t₇) ∧ Ι(t₇, AutomaticTransmission) ∧
+Π(c₇, d₇) ∧ Ι(d₇, XDrive)
+
+# Negatívny príklad: BMW X7 s RWD namiesto xDrive
+Ι(c₈a, BMW) ∧ Ι(c₈a, X7) ∧
+Π(c₈a, e₈a) ∧ Ι(e₈a, PetrolEngine) ∧
+Α(e₈a, power_kw, 280) ∧ Α(e₈a, fuel_type, petrol) ∧
+Π(c₈a, t₈a) ∧ Ι(t₈a, AutomaticTransmission) ∧
+Π(c₈a, d₈a) ∧ Ι(d₈a, RWD) ∧
+Ν(X7, RWD)
+
+#---------- PÁR 3: Series7 a typ prevodovky (Auto vs Manual) ----------
+# Pozitívny príklad: BMW Series 7 s automatickou prevodovkou
+Ι(c₁₁a, BMW) ∧ Ι(c₁₁a, Series7) ∧
+Π(c₁₁a, e₁₁a) ∧ Ι(e₁₁a, PetrolEngine) ∧
+Α(e₁₁a, power_kw, 250) ∧ Α(e₁₁a, fuel_type, petrol) ∧
+Π(c₁₁a, t₁₁a) ∧ Ι(t₁₁a, AutomaticTransmission) ∧
+Π(c₁₁a, d₁₁a) ∧ Ι(d₁₁a, RWD)
+
+# Negatívny príklad: BMW Series 7 s manuálnou prevodovkou
+Ι(c₁₁b, BMW) ∧ Ι(c₁₁b, Series7) ∧
+Π(c₁₁b, e₁₁b) ∧ Ι(e₁₁b, PetrolEngine) ∧
+Α(e₁₁b, power_kw, 250) ∧ Α(e₁₁b, fuel_type, petrol) ∧
+Π(c₁₁b, t₁₁b) ∧ Ι(t₁₁b, ManualTransmission) ∧
+Π(c₁₁b, d₁₁b) ∧ Ι(d₁₁b, RWD) ∧
+Ν(Series7, ManualTransmission)
+
+#---------- PÁR 4: X5 a typ prevodovky (Auto vs Manual) ----------
+# Pozitívny príklad: BMW X5 s automatickou prevodovkou
+Ι(c₁₂a, BMW) ∧ Ι(c₁₂a, X5) ∧
+Π(c₁₂a, e₁₂a) ∧ Ι(e₁₂a, DieselEngine) ∧
+Α(e₁₂a, power_kw, 230) ∧ Α(e₁₂a, fuel_type, diesel) ∧
+Π(c₁₂a, t₁₂a) ∧ Ι(t₁₂a, AutomaticTransmission) ∧
+Π(c₁₂a, d₁₂a) ∧ Ι(d₁₂a, XDrive)
+
+# Negatívny príklad: BMW X5 s manuálnou prevodovkou
+Ι(c₁₂b, BMW) ∧ Ι(c₁₂b, X5) ∧
+Π(c₁₂b, e₁₂b) ∧ Ι(e₁₂b, DieselEngine) ∧
+Α(e₁₂b, power_kw, 230) ∧ Α(e₁₂b, fuel_type, diesel) ∧
+Π(c₁₂b, t₁₂b) ∧ Ι(t₁₂b, ManualTransmission) ∧
+Π(c₁₂b, d₁₂b) ∧ Ι(d₁₂b, XDrive) ∧
+Ν(X5, ManualTransmission)
+
+#---------- PÁR 5: X5 a výkon motora (Silný vs Slabý) ----------
+# Pozitívny príklad: BMW X5 s výkonným motorom
+Ι(c₁₀a, BMW) ∧ Ι(c₁₀a, X5) ∧
+Π(c₁₀a, e₁₀a) ∧ Ι(e₁₀a, PetrolEngine) ∧
+Α(e₁₀a, power_kw, 250) ∧ Α(e₁₀a, fuel_type, petrol) ∧
+Π(c₁₀a, t₁₀a) ∧ Ι(t₁₀a, AutomaticTransmission) ∧
+Π(c₁₀a, d₁₀a) ∧ Ι(d₁₀a, XDrive)
+
+# Negatívny príklad: BMW X5 so slabým motorom
+Ι(c₁₀b, BMW) ∧ Ι(c₁₀b, X5) ∧
+Π(c₁₀b, e₁₀b) ∧ Ι(e₁₀b, PetrolEngine) ∧
+Α(e₁₀b, power_kw, 180) ∧ Α(e₁₀b, fuel_type, petrol) ∧
+Π(c₁₀b, t₁₀b) ∧ Ι(t₁₀b, AutomaticTransmission) ∧
+Π(c₁₀b, d₁₀b) ∧ Ι(d₁₀b, XDrive) ∧
+Ν(X5, weak_engine)
+
+#---------- PÁR 6: Series7 a výkon motora (Silný vs Slabý) ----------
+# Pozitívny príklad: BMW Series 7 s výkonným dieselovým motorom
+Ι(c₃, BMW) ∧ Ι(c₃, Series7) ∧
+Π(c₃, e₃) ∧ Ι(e₃, DieselEngine) ∧
+Α(e₃, power_kw, 220) ∧ Α(e₃, fuel_type, diesel) ∧
+Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧
+Π(c₃, d₃) ∧ Ι(d₃, RWD)
+
+# Negatívny príklad: BMW Series 7 so slabým motorom
+Ι(c₄, BMW) ∧ Ι(c₄, Series7) ∧
+Π(c₄, e₄) ∧ Ι(e₄, PetrolEngine) ∧
+Α(e₄, power_kw, 180) ∧ Α(e₄, fuel_type, petrol) ∧
+Π(c₄, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧
+Π(c₄, d₄) ∧ Ι(d₄, RWD) ∧
+Ν(Series7, weak_engine)
+
+#---------- PÁR 7: Series5 a typ motora (Diesel vs Hybrid) ----------
+# Pozitívny príklad: BMW Series 5 s dieselovým motorom
+Ι(c₁, BMW) ∧ Ι(c₁, Series5) ∧
+Π(c₁, e₁) ∧ Ι(e₁, DieselEngine) ∧
+Α(e₁, power_kw, 190) ∧ Α(e₁, fuel_type, diesel) ∧
+Π(c₁, t₁) ∧ Ι(t₁, AutomaticTransmission) ∧
+Π(c₁, d₁) ∧ Ι(d₁, RWD)
+
+# Negatívny príklad: BMW Series 5 s hybridným motorom
+Ι(c₁₄a, BMW) ∧ Ι(c₁₄a, Series5) ∧
+Π(c₁₄a, e₁₄a) ∧ Ι(e₁₄a, HybridEngine) ∧
+Α(e₁₄a, power_kw, 210) ∧ Α(e₁₄a, fuel_type, hybrid) ∧
+Π(c₁₄a, t₁₄a) ∧ Ι(t₁₄a, AutomaticTransmission) ∧
+Π(c₁₄a, d₁₄a) ∧ Ι(d₁₄a, RWD) ∧
+Ν(Series5, HybridEngine) 

@@ -237,17 +237,22 @@ class Model:
             l.link_type == link.link_type
         )]
     
-    def update_object_class(self, obj_name: str, new_class: str):
+    def update_object_class(self, object_name, new_class):
         """
-        Aktualizuje triedu objektu.
+        Aktualizuje triedu daného objektu.
         
         Args:
-            obj_name: Nazov objektu, ktoreho triedu chceme zmenit
-            new_class: Nova trieda pre objekt
+            object_name: Názov objektu
+            new_class: Nová trieda
         """
         for obj in self.objects:
-            if obj.name == obj_name:
+            if obj.name == object_name:
                 obj.class_name = new_class
+                # Aktualizuj aj spojenie MUST_BE_A, ak existuje
+                for link in self.links:
+                    if link.source == object_name and link.link_type == LinkType.MUST_BE_A:
+                        link.target = new_class
+                        break
                 break
     
     def get_attribute_value(self, obj_name: str, attr: str) -> Optional[AttributeValue]:
@@ -462,24 +467,6 @@ class Model:
         # Pridáme priame spojenie medzi triedami
         new_link = Link(source_class, target_class, link_type)
         self.add_link(new_link)
-    
-    def update_object_class(self, object_name, new_class):
-        """
-        Aktualizuje triedu daného objektu.
-        
-        Args:
-            object_name: Názov objektu
-            new_class: Nová trieda
-        """
-        for obj in self.objects:
-            if obj.name == object_name:
-                obj.class_name = new_class
-                # Aktualizuj aj spojenie MUST_BE_A, ak existuje
-                for link in self.links:
-                    if link.source == object_name and link.link_type == LinkType.MUST_BE_A:
-                        link.target = new_class
-                        break
-                break
 
 def formula_to_model(formula: Formula) -> Model:
     """
@@ -583,6 +570,30 @@ class ClassificationTree:
             
             if child not in self.children_map[parent]:
                 self.children_map[parent].append(child)
+    
+    def get_parent(self, class_name: str) -> Optional[str]:
+        """
+        Vráti rodiča danej triedy.
+        
+        Parametre:
+            class_name: Názov triedy
+            
+        Návratová hodnota:
+            Názov rodičovskej triedy, alebo None ak trieda nemá rodiča alebo neexistuje
+        """
+        return self.parent_map.get(class_name)
+    
+    def get_children(self, class_name: str) -> List[str]:
+        """
+        Vráti zoznam detí danej triedy.
+        
+        Parametre:
+            class_name: Názov triedy
+            
+        Návratová hodnota:
+            Zoznam názvov detských tried, alebo prázdny zoznam ak trieda nemá deti alebo neexistuje
+        """
+        return self.children_map.get(class_name, [])
     
     def add_union_class(self, union_class: str, component_classes: List[str]) -> None:
         """

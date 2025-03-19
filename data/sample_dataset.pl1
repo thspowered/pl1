@@ -19,24 +19,32 @@
 Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧
 Π(c₃, d₃) ∧ Ι(d₃, RWD)
 
-# Negatívny príklad 1: BMW Series 7 so slabým motorom (menej ako 200 kW)
+# KONTRASTNÝ NEGATÍVNY príklad k príkladu 3:
+# BMW Series 7 so slabým motorom (výkon pod 200 kW) - líši sa len vo výkone motora
 Ι(c₄, BMW) ∧ Ι(c₄, Series7) ∧
 Π(c₄, e₄) ∧ Ι(e₄, PetrolEngine) ∧
 Α(e₄, power_kw, 180) ∧ Α(e₄, fuel_type, petrol) ∧
 Π(c₄, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧
-Π(c₄, d₄) ∧ Ι(d₄, RWD)
+Π(c₄, d₄) ∧ Ι(d₄, RWD) ∧
+# Explicitný zákaz slabého motora pre Series 7
+Ν(Series7, weak_engine)
 
-# Negatívny príklad 2: BMW X5 bez xDrive
+# KONTRASTNÝ NEGATÍVNY príklad k príkladu 2:
+# BMW X5 bez xDrive (s RWD) - líši sa len v type pohonu
 Ι(c₅, BMW) ∧ Ι(c₅, X5) ∧
 Π(c₅, e₅) ∧ Ι(e₅, DieselEngine) ∧
 Α(e₅, power_kw, 210) ∧ Α(e₅, fuel_type, diesel) ∧
 Π(c₅, t₅) ∧ Ι(t₅, AutomaticTransmission) ∧
-Π(c₅, d₅) ∧ Ι(d₅, RWD)
+Π(c₅, d₅) ∧ Ι(d₅, RWD) ∧
+# Explicitný zákaz použitia RWD pre X5
+Ν(X5, RWD)
 
 # Negatívny príklad 3: BMW bez motora
 Ι(c₆, BMW) ∧ Ι(c₆, Series3) ∧
 Π(c₆, t₆) ∧ Ι(t₆, ManualTransmission) ∧
-Π(c₆, d₆) ∧ Ι(d₆, RWD)
+Π(c₆, d₆) ∧ Ι(d₆, RWD) ∧
+# Explicitný zákaz chýbajúceho motora
+Ν(BMW, no_engine)
 
 # Pozitívny príklad 4: BMW X7 s xDrive a výkonným motorom
 Ι(c₇, BMW) ∧ Ι(c₇, X7) ∧
@@ -45,11 +53,23 @@
 Π(c₇, t₇) ∧ Ι(t₇, AutomaticTransmission) ∧
 Π(c₇, d₇) ∧ Ι(d₇, XDrive)
 
+# KONTRASTNÝ NEGATÍVNY príklad k príkladu 4:
+# BMW X7 s RWD namiesto xDrive - líši sa len v type pohonu
+Ι(c₈a, BMW) ∧ Ι(c₈a, X7) ∧
+Π(c₈a, e₈a) ∧ Ι(e₈a, PetrolEngine) ∧
+Α(e₈a, power_kw, 280) ∧ Α(e₈a, fuel_type, petrol) ∧
+Π(c₈a, t₈a) ∧ Ι(t₈a, AutomaticTransmission) ∧
+Π(c₈a, d₈a) ∧ Ι(d₈a, RWD) ∧
+# Explicitný zákaz použitia RWD pre X7
+Ν(X7, RWD)
+
 # Negatívny príklad 4: BMW bez prevodovky
 Ι(c₈, BMW) ∧ Ι(c₈, Series5) ∧
 Π(c₈, e₈) ∧ Ι(e₈, DieselEngine) ∧
 Α(e₈, power_kw, 200) ∧ Α(e₈, fuel_type, diesel) ∧
-Π(c₈, d₈) ∧ Ι(d₈, RWD)
+Π(c₈, d₈) ∧ Ι(d₈, RWD) ∧
+# Explicitný zákaz chýbajúcej prevodovky
+Ν(BMW, no_transmission)
 
 # Pozitívny príklad 5: BMW Series 3 s manuálnou prevodovkou
 Ι(c₉, BMW) ∧ Ι(c₉, Series3) ∧
@@ -58,9 +78,123 @@
 Π(c₉, t₉) ∧ Ι(t₉, ManualTransmission) ∧
 Π(c₉, d₉) ∧ Ι(d₉, RWD)
 
-# Negatívny príklad 5: Nie je BMW (Audi)
-Ι(c₁₀, Audi) ∧ Ι(c₁₀, A6) ∧
-Π(c₁₀, e₁₀) ∧ Ι(e₁₀, DieselEngine) ∧
-Α(e₁₀, power_kw, 200) ∧ Α(e₁₀, fuel_type, diesel) ∧
-Π(c₁₀, t₁₀) ∧ Ι(t₁₀, AutomaticTransmission) ∧
-Π(c₁₀, d₁₀) ∧ Ι(d₁₀, AWD) 
+# NOVÝ KONTRASTNÝ PÁR:
+# Pozitívny príklad 10: BMW X5 s xDrive a výkonným motorom (250 kW)
+Ι(c₁₀a, BMW) ∧ Ι(c₁₀a, X5) ∧
+Π(c₁₀a, e₁₀a) ∧ Ι(e₁₀a, PetrolEngine) ∧
+Α(e₁₀a, power_kw, 250) ∧ Α(e₁₀a, fuel_type, petrol) ∧
+Π(c₁₀a, t₁₀a) ∧ Ι(t₁₀a, AutomaticTransmission) ∧
+Π(c₁₀a, d₁₀a) ∧ Ι(d₁₀a, XDrive)
+
+# Negatívny príklad 10: BMW X5 s xDrive ale slabým motorom - líši sa len výkonom motora
+Ι(c₁₀b, BMW) ∧ Ι(c₁₀b, X5) ∧
+Π(c₁₀b, e₁₀b) ∧ Ι(e₁₀b, PetrolEngine) ∧
+Α(e₁₀b, power_kw, 180) ∧ Α(e₁₀b, fuel_type, petrol) ∧
+Π(c₁₀b, t₁₀b) ∧ Ι(t₁₀b, AutomaticTransmission) ∧
+Π(c₁₀b, d₁₀b) ∧ Ι(d₁₀b, XDrive) ∧
+# Explicitný zákaz slabého motora pre X5
+Ν(X5, weak_engine)
+
+# NOVÝ KONTRASTNÝ PÁR:
+# Pozitívny príklad 11: BMW Series 7 s automatickou prevodovkou
+Ι(c₁₁a, BMW) ∧ Ι(c₁₁a, Series7) ∧
+Π(c₁₁a, e₁₁a) ∧ Ι(e₁₁a, PetrolEngine) ∧
+Α(e₁₁a, power_kw, 250) ∧ Α(e₁₁a, fuel_type, petrol) ∧
+Π(c₁₁a, t₁₁a) ∧ Ι(t₁₁a, AutomaticTransmission) ∧
+Π(c₁₁a, d₁₁a) ∧ Ι(d₁₁a, RWD)
+
+# Negatívny príklad 11: BMW Series 7 s manuálnou prevodovkou - líši sa len typom prevodovky
+Ι(c₁₁b, BMW) ∧ Ι(c₁₁b, Series7) ∧
+Π(c₁₁b, e₁₁b) ∧ Ι(e₁₁b, PetrolEngine) ∧
+Α(e₁₁b, power_kw, 250) ∧ Α(e₁₁b, fuel_type, petrol) ∧
+Π(c₁₁b, t₁₁b) ∧ Ι(t₁₁b, ManualTransmission) ∧
+Π(c₁₁b, d₁₁b) ∧ Ι(d₁₁b, RWD) ∧
+# Explicitný zákaz manuálnej prevodovky pre Series 7
+Ν(Series7, ManualTransmission)
+
+# NOVÝ KONTRASTNÝ PÁR:
+# Pozitívny príklad 12: BMW X5 s automat. prevodovkou
+Ι(c₁₂a, BMW) ∧ Ι(c₁₂a, X5) ∧
+Π(c₁₂a, e₁₂a) ∧ Ι(e₁₂a, DieselEngine) ∧
+Α(e₁₂a, power_kw, 230) ∧ Α(e₁₂a, fuel_type, diesel) ∧
+Π(c₁₂a, t₁₂a) ∧ Ι(t₁₂a, AutomaticTransmission) ∧
+Π(c₁₂a, d₁₂a) ∧ Ι(d₁₂a, XDrive)
+
+# Negatívny príklad 12: BMW X5 s manuálnou prevodovkou - líši sa len typom prevodovky
+Ι(c₁₂b, BMW) ∧ Ι(c₁₂b, X5) ∧
+Π(c₁₂b, e₁₂b) ∧ Ι(e₁₂b, DieselEngine) ∧
+Α(e₁₂b, power_kw, 230) ∧ Α(e₁₂b, fuel_type, diesel) ∧
+Π(c₁₂b, t₁₂b) ∧ Ι(t₁₂b, ManualTransmission) ∧
+Π(c₁₂b, d₁₂b) ∧ Ι(d₁₂b, XDrive) ∧
+# Explicitný zákaz manuálnej prevodovky pre X5
+Ν(X5, ManualTransmission)
+
+# VYSVETLENIE NEMOŽNÝCH KONFIGURÁCIÍ:
+# Negatívny príklad: BMW X s oboma typmi pohonu (RWD a xDrive súčasne - nemožná konfigurácia)
+Ι(c₁₃a, BMW) ∧ Ι(c₁₃a, X5) ∧
+Π(c₁₃a, e₁₃a) ∧ Ι(e₁₃a, DieselEngine) ∧
+Π(c₁₃a, t₁₃a) ∧ Ι(t₁₃a, AutomaticTransmission) ∧
+Π(c₁₃a, d₁₃a) ∧ Ι(d₁₃a, XDrive) ∧
+Π(c₁₃a, d₁₃b) ∧ Ι(d₁₃b, RWD) ∧
+# Explicitný zákaz dvoch typov pohonu naraz
+Ν(BMW, multiple_drives)
+
+# Negatívny príklad: BMW s dvoma motormi (nemožná konfigurácia)
+Ι(c₁₃b, BMW) ∧ Ι(c₁₃b, Series5) ∧
+Π(c₁₃b, e₁₃c) ∧ Ι(e₁₃c, DieselEngine) ∧
+Π(c₁₃b, e₁₃d) ∧ Ι(e₁₃d, PetrolEngine) ∧
+Π(c₁₃b, t₁₃b) ∧ Ι(t₁₃b, AutomaticTransmission) ∧
+Π(c₁₃b, d₁₃c) ∧ Ι(d₁₃c, RWD) ∧
+# Explicitný zákaz dvoch motorov naraz
+Ν(BMW, multiple_engines)
+
+# NOVÝ PRÍKLAD S HYBRIDNÝM MOTOROM:
+# Negatívny príklad: BMW Series 5 s hybridným motorom
+Ι(c₁₄a, BMW) ∧ Ι(c₁₄a, Series5) ∧
+Π(c₁₄a, e₁₄a) ∧ Ι(e₁₄a, HybridEngine) ∧
+Α(e₁₄a, power_kw, 210) ∧ Α(e₁₄a, fuel_type, hybrid) ∧
+Π(c₁₄a, t₁₄a) ∧ Ι(t₁₄a, AutomaticTransmission) ∧
+Π(c₁₄a, d₁₄a) ∧ Ι(d₁₄a, RWD) ∧
+# Explicitný zákaz hybridného motora pre Series 5
+Ν(Series5, HybridEngine) 
+
+
+# Základné všeobecné pravidlá pre všetky BMW
+# Každé BMW musí mať motor, prevodovku a pohon
+Μ(BMW, Engine) ∧ Μ(BMW, Transmission) ∧ Μ(BMW, Drive) ∧
+# Každé BMW nesmie mať viac motorov alebo viac typov pohonu
+Ν(BMW, multiple_engines) ∧ Ν(BMW, multiple_drives) ∧
+Ν(BMW, no_engine) ∧ Ν(BMW, no_transmission)
+
+# Pravidlá pre BMW X modelový rad (X5, X7, atď.)
+Μ(X5, XDrive) ∧ Μ(X7, XDrive) ∧  # X modely musia mať xDrive
+Ν(X5, RWD) ∧ Ν(X7, RWD) ∧  # X modely nesmú mať RWD
+Μ(X5, AutomaticTransmission) ∧ Μ(X7, AutomaticTransmission) ∧  # X modely musia mať automatickú prevodovku
+Ν(X5, ManualTransmission) ∧ Ν(X7, ManualTransmission) ∧  # X modely nesmú mať manuálnu prevodovku
+
+# Požiadavky na výkon pre X modely
+Μ(X5, PowerfulEngine) ∧ Μ(X7, PowerfulEngine) ∧
+Ν(X5, weak_engine) ∧ Ν(X7, weak_engine) ∧
+Α(X5.engine, power_kw, (200, 300)) ∧ Α(X7.engine, power_kw, (220, 300))  # Výkon motora pre X modely
+
+# Pravidlá pre BMW Series modelový rad
+Μ(Series7, AutomaticTransmission) ∧  # Series 7 musí mať automatickú prevodovku
+Ν(Series7, ManualTransmission) ∧  # Series 7 nesmie mať manuálnu prevodovku
+Μ(Series7, PowerfulEngine) ∧ Ν(Series7, weak_engine) ∧  # Series 7 musí mať výkonný motor
+Α(Series7.engine, power_kw, (200, 300))  # Výkon motora pre Series 7
+
+# Series 5 pravidlá
+Μ(Series5, Engine) ∧ Μ(Series5, Transmission) ∧ Μ(Series5, RWD) ∧
+Ν(Series5, HybridEngine)  # Series 5 nesmie mať hybridný motor
+
+# Series 3 pravidlá - môže mať manuálnu prevodovku
+Μ(Series3, Engine) ∧ Μ(Series3, Transmission) ∧ Μ(Series3, RWD) ∧
+Α(Series3.engine, power_kw, (140, 220))  # Výkon motora pre Series 3
+
+# Typy motorov - BMW môže mať buď diesel alebo benzín, ale nie hybridný
+Μ(BMW, Engine) ∧
+Μ(BMW, (DieselEngine ∨ PetrolEngine))  # BMW môže mať dieselový alebo benzínový motor
+
+# Typy pohonu - BMW môže mať buď RWD alebo xDrive
+Μ(BMW, Drive) ∧
+Μ(BMW, (RWD ∨ XDrive))  # BMW môže mať RWD alebo xDrive 
