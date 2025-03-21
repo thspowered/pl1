@@ -29,6 +29,7 @@ import ExampleList from './components/ExampleList';
 import TrainingPanel from './components/TrainingPanel';
 import TrainingResultDisplay from './components/TrainingResult';
 import ModelControls from './components/ModelControls';
+import LandingPage from './components/LandingPage';
 import { TrainingResult, NetworkNode, NetworkLink } from './types';
 
 // Vytvorenie tmavého motívu
@@ -111,7 +112,7 @@ function App() {
 
   // Handle file upload
   const handleFileUpload = (content: string) => {
-    setFileContent(content);
+          setFileContent(content);
     setFile(new File([content], "uploaded-file.txt"));
     showSuccess('Súbor bol úspešne nahraný.');
   };
@@ -336,7 +337,7 @@ function App() {
         setTrainingSteps([]);
         
         // Reset training result
-        setTrainingResult(null);
+    setTrainingResult(null);
         
         // Reset all examples - set usedInTraining to false
         resetExamples();
@@ -476,7 +477,7 @@ function App() {
     setFileContent('');
     setExamples([]);
     setShowExamples(false);
-    setTrainingResult(null);
+        setTrainingResult(null);
     setModelStatus(null);
   };
 
@@ -587,7 +588,9 @@ function App() {
           </Box>
         )}
         
-        {/* App header */}
+        {/* App header - zobrazí sa len ak je showExamples true */}
+        {showExamples && (
+          <>
         <Box 
           sx={{ 
             p: 2, 
@@ -603,16 +606,16 @@ function App() {
             PL1-Winston Learner
           </Typography>
           
-          {/* Model history navigation buttons */}
-          {showExamples && modelHistory.length > 0 && (
-            <ModelControls 
-              historyIndex={historyIndex}
-              historyLength={modelHistory.length}
-              isLoading={isLoading || apiLoading}
-              onStepBack={handleStepBack}
-              onStepForward={handleStepForward}
-              onReset={handleReset}
-            />
+              {/* Model history navigation buttons */}
+              {modelHistory.length > 0 && (
+                <ModelControls 
+                  historyIndex={historyIndex}
+                  historyLength={modelHistory.length}
+                  isLoading={isLoading || apiLoading}
+                  onStepBack={handleStepBack}
+                  onStepForward={handleStepForward}
+                  onReset={handleReset}
+                />
           )}
         </Box>
         
@@ -631,78 +634,18 @@ function App() {
             Systém pre učenie konceptov pomocou symbolickej notácie predikátovej logiky prvého rádu
           </Typography>
         </Container>
+          </>
+        )}
         
+        {/* Conditional rendering of content */}
         {!showExamples ? (
-          // Upload interface
-          <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
-            <Grid item xs={12} md={6}>
-              <Paper elevation={3} sx={{ height: '100%', p: { xs: 2, sm: 3, md: 4 } }}>
-                <Typography variant="h5" gutterBottom>
-                  Nahrať dataset
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  Nahrajte súbor s datasetom vo formáte PL1. Súbor by mal obsahovať pozitívne a negatívne príklady v symbolickej notácii.
-                </Typography>
-                
-                <FileUploader onFileUpload={handleFileUpload} />
-                
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  sx={{ mt: 3 }}
-                  disabled={!file || isProcessing}
-                  onClick={processDataset}
-                >
-                  {isProcessing ? (
-                    <>
-                      <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-                      Spracovávam...
-                    </>
-                  ) : (
-                    'Spracovať dataset'
-                  )}
-                </Button>
-              </Paper>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Paper elevation={3} sx={{ height: '100%', p: { xs: 2, sm: 3, md: 4 } }}>
-                <Typography variant="h5" gutterBottom>
-                  O projekte
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  Tento projekt implementuje systém pre učenie konceptov na základe pozitívnych a negatívnych príkladov. 
-                  Využíva Winstonov algoritmus učenia konceptov a reprezentuje znalosti pomocou symbolickej notácie predikátovej logiky prvého rádu (PL1).
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  Hlavné funkcie systému:
-                </Typography>
-                <ul>
-                  <li>
-                    <Typography variant="body1">
-                      Parsovanie a spracovanie príkladov v symbolickej notácii PL1
-                    </Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body1">
-                      Učenie konceptov pomocou Winstonovho algoritmu
-                    </Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body1">
-                      Porovnávanie nových príkladov s naučeným modelom
-                    </Typography>
-                  </li>
-                  <li>
-                    <Typography variant="body1">
-                      Vizualizácia naučeného modelu ako sémantickej siete
-                    </Typography>
-                  </li>
-                </ul>
-              </Paper>
-            </Grid>
-          </Grid>
+          // Use the new LandingPage component
+          <LandingPage 
+            file={file}
+            isProcessing={isProcessing}
+            onFileUpload={handleFileUpload}
+            onProcessDataset={processDataset}
+          />
         ) : (
           // Examples and training interface
           <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
