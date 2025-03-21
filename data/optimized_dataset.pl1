@@ -108,4 +108,184 @@
 Α(e₁₄a, power_kw, 210) ∧ Α(e₁₄a, fuel_type, hybrid) ∧
 Π(c₁₄a, t₁₄a) ∧ Ι(t₁₄a, AutomaticTransmission) ∧
 Π(c₁₄a, d₁₄a) ∧ Ι(d₁₄a, RWD) ∧
-Ν(Series5, HybridEngine) 
+Ν(Series5, HybridEngine)
+
+#---------- PÁR 8: Series5 a kombinácia pohonu a výkonu ----------
+# Pozitívny príklad: BMW Series 5 s RWD a silným motorom
+Ι(c₁₅a, BMW) ∧ Ι(c₁₅a, Series5) ∧
+Π(c₁₅a, e₁₅a) ∧ Ι(e₁₅a, PetrolEngine) ∧
+Α(e₁₅a, power_kw, 240) ∧ Α(e₁₅a, fuel_type, petrol) ∧
+Π(c₁₅a, t₁₅a) ∧ Ι(t₁₅a, AutomaticTransmission) ∧
+Π(c₁₅a, d₁₅a) ∧ Ι(d₁₅a, RWD)
+
+# Negatívny príklad: BMW Series 5 s XDrive a slabým motorom
+Ι(c₁₅b, BMW) ∧ Ι(c₁₅b, Series5) ∧
+Π(c₁₅b, e₁₅b) ∧ Ι(e₁₅b, PetrolEngine) ∧
+Α(e₁₅b, power_kw, 170) ∧ Α(e₁₅b, fuel_type, petrol) ∧
+Π(c₁₅b, t₁₅b) ∧ Ι(t₁₅b, AutomaticTransmission) ∧
+Π(c₁₅b, d₁₅b) ∧ Ι(d₁₅b, XDrive) ∧
+Ν(Series5, weak_engine_xdrive)
+
+#---------- PÁR 9: X5 a typ motora (Petrol vs Hybrid) ----------
+# Pozitívny príklad: BMW X5 s benzínovým motorom
+Ι(c₁₆a, BMW) ∧ Ι(c₁₆a, X5) ∧
+Π(c₁₆a, e₁₆a) ∧ Ι(e₁₆a, PetrolEngine) ∧
+Α(e₁₆a, power_kw, 265) ∧ Α(e₁₆a, fuel_type, petrol) ∧
+Α(e₁₆a, torque_nm, 450) ∧ Α(e₁₆a, cylinders, 8) ∧
+Π(c₁₆a, t₁₆a) ∧ Ι(t₁₆a, AutomaticTransmission) ∧
+Π(c₁₆a, d₁₆a) ∧ Ι(d₁₆a, XDrive)
+
+# Negatívny príklad: BMW X5 s hybridným motorom
+Ι(c₁₆b, BMW) ∧ Ι(c₁₆b, X5) ∧
+Π(c₁₆b, e₁₆b) ∧ Ι(e₁₆b, HybridEngine) ∧
+Α(e₁₆b, power_kw, 290) ∧ Α(e₁₆b, fuel_type, hybrid) ∧
+Α(e₁₆b, torque_nm, 500) ∧ Α(e₁₆b, cylinders, 6) ∧
+Π(c₁₆b, t₁₆b) ∧ Ι(t₁₆b, AutomaticTransmission) ∧
+Π(c₁₆b, d₁₆b) ∧ Ι(d₁₆b, XDrive) ∧
+Ν(X5, HybridEngine)
+
+#---------- PÁR 10: Series7 a atribúty motora ----------
+# Pozitívny príklad: BMW Series 7 s vysoko-výkonným motorom
+Ι(c₁₇a, BMW) ∧ Ι(c₁₇a, Series7) ∧
+Π(c₁₇a, e₁₇a) ∧ Ι(e₁₇a, PetrolEngine) ∧
+Α(e₁₇a, power_kw, 280) ∧ Α(e₁₇a, fuel_type, petrol) ∧
+Α(e₁₇a, torque_nm, 520) ∧ Α(e₁₇a, cylinders, 8) ∧
+Α(e₁₇a, displacement_cc, 4400) ∧
+Π(c₁₇a, t₁₇a) ∧ Ι(t₁₇a, AutomaticTransmission) ∧
+Π(c₁₇a, d₁₇a) ∧ Ι(d₁₇a, RWD)
+
+# Negatívny príklad: BMW Series 7 s výkonným motorom, ale s nesprávnymi parametrami
+Ι(c₁₇b, BMW) ∧ Ι(c₁₇b, Series7) ∧
+Π(c₁₇b, e₁₇b) ∧ Ι(e₁₇b, PetrolEngine) ∧
+Α(e₁₇b, power_kw, 250) ∧ Α(e₁₇b, fuel_type, petrol) ∧
+Α(e₁₇b, torque_nm, 400) ∧ Α(e₁₇b, cylinders, 6) ∧
+Α(e₁₇b, displacement_cc, 3000) ∧
+Π(c₁₇b, t₁₇b) ∧ Ι(t₁₇b, AutomaticTransmission) ∧
+Π(c₁₇b, d₁₇b) ∧ Ι(d₁₇b, RWD) ∧
+Ν(Series7, low_displacement_engine)
+
+#---------- PÁR 11: X7 a atribúty prevodovky ----------
+# Pozitívny príklad: BMW X7 s pokročilou automatickou prevodovkou
+Ι(c₁₈a, BMW) ∧ Ι(c₁₈a, X7) ∧
+Π(c₁₈a, e₁₈a) ∧ Ι(e₁₈a, PetrolEngine) ∧
+Α(e₁₈a, power_kw, 300) ∧ Α(e₁₈a, fuel_type, petrol) ∧
+Π(c₁₈a, t₁₈a) ∧ Ι(t₁₈a, AutomaticTransmission) ∧
+Α(t₁₈a, gears, 8) ∧ Α(t₁₈a, type, "sport_automatic") ∧
+Π(c₁₈a, d₁₈a) ∧ Ι(d₁₈a, XDrive)
+
+# Negatívny príklad: BMW X7 s menej pokročilou automatickou prevodovkou
+Ι(c₁₈b, BMW) ∧ Ι(c₁₈b, X7) ∧
+Π(c₁₈b, e₁₈b) ∧ Ι(e₁₈b, PetrolEngine) ∧
+Α(e₁₈b, power_kw, 300) ∧ Α(e₁₈b, fuel_type, petrol) ∧
+Π(c₁₈b, t₁₈b) ∧ Ι(t₁₈b, AutomaticTransmission) ∧
+Α(t₁₈b, gears, 6) ∧ Α(t₁₈b, type, "standard_automatic") ∧
+Π(c₁₈b, d₁₈b) ∧ Ι(d₁₈b, XDrive) ∧
+Ν(X7, basic_transmission)
+
+#---------- PÁR 12: X5 a hybridný systém s výkonnostnou charakteristikou ----------
+# Pozitívny príklad: BMW X5 s výkonným hybridným systémom
+Ι(c₁₉a, BMW) ∧ Ι(c₁₉a, X5) ∧
+Π(c₁₉a, e₁₉a) ∧ Ι(e₁₉a, HybridEngine) ∧
+Α(e₁₉a, power_kw, 290) ∧ Α(e₁₉a, fuel_type, hybrid) ∧
+Α(e₁₉a, electric_range_km, 80) ∧ Α(e₁₉a, battery_capacity_kwh, 24) ∧
+Π(c₁₉a, t₁₉a) ∧ Ι(t₁₉a, AutomaticTransmission) ∧
+Α(t₁₉a, gears, 8) ∧
+Π(c₁₉a, d₁₉a) ∧ Ι(d₁₉a, XDrive)
+
+# Negatívny príklad: BMW X5 s nedostatočným hybridným systémom
+Ι(c₁₉b, BMW) ∧ Ι(c₁₉b, X5) ∧
+Π(c₁₉b, e₁₉b) ∧ Ι(e₁₉b, HybridEngine) ∧
+Α(e₁₉b, power_kw, 250) ∧ Α(e₁₉b, fuel_type, hybrid) ∧
+Α(e₁₉b, electric_range_km, 40) ∧ Α(e₁₉b, battery_capacity_kwh, 12) ∧
+Π(c₁₉b, t₁₉b) ∧ Ι(t₁₉b, AutomaticTransmission) ∧
+Α(t₁₉b, gears, 8) ∧
+Π(c₁₉b, d₁₉b) ∧ Ι(d₁₉b, XDrive) ∧
+Ν(X5, low_range_hybrid)
+
+#---------- PÁR 13: Series5 s komplexnou konfiguráciou ----------
+# Pozitívny príklad: BMW Series5 s optimálnou komplexnou konfiguráciou
+Ι(c₂₀a, BMW) ∧ Ι(c₂₀a, Series5) ∧
+Π(c₂₀a, e₂₀a) ∧ Ι(e₂₀a, DieselEngine) ∧
+Α(e₂₀a, power_kw, 210) ∧ Α(e₂₀a, fuel_type, diesel) ∧
+Α(e₂₀a, torque_nm, 520) ∧ Α(e₂₀a, cylinders, 6) ∧
+Π(c₂₀a, t₂₀a) ∧ Ι(t₂₀a, AutomaticTransmission) ∧
+Α(t₂₀a, gears, 8) ∧ Α(t₂₀a, type, "sport_automatic") ∧
+Π(c₂₀a, d₂₀a) ∧ Ι(d₂₀a, RWD) ∧
+Α(c₂₀a, top_speed_kmh, 250) ∧ Α(c₂₀a, acceleration_0_100, 5.8) ∧
+Α(c₂₀a, fuel_consumption, 6.5)
+
+# Negatívny príklad: BMW Series5 s neoptimálnou komplexnou konfiguráciou
+Ι(c₂₀b, BMW) ∧ Ι(c₂₀b, Series5) ∧
+Π(c₂₀b, e₂₀b) ∧ Ι(e₂₀b, PetrolEngine) ∧
+Α(e₂₀b, power_kw, 180) ∧ Α(e₂₀b, fuel_type, petrol) ∧
+Α(e₂₀b, torque_nm, 350) ∧ Α(e₂₀b, cylinders, 4) ∧
+Π(c₂₀b, t₂₀b) ∧ Ι(t₂₀b, AutomaticTransmission) ∧
+Α(t₂₀b, gears, 6) ∧ Α(t₂₀b, type, "standard_automatic") ∧
+Π(c₂₀b, d₂₀b) ∧ Ι(d₂₀b, RWD) ∧
+Α(c₂₀b, top_speed_kmh, 220) ∧ Α(c₂₀b, acceleration_0_100, 7.9) ∧
+Α(c₂₀b, fuel_consumption, 8.2) ∧
+Ν(Series5, low_performance_config)
+
+#---------- PÁR 14: X7 a výbava interiéru ----------
+# Pozitívny príklad: BMW X7 s luxusnou výbavou
+Ι(c₂₁a, BMW) ∧ Ι(c₂₁a, X7) ∧
+Π(c₂₁a, e₂₁a) ∧ Ι(e₂₁a, PetrolEngine) ∧
+Α(e₂₁a, power_kw, 280) ∧
+Π(c₂₁a, t₂₁a) ∧ Ι(t₂₁a, AutomaticTransmission) ∧
+Π(c₂₁a, d₂₁a) ∧ Ι(d₂₁a, XDrive) ∧
+Α(c₂₁a, interior, "luxury") ∧ Α(c₂₁a, seats, 7) ∧
+Α(c₂₁a, entertainment_system, "premium") ∧
+Α(c₂₁a, leather_quality, "finest")
+
+# Negatívny príklad: BMW X7 so štandardnou výbavou
+Ι(c₂₁b, BMW) ∧ Ι(c₂₁b, X7) ∧
+Π(c₂₁b, e₂₁b) ∧ Ι(e₂₁b, PetrolEngine) ∧
+Α(e₂₁b, power_kw, 280) ∧
+Π(c₂₁b, t₂₁b) ∧ Ι(t₂₁b, AutomaticTransmission) ∧
+Π(c₂₁b, d₂₁b) ∧ Ι(d₂₁b, XDrive) ∧
+Α(c₂₁b, interior, "standard") ∧ Α(c₂₁b, seats, 5) ∧
+Α(c₂₁b, entertainment_system, "basic") ∧
+Α(c₂₁b, leather_quality, "standard") ∧
+Ν(X7, basic_interior)
+
+#---------- PÁR 15: X5 s komplexnými parametrami výkonu ----------
+# Pozitívny príklad: BMW X5 s prepracovaným výkonom
+Ι(c₂₂a, BMW) ∧ Ι(c₂₂a, X5) ∧
+Π(c₂₂a, e₂₂a) ∧ Ι(e₂₂a, PetrolEngine) ∧
+Α(e₂₂a, power_kw, 265) ∧ Α(e₂₂a, fuel_type, petrol) ∧
+Α(e₂₂a, torque_nm, 480) ∧ Α(e₂₂a, cylinders, 8) ∧
+Π(c₂₂a, t₂₂a) ∧ Ι(t₂₂a, AutomaticTransmission) ∧
+Π(c₂₂a, d₂₂a) ∧ Ι(d₂₂a, XDrive) ∧
+Α(c₂₂a, weight_kg, 2200) ∧ Α(c₂₂a, top_speed_kmh, 250) ∧
+Α(c₂₂a, acceleration_0_100, 5.2) ∧ Α(c₂₂a, power_to_weight, 0.12)
+
+# Negatívny príklad: BMW X5 s nevyhovujúcim výkonom pre hmotnosť
+Ι(c₂₂b, BMW) ∧ Ι(c₂₂b, X5) ∧
+Π(c₂₂b, e₂₂b) ∧ Ι(e₂₂b, PetrolEngine) ∧
+Α(e₂₂b, power_kw, 220) ∧ Α(e₂₂b, fuel_type, petrol) ∧
+Α(e₂₂b, torque_nm, 400) ∧ Α(e₂₂b, cylinders, 6) ∧
+Π(c₂₂b, t₂₂b) ∧ Ι(t₂₂b, AutomaticTransmission) ∧
+Π(c₂₂b, d₂₂b) ∧ Ι(d₂₂b, XDrive) ∧
+Α(c₂₂b, weight_kg, 2300) ∧ Α(c₂₂b, top_speed_kmh, 220) ∧
+Α(c₂₂b, acceleration_0_100, 7.5) ∧ Α(c₂₂b, power_to_weight, 0.096) ∧
+Ν(X5, low_power_to_weight)
+
+#---------- PÁR 16: Series7 a ekonomickosť prevádzky ----------
+# Pozitívny príklad: BMW Series7 s ekonomickou prevádzkou
+Ι(c₂₃a, BMW) ∧ Ι(c₂₃a, Series7) ∧
+Π(c₂₃a, e₂₃a) ∧ Ι(e₂₃a, HybridEngine) ∧
+Α(e₂₃a, power_kw, 250) ∧ Α(e₂₃a, fuel_type, hybrid) ∧
+Α(e₂₃a, electric_range_km, 60) ∧ Α(e₂₃a, combined_consumption, 2.5) ∧
+Π(c₂₃a, t₂₃a) ∧ Ι(t₂₃a, AutomaticTransmission) ∧
+Π(c₂₃a, d₂₃a) ∧ Ι(d₂₃a, RWD) ∧
+Α(c₂₃a, emissions_g_km, 55) ∧ Α(c₂₃a, eco_rating, "A+")
+
+# Negatívny príklad: BMW Series7 s vyššou spotrebou
+Ι(c₂₃b, BMW) ∧ Ι(c₂₃b, Series7) ∧
+Π(c₂₃b, e₂₃b) ∧ Ι(e₂₃b, PetrolEngine) ∧
+Α(e₂₃b, power_kw, 270) ∧ Α(e₂₃b, fuel_type, petrol) ∧
+Α(e₂₃b, combined_consumption, 9.8) ∧
+Π(c₂₃b, t₂₃b) ∧ Ι(t₂₃b, AutomaticTransmission) ∧
+Π(c₂₃b, d₂₃b) ∧ Ι(d₂₃b, RWD) ∧
+Α(c₂₃b, emissions_g_km, 210) ∧ Α(c₂₃b, eco_rating, "C") ∧
+Ν(Series7, high_consumption) 
