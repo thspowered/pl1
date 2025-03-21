@@ -93,7 +93,7 @@ def create_mid_range_phone(name_prefix="mr1"):
     """Vytvoří model mid-range telefonu pro testování."""
     phone = Object(f"{name_prefix}_phone", "MidRangePhone")
     processor = Object(f"{name_prefix}_proc", "MidRangeProcessor", {"clock_speed": 2.4, "cores": 6})
-    ram = Object(f"{name_prefix}_ram", "HighRAM", {"capacity": 8})  # Sdílí stejný typ RAM jako high-end
+    ram = Object(f"{name_prefix}_ram", "HighRAM", {"capacity": 8})  
     display = Object(f"{name_prefix}_display", "AMOLEDDisplay", {"size": 6.4, "resolution": "FHD+"})
     battery = Object(f"{name_prefix}_battery", "StandardBattery", {"capacity": 4500})
     camera = Object(f"{name_prefix}_camera", "MidResCamera", {"megapixels": 64})

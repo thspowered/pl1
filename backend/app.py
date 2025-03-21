@@ -222,14 +222,14 @@ def generate_model_visualization(model: Model):
         Dictionary obsahujúci uzly a hrany pre vizualizáciu
     """
     if not model:
-        return {"nodes": [], "edges": []}
+        return {"nodes": [], "links": []}
         
     try:
         return model.to_semantic_network()
     except Exception as e:
         print(f"Error generating model visualization: {str(e)}")
         traceback.print_exc()
-        return {"nodes": [], "edges": [], "error": str(e)}
+        return {"nodes": [], "links": [], "error": str(e)}
 
 def get_timestamp():
     """Vráti aktuálny časový údaj vo formáte ISO 8601."""

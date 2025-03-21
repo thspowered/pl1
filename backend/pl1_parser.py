@@ -270,20 +270,4 @@ def parse_pl1_dataset(text: str) -> List[Formula]:
             if formula.predicates:
                 formulas.append(formula)
     
-    return formulas
-
-# Priklad pouzitia:
-if __name__ == "__main__":
-    # Priklad symbolickej notacie PL1
-    example_text = """
-    S₃(b₁) ∧ MT(b₁, "3_series") ∧ BT(b₁, "sedan") ∧
-    HE(b₁, e₁) ∧ HT(b₁, t₁) ∧ HD(b₁, d₁) ∧ TL(b₁, "sport_line") ∧
-    D(e₁, 2.0) ∧ FT(e₁, "petrol") ∧ P(e₁, 135) ∧
-    TT(t₁, "steptronic") ∧ DT(d₁, "rear_wheel")
-    """
-    
-    formula = parse_pl1_formula(example_text)
-    print(f"Parsovana formula: {formula}")
-    print(f"Pocet predikatov: {len(formula.predicates)}")
-    for predicate in formula.predicates:
-        print(f"- {predicate}") 
+    return formulas 

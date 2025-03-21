@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import List, Set, Dict, Tuple, Optional, Union, Any
 from enum import Enum
-import networkx as nx
 from copy import deepcopy
 from backend.pl1_parser import Predicate, Formula, PredicateType
 
@@ -288,34 +287,6 @@ class Model:
                     obj.attributes = {}
                 obj.attributes[attr] = interval
                 break
-
-    def create_semantic_network(self) -> nx.DiGraph:
-        """
-        Vytvori orientovany graf reprezentujuci semanticku siet modelu.
-        
-        Tato metoda konvertuje model na graf v kniznici NetworkX, kde uzly
-        su objekty a hrany su spojenia medzi nimi. Atributy objektov su
-        reprezentovane ako samostatne uzly spojene s objektmi.
-        
-        Returns:
-            DiGraph: Orientovany graf reprezentujuci model
-        """
-        G = nx.DiGraph()
-        
-        # Pridaj vsetky objekty ako uzly
-        for obj in self.objects:
-            G.add_node(obj.name, class_name=obj.class_name)
-            if obj.attributes:
-                for attr, value in obj.attributes.items():
-                    attr_node = f"{obj.name}_{attr}"
-                    G.add_node(attr_node, value=value)
-                    G.add_edge(obj.name, attr_node, type="has_attribute")
-        
-        # Pridaj vsetky spojenia ako hrany
-        for link in self.links:
-            G.add_edge(link.source, link.target, type=link.link_type.value)
-            
-        return G
 
     def to_formula(self) -> str:
         """

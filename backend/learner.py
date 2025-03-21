@@ -1,5 +1,4 @@
 from backend.model import Model, Link, LinkType, ClassificationTree, Object
-from backend.pl1_parser import Formula, Predicate
 from typing import List, Dict, Set, Tuple, Optional, Any
 import traceback
 from datetime import datetime
