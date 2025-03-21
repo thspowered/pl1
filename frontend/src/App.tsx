@@ -38,6 +38,7 @@ import Graph from 'graphology';
 import Sigma from 'sigma';
 import { circular } from 'graphology-layout';
 import ForceAtlas2 from 'graphology-layout-forceatlas2';
+import axios from 'axios';
 
 // Vytvorenie tmavého motívu
 const darkTheme = createTheme({
@@ -633,6 +634,8 @@ const SigmaNetwork = ({ nodes, links }: SigmaNetworkProps) => {
 };
 
 function App() {
+  const apiBaseUrl = 'http://localhost:8000'; // API base URL
+  
   const [file, setFile] = useState<File | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
   const [examples, setExamples] = useState<Example[]>([]);
@@ -660,6 +663,17 @@ function App() {
     negative_examples_count: number;
   } | null>(null);
   const [retrainAll, setRetrainAll] = useState<boolean>(false);
+  const [modelHistory, setModelHistory] = useState<Array<any>>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  
+  // Add missing state variables
+  const [nodes, setNodes] = useState<NetworkNode[]>([]);
+  const [links, setLinks] = useState<NetworkLink[]>([]);
+  const [trainingSteps, setTrainingSteps] = useState<any[]>([]);
+  const [usedExamplesCount, setUsedExamplesCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Konfigurácia dropzone
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -1294,6 +1308,18 @@ function App() {
         severity: 'success',
       });
       
+      // Přidáme aktuální model do historie
+      const newModelState = {
+        model_visualization: trainingData.model_visualization,
+        training_steps: trainingData.training_steps,
+        used_examples_count: trainingData.used_examples_count
+      };
+      
+      // Odstraníme stavy vpřed, pokud jsme se vrátili a pak trénovali
+      const newHistory = modelHistory.slice(0, historyIndex + 1);
+      setModelHistory([...newHistory, newModelState]);
+      setHistoryIndex(newHistory.length);
+      
     } catch (error) {
       console.error('Chyba pri trénovaní modelu:', error);
       setTrainingResult({
@@ -1394,6 +1420,223 @@ function App() {
     }
   }, [examples]);
 
+  // Funkce pro krok zpět
+  const handleStepBack = async () => {
+    if (historyIndex > 0 || modelHistory.length === 0) {
+      try {
+        setIsLoading(true);
+        // Voláme API pro krok zpět
+        const response = await axios.post(`${apiBaseUrl}/api/model-history/step-back`);
+        
+        if (response.data.success) {
+          // Nastavíme nový index historie
+          setHistoryIndex(response.data.current_index);
+          
+          // Aktualizujeme stav aplikace z odpovědi
+          if (response.data.model_visualization) {
+            setNodes(response.data.model_visualization.nodes || []);
+            setLinks(response.data.model_visualization.links || []);
+          }
+          
+          // Aktualizujeme také další relevantní stavy
+          if (response.data.training_steps) {
+            setTrainingSteps(response.data.training_steps);
+            // Aktualizujeme trainingResult, aby se zobrazila historie kroků
+            if (trainingResult) {
+              setTrainingResult({
+                ...trainingResult,
+                training_steps: response.data.training_steps,
+                model_visualization: response.data.model_visualization // Přidáno - aktualizace vizualizace
+              });
+            } else {
+              setTrainingResult({
+                success: true,
+                message: "Model obnoven na předchozí krok",
+                model_updated: true,
+                training_steps: response.data.training_steps,
+                model_visualization: response.data.model_visualization // Přidáno - aktualizace vizualizace
+              });
+            }
+          }
+          
+          if (response.data.used_examples_count !== undefined) {
+            setUsedExamplesCount(response.data.used_examples_count);
+          }
+          
+          // Aktualizujeme dataset pro zobrazení použitých příkladů
+          await fetchDataset(true);
+          
+          // Aktualizujeme stav modelu
+          await fetchModelStatus(true);
+          
+          setNotification({
+            open: true,
+            message: "Model obnoven na předchozí krok",
+            severity: 'success',
+          });
+        } else {
+          setNotification({
+            open: true,
+            message: response.data.message || "Nepodařilo se vrátit o krok zpět",
+            severity: 'warning',
+          });
+        }
+      } catch (error) {
+        console.error("Chyba při kroku zpět:", error);
+        setNotification({
+          open: true,
+          message: "Nastala chyba při kroku zpět",
+          severity: 'error',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Funkce pro krok vpřed
+  const handleStepForward = async () => {
+    if (historyIndex < modelHistory.length - 1 || modelHistory.length === 0) {
+      try {
+        setIsLoading(true);
+        // Voláme API pro krok vpřed
+        const response = await axios.post(`${apiBaseUrl}/api/model-history/step-forward`);
+        
+        if (response.data.success) {
+          // Nastavíme nový index historie
+          setHistoryIndex(response.data.current_index);
+          
+          // Aktualizujeme stav aplikace z odpovědi
+          if (response.data.model_visualization) {
+            setNodes(response.data.model_visualization.nodes || []);
+            setLinks(response.data.model_visualization.links || []);
+          }
+          
+          // Aktualizujeme také další relevantní stavy
+          if (response.data.training_steps) {
+            setTrainingSteps(response.data.training_steps);
+            // Aktualizujeme trainingResult, aby se zobrazila historie kroků
+            if (trainingResult) {
+              setTrainingResult({
+                ...trainingResult,
+                training_steps: response.data.training_steps,
+                model_visualization: response.data.model_visualization // Přidáno - aktualizace vizualizace
+              });
+            } else {
+              setTrainingResult({
+                success: true,
+                message: "Model posunut na následující krok",
+                model_updated: true,
+                training_steps: response.data.training_steps,
+                model_visualization: response.data.model_visualization // Přidáno - aktualizace vizualizace
+              });
+            }
+          }
+          
+          if (response.data.used_examples_count !== undefined) {
+            setUsedExamplesCount(response.data.used_examples_count);
+          }
+          
+          // Aktualizujeme dataset pro zobrazení použitých příkladů
+          await fetchDataset(true);
+          
+          // Aktualizujeme stav modelu
+          await fetchModelStatus(true);
+          
+          setNotification({
+            open: true,
+            message: "Model posunut na následující krok",
+            severity: 'success',
+          });
+        } else {
+          setNotification({
+            open: true,
+            message: response.data.message || "Nepodařilo se posunout o krok vpřed",
+            severity: 'warning',
+          });
+        }
+      } catch (error) {
+        console.error("Chyba při kroku vpřed:", error);
+        setNotification({
+          open: true,
+          message: "Nastala chyba při kroku vpřed",
+          severity: 'error',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Upravíme funkci resetApp pro vymazání hypotézy
+  const clearHypothesis = async () => {
+    try {
+      setIsLoading(true);
+      // Voláme resetModel API
+      const response = await axios.post(`${apiBaseUrl}/api/reset`);
+      
+      if (response.data.success) {
+        // Resetujeme vizualizaci modelu
+        setNodes([]);
+        setLinks([]);
+        
+        // Resetujeme historii kroků
+        setModelHistory([]);
+        setHistoryIndex(-1);
+        
+        // Resetujeme trénovací kroky
+        setTrainingSteps([]);
+        
+        // Resetujeme počítadlo použitých příkladů
+        setUsedExamplesCount(0);
+        
+        // Resetujeme výsledek tréninku
+        setTrainingResult(null);
+        
+        // DŮLEŽITÉ: Resetujeme všechny příklady - IGNORUJEME co vrátí API a natvrdo nastavíme usedInTraining=false
+        setExamples(prevExamples => {
+          if (!prevExamples || prevExamples.length === 0) {
+            return prevExamples;
+          }
+          
+          // Kompletní reset všech příznaků
+          return prevExamples.map(example => ({
+            ...example,
+            usedInTraining: false,
+            selected: false
+          }));
+        });
+        
+        setNotification({
+          open: true,
+          message: "Hypotéza byla vymazána",
+          severity: 'success',
+        });
+        
+        // Aktualizujeme stav modelu
+        await fetchModelStatus(true);
+        
+        // NEAKTUALIZUJEME dataset z backendu, protože ten stále ukazuje příklady jako použité
+        // await fetchDataset(true);
+      } else {
+        setNotification({
+          open: true,
+          message: "Nepodařilo se vymazat hypotézu: " + response.data.message,
+          severity: 'error',
+        });
+      }
+    } catch (error) {
+      console.error("Chyba při mazání hypotézy:", error);
+      setNotification({
+        open: true,
+        message: "Nastala chyba při mazání hypotézy",
+        severity: 'error',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
@@ -1444,8 +1687,8 @@ function App() {
         
         {/* Modálne okno s informáciou o trénovaní */}
         {isTraining && (
-          <Box
-            sx={{
+          <Box 
+            sx={{ 
               position: 'fixed',
               top: '50%',
               left: '50%',
@@ -1471,6 +1714,59 @@ function App() {
           </Box>
         )}
         
+        {/* Hlavička aplikácie */}
+        <Box 
+          sx={{ 
+            p: 2, 
+            borderBottom: '1px solid #333',
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2
+          }}
+        >
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
+            PL1-Winston Learner
+          </Typography>
+          
+          {/* Navigační tlačítka pro historii modelu */}
+          {showExamples && modelHistory.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={clearHypothesis}
+                disabled={isLoading || historyIndex < 0}
+                startIcon={<span>🗑️</span>}
+                size="small"
+              >
+                Vymazat hypotézu
+              </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={handleStepBack}
+                disabled={isLoading || historyIndex <= 0}
+                startIcon={<span>⬅️</span>}
+                size="small"
+              >
+                Krok zpět
+              </Button>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={handleStepForward}
+                disabled={isLoading || historyIndex >= modelHistory.length - 1}
+                startIcon={<span>➡️</span>}
+                size="small"
+              >
+                Krok vpřed
+              </Button>
+            </Box>
+          )}
+        </Box>
+        
         <Container 
           sx={{ 
             py: 6, 
@@ -1485,691 +1781,691 @@ function App() {
           <Typography variant="h5" align="center" color="text.secondary" paragraph>
             Systém pre učenie konceptov pomocou symbolickej notácie predikátovej logiky prvého rádu
           </Typography>
-
-          {!showExamples ? (
-            // Zobrazenie nahrávacieho rozhrania
-            <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
-              <Grid item xs={12} md={6}>
-                <Paper elevation={3} sx={{ height: '100%', p: { xs: 2, sm: 3, md: 4 } }}>
-                  <Typography variant="h5" gutterBottom>
-                    Nahrať dataset
-                  </Typography>
-                  <Typography variant="body1" paragraph>
-                    Nahrajte súbor s datasetom vo formáte PL1. Súbor by mal obsahovať pozitívne a negatívne príklady v symbolickej notácii.
-                  </Typography>
-                  
-                  <Box
-                    {...getRootProps()}
-                    sx={{
-                      border: '2px dashed',
-                      borderColor: isDragActive ? 'primary.main' : 'grey.500',
-                      borderRadius: 2,
-                      p: { xs: 2, sm: 3, md: 4 },
-                      mt: 2,
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      backgroundColor: isDragActive ? 'rgba(144, 202, 249, 0.1)' : 'transparent',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                        backgroundColor: 'rgba(144, 202, 249, 0.05)',
-                      },
-                      width: '100%',
-                    }}
-                  >
-                    <input {...getInputProps()} />
-                    <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-                    {isDragActive ? (
-                      <Typography>Pustite súbor sem...</Typography>
-                    ) : (
-                      <Typography>
-                        Pretiahnite sem súbor alebo kliknite pre výber súboru
-                      </Typography>
-                    )}
-                    {file && (
-                      <Typography variant="body2" sx={{ mt: 2, fontWeight: 'bold' }}>
-                        Vybraný súbor: {file.name}
-                      </Typography>
-                    )}
-                  </Box>
-                  
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    fullWidth
-                    sx={{ mt: 3 }}
-                    disabled={!file || isProcessing}
-                    onClick={processDataset}
-                  >
-                    {isProcessing ? (
-                      <>
-                        <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-                        Spracovávam...
-                      </>
-                    ) : (
-                      'Spracovať dataset'
-                    )}
-                  </Button>
-                </Paper>
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Paper elevation={3} sx={{ height: '100%', p: { xs: 2, sm: 3, md: 4 } }}>
-                  <Typography variant="h5" gutterBottom>
-                    O projekte
-                  </Typography>
-                  <Typography variant="body1" paragraph>
-                    Tento projekt implementuje systém pre učenie konceptov na základe pozitívnych a negatívnych príkladov. 
-                    Využíva Winstonov algoritmus učenia konceptov a reprezentuje znalosti pomocou symbolickej notácie predikátovej logiky prvého rádu (PL1).
-                  </Typography>
-                  <Typography variant="body1" paragraph>
-                    Hlavné funkcie systému:
-                  </Typography>
-                  <ul>
-                    <li>
-                      <Typography variant="body1">
-                        Parsovanie a spracovanie príkladov v symbolickej notácii PL1
-                      </Typography>
-                    </li>
-                    <li>
-                      <Typography variant="body1">
-                        Učenie konceptov pomocou Winstonovho algoritmu
-                      </Typography>
-                    </li>
-                    <li>
-                      <Typography variant="body1">
-                        Porovnávanie nových príkladov s naučeným modelom
-                      </Typography>
-                    </li>
-                    <li>
-                      <Typography variant="body1">
-                        Vizualizácia naučeného modelu ako sémantickej siete
-                      </Typography>
-                    </li>
-                  </ul>
-                </Paper>
-              </Grid>
-            </Grid>
-          ) : (
-            // Zobrazenie príkladov a trénovacieho rozhrania
-            <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
-              <Grid item xs={12}>
-                <Paper elevation={3} sx={{ 
-                  p: { xs: 2, sm: 3, md: 4 },
-                  height: 'auto',
-                  overflow: 'visible'
-                }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h5">
-                      Príklady v datasete
+        </Container>
+        
+        {!showExamples ? (
+          // Zobrazenie nahrávacieho rozhrania
+          <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
+            <Grid item xs={12} md={6}>
+              <Paper elevation={3} sx={{ height: '100%', p: { xs: 2, sm: 3, md: 4 } }}>
+                <Typography variant="h5" gutterBottom>
+                  Nahrať dataset
+                </Typography>
+                <Typography variant="body1" paragraph>
+                  Nahrajte súbor s datasetom vo formáte PL1. Súbor by mal obsahovať pozitívne a negatívne príklady v symbolickej notácii.
+                </Typography>
+                
+                <Box
+                  {...getRootProps()}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: isDragActive ? 'primary.main' : 'grey.500',
+                    borderRadius: 2,
+                    p: { xs: 2, sm: 3, md: 4 },
+                    mt: 2,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    backgroundColor: isDragActive ? 'rgba(144, 202, 249, 0.1)' : 'transparent',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      backgroundColor: 'rgba(144, 202, 249, 0.05)',
+                    },
+                    width: '100%',
+                  }}
+                >
+                  <input {...getInputProps()} />
+                  <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                  {isDragActive ? (
+                    <Typography>Pustite súbor sem...</Typography>
+                  ) : (
+                    <Typography>
+                      Pretiahnite sem súbor alebo kliknite pre výber súboru
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
+                  )}
+                  {file && (
+                    <Typography variant="body2" sx={{ mt: 2, fontWeight: 'bold' }}>
+                      Vybraný súbor: {file.name}
+                    </Typography>
+                  )}
+                </Box>
+                
+                <Button
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  sx={{ mt: 3 }}
+                  disabled={!file || isProcessing}
+                  onClick={processDataset}
+                >
+                  {isProcessing ? (
+                    <>
+                      <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
+                      Spracovávam...
+                    </>
+                  ) : (
+                    'Spracovať dataset'
+                  )}
+                </Button>
+              </Paper>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Paper elevation={3} sx={{ height: '100%', p: { xs: 2, sm: 3, md: 4 } }}>
+                <Typography variant="h5" gutterBottom>
+                  O projekte
+                </Typography>
+                <Typography variant="body1" paragraph>
+                  Tento projekt implementuje systém pre učenie konceptov na základe pozitívnych a negatívnych príkladov. 
+                  Využíva Winstonov algoritmus učenia konceptov a reprezentuje znalosti pomocou symbolickej notácie predikátovej logiky prvého rádu (PL1).
+                </Typography>
+                <Typography variant="body1" paragraph>
+                  Hlavné funkcie systému:
+                </Typography>
+                <ul>
+                  <li>
+                    <Typography variant="body1">
+                      Parsovanie a spracovanie príkladov v symbolickej notácii PL1
+                    </Typography>
+                  </li>
+                  <li>
+                    <Typography variant="body1">
+                      Učenie konceptov pomocou Winstonovho algoritmu
+                    </Typography>
+                  </li>
+                  <li>
+                    <Typography variant="body1">
+                      Porovnávanie nových príkladov s naučeným modelom
+                    </Typography>
+                  </li>
+                  <li>
+                    <Typography variant="body1">
+                      Vizualizácia naučeného modelu ako sémantickej siete
+                    </Typography>
+                  </li>
+                </ul>
+              </Paper>
+            </Grid>
+          </Grid>
+        ) : (
+          // Zobrazenie príkladov a trénovacieho rozhrania
+          <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
+            <Grid item xs={12}>
+              <Paper elevation={3} sx={{ 
+                p: { xs: 2, sm: 3, md: 4 },
+                height: 'auto',
+                overflow: 'visible'
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h5">
+                    Príklady v datasete
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    {modelStatus && modelStatus.model_initialized && (
+                      <Chip 
+                        label={`Použité príklady: ${examples.filter(ex => ex.usedInTraining).length}/${examples.length}`}
+                        color="primary"
+                      />
+                    )}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button 
+                        variant="outlined" 
+                        color="primary" 
+                        onClick={goToUploadScreen}
+                        startIcon={<span style={{ fontSize: '1.2rem' }}>📁</span>}
+                        size="small"
+                      >
+                        Nahrať nový dataset
+                      </Button>
                       {modelStatus && modelStatus.model_initialized && (
-                        <Chip 
-                          label={`Použité príklady: ${examples.filter(ex => ex.usedInTraining).length}/${examples.length}`}
-                          color="primary"
-                        />
-                      )}
-                      <Box sx={{ display: 'flex', gap: 1 }}>
                         <Button 
                           variant="outlined" 
-                          color="primary" 
-                          onClick={goToUploadScreen}
-                          startIcon={<span style={{ fontSize: '1.2rem' }}>📁</span>}
+                          color="error" 
+                          onClick={resetApp}
+                          startIcon={<span style={{ fontSize: '1.2rem' }}>🔄</span>}
                           size="small"
                         >
-                          Nahrať nový dataset
+                          Resetovať model
                         </Button>
-                        {modelStatus && modelStatus.model_initialized && (
-                          <Button 
-                            variant="outlined" 
-                            color="error" 
-                            onClick={resetApp}
-                            startIcon={<span style={{ fontSize: '1.2rem' }}>🔄</span>}
-                            size="small"
-                          >
-                            Resetovať model
-                          </Button>
-                        )}
-                      </Box>
+                      )}
                     </Box>
                   </Box>
-                  
-                  {modelStatus && modelStatus.model_initialized && (
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <Typography variant="body2" fontWeight="bold">
-                          Stav modelu:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                          <Chip 
-                            icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>🔄</span>}
-                            label={`Použité príklady: ${modelStatus.used_examples_count}/${modelStatus.total_examples_count}`}
-                            color="primary"
-                            variant="outlined"
-                            size="small"
-                          />
-                          <Chip 
-                            icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>📊</span>}
-                            label={`Objekty: ${modelStatus.objects_count}, Spojenia: ${modelStatus.links_count}`}
-                            color="default"
-                            variant="outlined"
-                            size="small"
-                          />
-                          <Chip 
-                            icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>✅</span>}
-                            label={`Pozitívne príklady: ${modelStatus.positive_examples_count}`}
-                            color="success"
-                            variant="outlined"
-                            size="small"
-                          />
-                          <Chip 
-                            icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>❌</span>}
-                            label={`Negatívne príklady: ${modelStatus.negative_examples_count}`}
-                            color="error"
-                            variant="outlined"
-                            size="small"
-                          />
+                </Box>
+                
+                {modelStatus && modelStatus.model_initialized && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Typography variant="body2" fontWeight="bold">
+                        Stav modelu:
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        <Chip 
+                          icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>🔄</span>}
+                          label={`Použité príklady: ${modelStatus.used_examples_count}/${modelStatus.total_examples_count}`}
+                          color="primary"
+                          variant="outlined"
+                          size="small"
+                        />
+                        <Chip 
+                          icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>📊</span>}
+                          label={`Objekty: ${modelStatus.objects_count}, Spojenia: ${modelStatus.links_count}`}
+                          color="default"
+                          variant="outlined"
+                          size="small"
+                        />
+                        <Chip 
+                          icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>✅</span>}
+                          label={`Pozitívne príklady: ${modelStatus.positive_examples_count}`}
+                          color="success"
+                          variant="outlined"
+                          size="small"
+                        />
+                        <Chip 
+                          icon={<span style={{ fontSize: '1.2rem', marginRight: '4px' }}>❌</span>}
+                          label={`Negatívne príklady: ${modelStatus.negative_examples_count}`}
+                          color="error"
+                          variant="outlined"
+                          size="small"
+                        />
+                      </Box>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Zostáva {modelStatus.total_examples_count - modelStatus.used_examples_count} nepoužitých príkladov.
+                        {modelStatus.used_examples_count > 0 && ' Príklady použité v trénovaní sú automaticky označené.'}
+                      </Typography>
+                    </Box>
+                  </Alert>
+                )}
+                
+                <Box sx={{ mb: 2 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={examples.every(ex => ex.selected)}
+                        indeterminate={examples.some(ex => ex.selected) && !examples.every(ex => ex.selected)}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                      />
+                    }
+                    label="Vybrať všetky príklady"
+                  />
+                </Box>
+                
+                <Divider sx={{ mb: 2 }} />
+                
+                <Box sx={{ 
+                  maxHeight: '65vh',
+                  overflow: 'auto',
+                  pr: 1
+                }}>
+                  {examples.map((example) => (
+                    <Card key={example.id} sx={{ 
+                      mb: 1.5, 
+                      backgroundColor: example.usedInTraining ? 'rgba(25, 118, 210, 0.08)' : 'background.paper',
+                      boxShadow: example.usedInTraining 
+                        ? '0 0 0 1px rgba(25, 118, 210, 0.5), 0 2px 4px rgba(0,0,0,0.2)'
+                        : '0 2px 4px rgba(0,0,0,0.2)',
+                      position: 'relative',
+                      transition: 'all 0.2s ease',
+                      opacity: example.usedInTraining ? 0.9 : 1,
+                      '&:hover': {
+                        boxShadow: example.usedInTraining 
+                          ? '0 0 0 1px rgba(25, 118, 210, 0.7), 0 4px 8px rgba(0,0,0,0.3)'
+                          : '0 4px 8px rgba(0,0,0,0.3)',
+                      }
+                    }}>
+                      {example.usedInTraining && (
+                        <Box sx={{ 
+                          position: 'absolute', 
+                          top: 0, 
+                          right: 0, 
+                          backgroundColor: 'primary.main', 
+                          color: 'white',
+                          px: 1,
+                          py: 0.5,
+                          borderBottomLeftRadius: 8,
+                          fontSize: '0.7rem',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5
+                        }}>
+                          <span style={{ fontSize: '1rem' }}>✓</span> Použité v trénovaní
                         </Box>
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                          Zostáva {modelStatus.total_examples_count - modelStatus.used_examples_count} nepoužitých príkladov.
-                          {modelStatus.used_examples_count > 0 && ' Príklady použité v trénovaní sú automaticky označené.'}
+                      )}
+                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                          <Checkbox
+                            checked={example.selected}
+                            onChange={() => handleExampleSelection(example.id)}
+                            disabled={example.usedInTraining}
+                            sx={{ 
+                              pt: 0, 
+                              mt: 0, 
+                              mr: 1,
+                              '&.Mui-checked': {
+                                color: example.usedInTraining ? 'primary.dark' : 'primary.main',
+                              },
+                              '&.Mui-disabled': {
+                                color: example.usedInTraining ? 'primary.main' : 'text.disabled',
+                              }
+                            }}
+                          />
+                          <Box sx={{ width: '100%' }}>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              mb: 0.5 
+                            }}>
+                              <Typography 
+                                variant="subtitle1" 
+                                sx={{ 
+                                  fontWeight: 'bold', 
+                                  fontSize: '0.95rem',
+                                  color: example.usedInTraining ? 'primary.main' : 'text.primary'
+                                }}
+                              >
+                                {example.name}
+                                <Chip 
+                                  label={example.isPositive ? "Pozitívny" : "Negatívny"} 
+                                  color={example.isPositive ? "success" : "error"}
+                                  size="small"
+                                  sx={{ ml: 1, height: '20px', '& .MuiChip-label': { px: 1, py: 0.5, fontSize: '0.7rem' } }}
+                                />
+                              </Typography>
+                            </Box>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                whiteSpace: 'pre-wrap', 
+                                backgroundColor: example.usedInTraining ? 'rgba(25, 118, 210, 0.05)' : 'rgba(0, 0, 0, 0.2)', 
+                                p: 1.5, 
+                                borderRadius: 1,
+                                fontFamily: 'monospace',
+                                fontSize: '0.85rem',
+                                width: '100%',
+                                overflowX: 'hidden',
+                                lineHeight: 1.4,
+                                border: example.usedInTraining ? '1px solid rgba(25, 118, 210, 0.2)' : 'none'
+                              }}
+                            >
+                              {example.formula}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+                
+                <Box sx={{ mt: 2, mb: 2 }}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Trénovanie modelu
+                    </Typography>
+                    
+                    {/* Pridaj prepínač režimu trénovania */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="body2">Inkrementálne dotrénovanie</Typography>
+                      <Tooltip title={
+                        retrainAll 
+                          ? "Model sa natrénuje od začiatku na všetkých príkladoch (pôvodných + nových)" 
+                          : "Model sa dotrénuje len na nových príkladoch"
+                      }>
+                        <Switch
+                          checked={retrainAll}
+                          onChange={(e) => setRetrainAll(e.target.checked)}
+                          color="primary"
+                        />
+                      </Tooltip>
+                      <Typography variant="body2">Úplné pretrénovanie</Typography>
+                    </Box>
+                    
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={trainModel}
+                      disabled={isTraining || examples.filter(ex => ex.selected).length === 0}
+                      startIcon={isTraining ? <CircularProgress size={20} color="inherit" /> : null}
+                    >
+                      {isTraining 
+                        ? 'Trénujem...' 
+                        : retrainAll 
+                          ? 'Pretrénovať model od začiatku' 
+                          : 'Dotrénovať model'
+                      }
+                    </Button>
+                  </Paper>
+                </Box>
+                
+                {isUpdatingModel && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Alert severity="info" sx={{ width: 'auto' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <CircularProgress size={20} sx={{ mr: 2 }} />
+                        <Typography variant="body2">
+                          Aktualizujem informácie o modeli a použitých príkladoch...
                         </Typography>
                       </Box>
                     </Alert>
-                  )}
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={examples.every(ex => ex.selected)}
-                          indeterminate={examples.some(ex => ex.selected) && !examples.every(ex => ex.selected)}
-                          onChange={(e) => handleSelectAll(e.target.checked)}
-                        />
-                      }
-                      label="Vybrať všetky príklady"
-                    />
                   </Box>
-                  
-                  <Divider sx={{ mb: 2 }} />
-                  
-                  <Box sx={{ 
-                    maxHeight: '65vh',
-                    overflow: 'auto',
-                    pr: 1
-                  }}>
-                    {examples.map((example) => (
-                      <Card key={example.id} sx={{ 
-                        mb: 1.5, 
-                        backgroundColor: example.usedInTraining ? 'rgba(25, 118, 210, 0.08)' : 'background.paper',
-                        boxShadow: example.usedInTraining 
-                          ? '0 0 0 1px rgba(25, 118, 210, 0.5), 0 2px 4px rgba(0,0,0,0.2)'
-                          : '0 2px 4px rgba(0,0,0,0.2)',
-                        position: 'relative',
-                        transition: 'all 0.2s ease',
-                        opacity: example.usedInTraining ? 0.9 : 1,
-                        '&:hover': {
-                          boxShadow: example.usedInTraining 
-                            ? '0 0 0 1px rgba(25, 118, 210, 0.7), 0 4px 8px rgba(0,0,0,0.3)'
-                            : '0 4px 8px rgba(0,0,0,0.3)',
-                        }
-                      }}>
-                        {example.usedInTraining && (
-                          <Box sx={{ 
-                            position: 'absolute', 
-                            top: 0, 
-                            right: 0, 
-                            backgroundColor: 'primary.main', 
-                            color: 'white',
-                            px: 1,
-                            py: 0.5,
-                            borderBottomLeftRadius: 8,
-                            fontSize: '0.7rem',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5
-                          }}>
-                            <span style={{ fontSize: '1rem' }}>✓</span> Použité v trénovaní
-                          </Box>
-                        )}
-                        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                          <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                            <Checkbox
-                              checked={example.selected}
-                              onChange={() => handleExampleSelection(example.id)}
-                              disabled={example.usedInTraining}
-                              sx={{ 
-                                pt: 0, 
-                                mt: 0, 
-                                mr: 1,
-                                '&.Mui-checked': {
-                                  color: example.usedInTraining ? 'primary.dark' : 'primary.main',
-                                },
-                                '&.Mui-disabled': {
-                                  color: example.usedInTraining ? 'primary.main' : 'text.disabled',
-                                }
-                              }}
-                            />
-                            <Box sx={{ width: '100%' }}>
-                              <Box sx={{ 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center', 
-                                mb: 0.5 
-                              }}>
-                                <Typography 
-                                  variant="subtitle1" 
-                                  sx={{ 
-                                    fontWeight: 'bold', 
-                                    fontSize: '0.95rem',
-                                    color: example.usedInTraining ? 'primary.main' : 'text.primary'
-                                  }}
-                                >
-                                  {example.name}
-                                  <Chip 
-                                    label={example.isPositive ? "Pozitívny" : "Negatívny"} 
-                                    color={example.isPositive ? "success" : "error"}
-                                    size="small"
-                                    sx={{ ml: 1, height: '20px', '& .MuiChip-label': { px: 1, py: 0.5, fontSize: '0.7rem' } }}
-                                  />
+                )}
+                
+                {examples.filter(ex => ex.selected && ex.usedInTraining).length > 0 && !isUpdatingModel && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                    ({examples.filter(ex => ex.selected && ex.usedInTraining).length} príkladov už bolo použitých v trénovaní)
+                  </Typography>
+                )}
+                
+                {trainingResult && (
+                  <Paper sx={{ p: 2, mt: 3, bgcolor: trainingResult.success ? 'success.dark' : 'error.dark' }}>
+                    <Typography variant="h6" gutterBottom>
+                      {trainingResult.success ? 'Trénovanie úspešné' : 'Chyba trénovania'}
+                    </Typography>
+                    <Typography variant="body1">{trainingResult.message}</Typography>
+                    
+                    {trainingResult.success && (
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          Použitých {trainingResult.used_examples_count || 0} z {trainingResult.total_examples_count || 0} príkladov
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                          Režim trénovania: {trainingResult.training_mode === 'retrained' ? 'Úplné pretrénovanie' : 'Inkrementálne dotrénovanie'}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Paper>
+                )}
+                
+                {trainingResult && trainingResult.training_steps && trainingResult.training_steps.length > 0 && (
+                  <Box sx={{ mt: 4, mb: 4 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Kroky trénovania
+                    </Typography>
+                    <Stepper orientation="vertical">
+                      {trainingResult.training_steps.map((step, index) => (
+                        <Step key={index} active={true} completed={true}>
+                          <StepLabel>
+                            {step.step === 'initialize' && 'Inicializácia modelu'}
+                            {step.step === 'update' && 'Aktualizácia modelu'}
+                            {step.step === 'update_multi' && 'Hromadná aktualizácia modelu'}
+                            {step.step === 'error' && 'Chyba pri trénovaní'}
+                          </StepLabel>
+                          <StepContent>
+                            <Typography variant="body1">{step.description}</Typography>
+                            
+                            {/* Zobrazenie detailov o použitých príkladoch */}
+                            {step.example_name && (
+                              <Box sx={{ mt: 1, mb: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                  Použitý príklad: {step.example_name} ({step.is_positive ? 'pozitívny' : 'negatívny'})
                                 </Typography>
                               </Box>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  whiteSpace: 'pre-wrap', 
-                                  backgroundColor: example.usedInTraining ? 'rgba(25, 118, 210, 0.05)' : 'rgba(0, 0, 0, 0.2)', 
-                                  p: 1.5, 
-                                  borderRadius: 1,
-                                  fontFamily: 'monospace',
-                                  fontSize: '0.85rem',
-                                  width: '100%',
-                                  overflowX: 'hidden',
-                                  lineHeight: 1.4,
-                                  border: example.usedInTraining ? '1px solid rgba(25, 118, 210, 0.2)' : 'none'
-                                }}
-                              >
-                                {example.formula}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    ))}
+                            )}
+                            
+                            {step.negative_examples && step.negative_examples.length > 0 && (
+                              <Box sx={{ mt: 1, mb: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                  Negatívne príklady:
+                                </Typography>
+                                <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
+                                  {step.negative_examples.map((name, i) => (
+                                    <li key={i}>
+                                      <Typography variant="body2">{name}</Typography>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </Box>
+                            )}
+                            
+                            {/* Zobrazenie použitých heuristík */}
+                            {step.heuristics && step.heuristics.length > 0 && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                  Použité heuristiky, ktoré vykonali zmeny v modeli:
+                                </Typography>
+                                <Accordion sx={{ mt: 1, bgcolor: 'background.paper' }}>
+                                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                    <Typography variant="body2">
+                                      {step.heuristics.length} aplikovaných heuristík v tomto kroku
+                                    </Typography>
+                                  </AccordionSummary>
+                                  <AccordionDetails>
+                                    <List dense>
+                                      {step.heuristics.map((heuristic, hIndex) => (
+                                        <ListItem key={hIndex} sx={{ mb: 1, flexDirection: 'column', alignItems: 'flex-start' }}>
+                                          <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main' }}>
+                                            {heuristic.description}
+                                          </Typography>
+                                          {heuristic.details && (
+                                            <Box sx={{ mt: 0.5, ml: 2 }}>
+                                              <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
+                                                Spracované objekty: {heuristic.details.good_objects} (pozitívny príklad) 
+                                                {heuristic.details.near_miss_objects !== undefined && `, ${heuristic.details.near_miss_objects} (negatívny príklad)`}
+                                              </Typography>
+                                              {heuristic.details.changes_made && (
+                                                <Typography variant="caption" component="div" sx={{ color: 'success.main' }}>
+                                                  Pridaných spojení: {heuristic.details.changes_made}
+                                                </Typography>
+                                              )}
+                                              {heuristic.details.links_removed && (
+                                                <Typography variant="caption" component="div" sx={{ color: 'success.main' }}>
+                                                  Odstránených spojení: {heuristic.details.links_removed}
+                                                </Typography>
+                                              )}
+                                            </Box>
+                                          )}
+                                        </ListItem>
+                                      ))}
+                                    </List>
+                                  </AccordionDetails>
+                                </Accordion>
+                              </Box>
+                            )}
+                          </StepContent>
+                        </Step>
+                      ))}
+                    </Stepper>
                   </Box>
-                  
-                  <Box sx={{ mt: 2, mb: 2 }}>
-                    <Paper sx={{ p: 2 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Trénovanie modelu
+                )}
+                
+                {trainingResult && trainingResult.model_hypothesis && (
+                  <Accordion sx={{ mt: 3 }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">
+                        Naučená hypotéza modelu
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Box sx={{ p: 2, backgroundColor: '#112', borderRadius: 1, overflow: 'auto' }}>
+                        <Typography 
+                          variant="body2" 
+                          component="pre" 
+                          sx={{ 
+                            whiteSpace: 'pre-wrap', 
+                            fontFamily: 'monospace',
+                            fontSize: '0.85rem',
+                            color: '#66f'
+                          }}
+                        >
+                          {trainingResult.model_hypothesis}
+                        </Typography>
+                      </Box>
+                      <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+                        Toto je formálny zápis odvodenej hypotézy. Vyjadruje, čo sa model naučil o koncepte na základe poskytnutých príkladov.
+                      </Typography>
+                    </AccordionDetails>
+                  </Accordion>
+                )}
+                
+                {trainingResult && trainingResult.model_visualization && (
+                  <Accordion sx={{ mt: 3 }}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="h6">
+                        Vizualizácia naučeného modelu
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Typography variant="body2" gutterBottom>
+                        Model obsahuje {trainingResult.model_visualization.nodes.length} objektov a {trainingResult.model_visualization.links.length} spojení.
                       </Typography>
                       
-                      {/* Pridaj prepínač režimu trénovania */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="body2">Inkrementálne dotrénovanie</Typography>
-                        <Tooltip title={
-                          retrainAll 
-                            ? "Model sa natrénuje od začiatku na všetkých príkladoch (pôvodných + nových)" 
-                            : "Model sa dotrénuje len na nových príkladoch"
-                        }>
-                          <Switch
-                            checked={retrainAll}
-                            onChange={(e) => setRetrainAll(e.target.checked)}
-                            color="primary"
-                          />
-                        </Tooltip>
-                        <Typography variant="body2">Úplné pretrénovanie</Typography>
+                      <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                        Objekty:
+                      </Typography>
+                      <List dense>
+                        {trainingResult.model_visualization.nodes.map((node, index) => (
+                          <li key={index}>
+                            <Chip 
+                              label={`${node.name} (${node.class})`} 
+                              color={node.category === 'attribute' ? 'secondary' : 'primary'} 
+                              size="small"
+                              sx={{ m: 0.5 }}
+                            />
+                          </li>
+                        ))}
+                      </List>
+                      
+                      <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                        Spojenia:
+                      </Typography>
+                      <List dense>
+                        {trainingResult.model_visualization.links.map((link, index) => (
+                          <li key={index}>
+                            <Chip 
+                              label={`${link.source} → ${link.target} (${link.type})`} 
+                              variant="outlined"
+                              size="small"
+                              sx={{ m: 0.5 }}
+                            />
+                          </li>
+                        ))}
+                      </List>
+                      
+                      <Box sx={{ mt: 4, mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="h6">
+                          Sémantická sieť modelu
+                        </Typography>
+                        <Button 
+                          variant="outlined" 
+                          color="primary"
+                          onClick={() => {
+                            // Vynútiť kompletný remount SigmaNetwork komponenty
+                            // s prepočítaním rozvrhnutia grafu
+                            if (trainingResult && trainingResult.model_visualization) {
+                              // Zabezpečíme, že všetky uzly a prepojenia sa zobrazia
+                              // Vytvoríme nový objekt, aby sa vynútilo prekresľovanie
+                              const modifiedVisualization = {
+                                nodes: [...trainingResult.model_visualization.nodes],
+                                links: [...trainingResult.model_visualization.links]
+                              };
+                            
+                              // Nastavíme key pre vynútenie remount
+                              setTrainingResult(prev => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  model_visualization: modifiedVisualization 
+                                };
+                              });
+                              
+                              // Pridáme informačnú hlášku
+                              console.log(`Obnovujeme graf s ${modifiedVisualization.nodes.length} uzlami a ${modifiedVisualization.links.length} spojeniami`);
+                            }
+                          }}
+                          size="small"
+                          startIcon={<span style={{ fontSize: '1rem' }}>🔄</span>}
+                        >
+                          Obnoviť graf
+                        </Button>
                       </Box>
                       
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={trainModel}
-                        disabled={isTraining || examples.filter(ex => ex.selected).length === 0}
-                        startIcon={isTraining ? <CircularProgress size={20} color="inherit" /> : null}
-                      >
-                        {isTraining 
-                          ? 'Trénujem...' 
-                          : retrainAll 
-                            ? 'Pretrénovať model od začiatku' 
-                            : 'Dotrénovať model'
-                        }
-                      </Button>
-                    </Paper>
-                  </Box>
-                  
-                  {isUpdatingModel && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                      <Alert severity="info" sx={{ width: 'auto' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <CircularProgress size={20} sx={{ mr: 2 }} />
-                          <Typography variant="body2">
-                            Aktualizujem informácie o modeli a použitých príkladoch...
-                          </Typography>
-                        </Box>
-                      </Alert>
-                    </Box>
-                  )}
-                  
-                  {examples.filter(ex => ex.selected && ex.usedInTraining).length > 0 && !isUpdatingModel && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
-                      ({examples.filter(ex => ex.selected && ex.usedInTraining).length} príkladov už bolo použitých v trénovaní)
-                    </Typography>
-                  )}
-                  
-                  {trainingResult && (
-                    <Paper sx={{ p: 2, mt: 3, bgcolor: trainingResult.success ? 'success.dark' : 'error.dark' }}>
-                      <Typography variant="h6" gutterBottom>
-                        {trainingResult.success ? 'Trénovanie úspešné' : 'Chyba trénovania'}
-                      </Typography>
-                      <Typography variant="body1">{trainingResult.message}</Typography>
-                      
-                      {trainingResult.success && (
-                        <Box sx={{ mt: 1 }}>
-                          <Typography variant="body2" sx={{ mt: 1 }}>
-                            Použitých {trainingResult.used_examples_count || 0} z {trainingResult.total_examples_count || 0} príkladov
-                          </Typography>
-                          <Typography variant="body2" sx={{ mt: 1 }}>
-                            Režim trénovania: {trainingResult.training_mode === 'retrained' ? 'Úplné pretrénovanie' : 'Inkrementálne dotrénovanie'}
-                          </Typography>
-                        </Box>
-                      )}
-                    </Paper>
-                  )}
-                  
-                  {trainingResult && trainingResult.training_steps && trainingResult.training_steps.length > 0 && (
-                    <Box sx={{ mt: 4, mb: 4 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Kroky trénovania
-                      </Typography>
-                      <Stepper orientation="vertical">
-                        {trainingResult.training_steps.map((step, index) => (
-                          <Step key={index} active={true} completed={true}>
-                            <StepLabel>
-                              {step.step === 'initialize' && 'Inicializácia modelu'}
-                              {step.step === 'update' && 'Aktualizácia modelu'}
-                              {step.step === 'update_multi' && 'Hromadná aktualizácia modelu'}
-                              {step.step === 'error' && 'Chyba pri trénovaní'}
-                            </StepLabel>
-                            <StepContent>
-                              <Typography variant="body1">{step.description}</Typography>
-                              
-                              {/* Zobrazenie detailov o použitých príkladoch */}
-                              {step.example_name && (
-                                <Box sx={{ mt: 1, mb: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                    Použitý príklad: {step.example_name} ({step.is_positive ? 'pozitívny' : 'negatívny'})
-                                  </Typography>
-                                </Box>
-                              )}
-                              
-                              {step.negative_examples && step.negative_examples.length > 0 && (
-                                <Box sx={{ mt: 1, mb: 1 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                    Negatívne príklady:
-                                  </Typography>
-                                  <ul style={{ margin: '4px 0', paddingLeft: '20px' }}>
-                                    {step.negative_examples.map((name, i) => (
-                                      <li key={i}>
-                                        <Typography variant="body2">{name}</Typography>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </Box>
-                              )}
-                              
-                              {/* Zobrazenie použitých heuristík */}
-                              {step.heuristics && step.heuristics.length > 0 && (
-                                <Box sx={{ mt: 2 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                                    Použité heuristiky, ktoré vykonali zmeny v modeli:
-                                  </Typography>
-                                  <Accordion sx={{ mt: 1, bgcolor: 'background.paper' }}>
-                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                      <Typography variant="body2">
-                                        {step.heuristics.length} aplikovaných heuristík v tomto kroku
-                                      </Typography>
-                                    </AccordionSummary>
-                                    <AccordionDetails>
-                                      <List dense>
-                                        {step.heuristics.map((heuristic, hIndex) => (
-                                          <ListItem key={hIndex} sx={{ mb: 1, flexDirection: 'column', alignItems: 'flex-start' }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-                                              {heuristic.description}
-                                            </Typography>
-                                            {heuristic.details && (
-                                              <Box sx={{ mt: 0.5, ml: 2 }}>
-                                                <Typography variant="caption" component="div" sx={{ color: 'text.secondary' }}>
-                                                  Spracované objekty: {heuristic.details.good_objects} (pozitívny príklad) 
-                                                  {heuristic.details.near_miss_objects !== undefined && `, ${heuristic.details.near_miss_objects} (negatívny príklad)`}
-                                                </Typography>
-                                                {heuristic.details.changes_made && (
-                                                  <Typography variant="caption" component="div" sx={{ color: 'success.main' }}>
-                                                    Pridaných spojení: {heuristic.details.changes_made}
-                                                  </Typography>
-                                                )}
-                                                {heuristic.details.links_removed && (
-                                                  <Typography variant="caption" component="div" sx={{ color: 'success.main' }}>
-                                                    Odstránených spojení: {heuristic.details.links_removed}
-                                                  </Typography>
-                                                )}
-                                              </Box>
-                                            )}
-                                          </ListItem>
-                                        ))}
-                                      </List>
-                                    </AccordionDetails>
-                                  </Accordion>
-                                </Box>
-                              )}
-                            </StepContent>
-                          </Step>
-                        ))}
-                      </Stepper>
-                    </Box>
-                  )}
-                  
-                  {trainingResult && trainingResult.model_hypothesis && (
-                    <Accordion sx={{ mt: 3 }}>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography variant="h6">
-                          Naučená hypotéza modelu
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Box sx={{ p: 2, backgroundColor: '#112', borderRadius: 1, overflow: 'auto' }}>
-                          <Typography 
-                            variant="body2" 
-                            component="pre" 
-                            sx={{ 
-                              whiteSpace: 'pre-wrap', 
-                              fontFamily: 'monospace',
-                              fontSize: '0.85rem',
-                              color: '#66f'
-                            }}
-                          >
-                            {trainingResult.model_hypothesis}
-                          </Typography>
-                        </Box>
-                        <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
-                          Toto je formálny zápis odvodenej hypotézy. Vyjadruje, čo sa model naučil o koncepte na základe poskytnutých príkladov.
-                        </Typography>
-                      </AccordionDetails>
-                    </Accordion>
-                  )}
-                  
-                  {trainingResult && trainingResult.model_visualization && (
-                    <Accordion sx={{ mt: 3 }}>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography variant="h6">
-                          Vizualizácia naučeného modelu
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Typography variant="body2" gutterBottom>
-                          Model obsahuje {trainingResult.model_visualization.nodes.length} objektov a {trainingResult.model_visualization.links.length} spojení.
-                        </Typography>
-                        
-                        <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                          Objekty:
-                        </Typography>
-                        <List dense>
-                          {trainingResult.model_visualization.nodes.map((node, index) => (
-                            <li key={index}>
-                              <Chip 
-                                label={`${node.name} (${node.class})`} 
-                                color={node.category === 'attribute' ? 'secondary' : 'primary'} 
-                                size="small"
-                                sx={{ m: 0.5 }}
-                              />
-                            </li>
-                          ))}
-                        </List>
-                        
-                        <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
-                          Spojenia:
-                        </Typography>
-                        <List dense>
-                          {trainingResult.model_visualization.links.map((link, index) => (
-                            <li key={index}>
-                              <Chip 
-                                label={`${link.source} → ${link.target} (${link.type})`} 
-                                variant="outlined"
-                                size="small"
-                                sx={{ m: 0.5 }}
-                              />
-                            </li>
-                          ))}
-                        </List>
-                        
-                        <Box sx={{ mt: 4, mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant="h6">
-                            Sémantická sieť modelu
-                          </Typography>
-                          <Button 
-                            variant="outlined" 
-                            color="primary"
-                            onClick={() => {
-                              // Vynútiť kompletný remount SigmaNetwork komponenty
-                              // s prepočítaním rozvrhnutia grafu
-                              if (trainingResult && trainingResult.model_visualization) {
-                                // Zabezpečíme, že všetky uzly a prepojenia sa zobrazia
-                                // Vytvoríme nový objekt, aby sa vynútilo prekresľovanie
-                                const modifiedVisualization = {
-                                  nodes: [...trainingResult.model_visualization.nodes],
-                                  links: [...trainingResult.model_visualization.links]
-                                };
-                              
-                                // Nastavíme key pre vynútenie remount
-                                setTrainingResult(prev => {
-                                  if (!prev) return prev;
-                                  return {
-                                    ...prev,
-                                    model_visualization: modifiedVisualization 
-                                  };
-                                });
-                                
-                                // Pridáme informačnú hlášku
-                                console.log(`Obnovujeme graf s ${modifiedVisualization.nodes.length} uzlami a ${modifiedVisualization.links.length} spojeniami`);
-                              }
-                            }}
-                            size="small"
-                            startIcon={<span style={{ fontSize: '1rem' }}>🔄</span>}
-                          >
-                            Obnoviť graf
-                          </Button>
-                        </Box>
-                        
-                        <Box sx={{ mt: 2, border: '1px solid #333', borderRadius: '8px', overflow: 'hidden' }}>
-                          {trainingResult.model_visualization.nodes.length > 0 ? (
-                            <Box sx={{ position: 'relative' }}>
-                              <SigmaNetwork 
-                                key={`graph-${Date.now()}`}
-                                nodes={trainingResult.model_visualization.nodes}
-                                links={trainingResult.model_visualization.links}
-                              />
-                              <Box
-                                sx={{
-                                  position: 'absolute',
-                                  bottom: 8,
-                                  right: 8,
-                                  backgroundColor: 'rgba(0,0,0,0.7)',
-                                  p: 1,
-                                  borderRadius: 1,
-                                  color: 'white',
-                                  fontSize: '0.75rem'
-                                }}
-                              >
-                                Tip: Použite myš na približovanie a posun v grafe
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Box 
-                              sx={{ 
-                                height: '200px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                backgroundColor: '#1e1e1e'
+                      <Box sx={{ mt: 2, border: '1px solid #333', borderRadius: '8px', overflow: 'hidden' }}>
+                        {trainingResult.model_visualization.nodes.length > 0 ? (
+                          <Box sx={{ position: 'relative' }}>
+                            <SigmaNetwork 
+                              key={`graph-${Date.now()}`}
+                              nodes={trainingResult.model_visualization.nodes}
+                              links={trainingResult.model_visualization.links}
+                            />
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                bottom: 8,
+                                right: 8,
+                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                p: 1,
+                                borderRadius: 1,
+                                color: 'white',
+                                fontSize: '0.75rem'
                               }}
                             >
-                              <Typography color="text.secondary">
-                                Prázdna sémantická sieť - nie sú k dispozícii žiadne uzly pre vizualizáciu.
-                              </Typography>
+                              Tip: Použite myš na približovanie a posun v grafe
                             </Box>
-                          )}
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  )}
-                </Paper>
-              </Grid>
+                          </Box>
+                        ) : (
+                          <Box 
+                            sx={{ 
+                              height: '200px', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center',
+                              backgroundColor: '#1e1e1e'
+                            }}
+                          >
+                            <Typography color="text.secondary">
+                              Prázdna sémantická sieť - nie sú k dispozícii žiadne uzly pre vizualizáciu.
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </AccordionDetails>
+                  </Accordion>
+                )}
+              </Paper>
             </Grid>
-          )}
-        </Container>
-        
-        {/* Notifikácie */}
-        <Snackbar
-          open={notification.open}
-          autoHideDuration={6000}
-          onClose={handleCloseNotification}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          </Grid>
+        )}
+      </Box>
+      
+      {/* Notifikácie */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{ 
+          zIndex: 9999,
+          '& .MuiAlert-root': {
+            width: '100%',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+            fontSize: '1rem',
+            alignItems: 'center'
+          }
+        }}
+      >
+        <Alert 
+          onClose={handleCloseNotification} 
+          severity={notification.severity}
+          variant="filled"
           sx={{ 
-            zIndex: 9999,
-            '& .MuiAlert-root': {
-              width: '100%',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-              fontSize: '1rem',
-              alignItems: 'center'
+            width: '100%',
+            minWidth: '300px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+            '& .MuiAlert-message': {
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1
             }
           }}
         >
-          <Alert 
-            onClose={handleCloseNotification} 
-            severity={notification.severity}
-            variant="filled"
-            sx={{ 
-              width: '100%',
-              minWidth: '300px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-              '& .MuiAlert-message': {
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1
-              }
-            }}
-          >
-            {isTraining && notification.severity === 'info' && (
-              <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" />
-            )}
-            {notification.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-    </ThemeProvider>
-  );
+          {isTraining && notification.severity === 'info' && (
+            <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" />
+          )}
+          {notification.message}
+        </Alert>
+      </Snackbar>
+  </ThemeProvider>
+);
 }
 
 export default App;

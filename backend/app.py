@@ -31,6 +31,8 @@ classification_tree = ClassificationTree()
 learner = WinstonLearner(classification_tree)
 dataset_examples = []  # Zoznam všetkých príkladov v datasete
 training_history = []  # História trénovania (použité príklady)
+model_history = []  # Historie stavů modelu pro navigaci vpřed/zpět
+current_history_index = -1  # Aktuální index v historii modelu
 
 # Dátové modely pre API
 class PL1Example(BaseModel):
@@ -849,15 +851,27 @@ async def train_model(training_request: TrainingRequest):
             if example_id < len(dataset_examples):
                 dataset_examples[example_id]["used_in_training"] = True
         
-        # Finálna odpoveď s výsledkami
+        # Na konci po úspěšném tréninku uložíme stav do historie
+        # Přidáme na konec funkce před return:
+        
+        # Uložíme aktuální stav modelu do historie
+        save_model_to_history(
+            model_state=current_model,
+            visualization=model_visualization,
+            steps=training_steps,
+            examples_count=used_count
+        )
+        
+        # Vrať výsledok trénovania
         return {
             "success": True,
-            "message": f"Model bol úspešne natrénovaný s {len(example_ids)} príkladmi.",
+            "message": "Model bol úspešne natrénovaný.",
             "model_updated": True,
             "model_visualization": model_visualization,
             "model_hypothesis": model_hypothesis,
             "training_steps": training_steps,
-            "used_examples_count": len(example_ids),
+            "training_mode": "batch" if len(example_ids) > 1 else "single",
+            "used_examples_count": used_count,
             "total_examples_count": len(dataset_examples)
         }
     
@@ -989,14 +1003,126 @@ async def get_training_history():
 @app.post("/api/reset")
 async def reset_model():
     """Resetuje naučený model a históriu trénovania."""
-    global current_model, training_history
+    global current_model, training_history, model_history, current_history_index, dataset_examples
     
+    # Resetujeme model
     current_model = Model(objects=[], links=[])
-    # Namiesto úplného vymazania histórie označíme všetky záznamy ako neaktuálne
-    for entry in training_history:
-        entry["current"] = False
     
-    return {"success": True, "message": "Model bol resetovaný a história označená ako neaktuálna."}
+    # Kompletně vymažeme historii tréninku místo pouhého označení jako neaktuální
+    training_history = []
+    
+    # Resetujeme příznaky used_in_training ve všech příkladech
+    for example in dataset_examples:
+        example["used_in_training"] = False
+    
+    # Vymažeme historii modelu
+    model_history = []
+    current_history_index = -1
+    
+    return {"success": True, "message": "Model a historie byly úplně resetovány."}
+
+@app.get("/api/model-history")
+async def get_model_history():
+    """Vrátí historii stavů modelu pro navigaci."""
+    global model_history, current_history_index
+    
+    # Vrátíme základní informace o historii - ne kompletní modely (ty by byly moc velké)
+    history_info = []
+    for i, entry in enumerate(model_history):
+        history_info.append({
+            "index": i,
+            "timestamp": entry.get("timestamp", ""),
+            "is_current": i == current_history_index,
+            "objects_count": len(entry.get("model_state", {}).get("objects", [])) if entry.get("model_state") else 0,
+            "links_count": len(entry.get("model_state", {}).get("links", [])) if entry.get("model_state") else 0,
+            "used_examples_count": entry.get("used_examples_count", 0)
+        })
+    
+    return {
+        "history": history_info,
+        "current_index": current_history_index,
+        "total_entries": len(model_history)
+    }
+
+@app.post("/api/model-history/step-back")
+async def step_back_in_history():
+    """Krok zpět v historii modelu."""
+    global current_model, model_history, current_history_index, dataset_examples
+    
+    # Kontrola, zda můžeme jít zpět
+    if current_history_index <= 0 or len(model_history) == 0:
+        return {
+            "success": False,
+            "message": "Nelze jít zpět - jsme na začátku historie nebo historie je prázdná.",
+            "current_index": current_history_index
+        }
+    
+    # Posun zpět v historii
+    current_history_index -= 1
+    
+    # Obnovení modelu z historie
+    history_entry = model_history[current_history_index]
+    if history_entry.get("model_state"):
+        current_model = Model.from_dict(history_entry["model_state"])
+    
+    # Obnovení informací o použitých příkladech
+    used_example_ids = history_entry.get("used_example_ids", [])
+    
+    # Resetování příznaků used_in_training pro všechny příklady
+    for example in dataset_examples:
+        example["used_in_training"] = example["id"] in used_example_ids
+    
+    # Získání vizualizace pro frontend
+    visualization = generate_model_visualization(current_model)
+    
+    return {
+        "success": True,
+        "message": f"Model obnoven na stav z historie (index {current_history_index}).",
+        "current_index": current_history_index,
+        "model_visualization": visualization,
+        "training_steps": history_entry.get("training_steps", []),
+        "used_examples_count": history_entry.get("used_examples_count", 0)
+    }
+
+@app.post("/api/model-history/step-forward")
+async def step_forward_in_history():
+    """Krok vpřed v historii modelu."""
+    global current_model, model_history, current_history_index, dataset_examples
+    
+    # Kontrola, zda můžeme jít vpřed
+    if current_history_index >= len(model_history) - 1 or len(model_history) == 0:
+        return {
+            "success": False,
+            "message": "Nelze jít vpřed - jsme na konci historie nebo historie je prázdná.",
+            "current_index": current_history_index
+        }
+    
+    # Posun vpřed v historii
+    current_history_index += 1
+    
+    # Obnovení modelu z historie
+    history_entry = model_history[current_history_index]
+    if history_entry.get("model_state"):
+        current_model = Model.from_dict(history_entry["model_state"])
+    
+    # Obnovení informací o použitých příkladech
+    used_example_ids = history_entry.get("used_example_ids", [])
+    
+    # Resetování příznaků used_in_training pro všechny příklady
+    for example in dataset_examples:
+        example["used_in_training"] = example["id"] in used_example_ids
+    
+    # Získání vizualizace pro frontend
+    visualization = generate_model_visualization(current_model)
+    
+    return {
+        "success": True,
+        "message": f"Model posunut na stav z historie (index {current_history_index}).",
+        "current_index": current_history_index,
+        "model_visualization": visualization,
+        "training_steps": history_entry.get("training_steps", []),
+        "used_examples_count": history_entry.get("used_examples_count", 0)
+    }
 
 @app.get("/api/model-status")
 async def get_model_status():
@@ -1156,6 +1282,32 @@ async def analyze_example(example_id: int):
             status_code=500,
             content={"success": False, "message": f"Chyba pri prístupe k príkladu: {str(e)}"}
         )
+
+# Funkcia pre uloženie stavu modelu do historie
+def save_model_to_history(model_state, visualization=None, steps=None, examples_count=0):
+    global model_history, current_history_index, dataset_examples
+    
+    # Pokud jsme se vrátili zpět a pak děláme novou změnu, odstraníme historii vpřed
+    if current_history_index < len(model_history) - 1:
+        model_history = model_history[:current_history_index+1]
+    
+    # Získáme seznam ID příkladů, které jsou aktuálně označeny jako použité
+    used_example_ids = [example["id"] for example in dataset_examples if example.get("used_in_training", False)]
+    
+    # Uložíme aktuální stav modelu včetně seznamu použitých příkladů
+    model_history.append({
+        "model_state": model_state.to_dict() if model_state else None,
+        "model_visualization": visualization,
+        "training_steps": steps,
+        "used_examples_count": examples_count,
+        "used_example_ids": used_example_ids,  # Ukládáme i ID použitých příkladů
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    # Aktualizujeme index
+    current_history_index = len(model_history) - 1
+    print(f"Saved model to history at index {current_history_index} with {len(used_example_ids)} used examples")
+    return current_history_index
 
 # Spustenie aplikácie (pre lokálny vývoj)
 if __name__ == "__main__":
