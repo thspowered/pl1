@@ -35,6 +35,7 @@ export interface TrainingResult {
   used_examples_count?: number;
   total_examples_count?: number;
   training_mode?: string;
+  time_elapsed?: number;
 }
 
 // Types for API responses

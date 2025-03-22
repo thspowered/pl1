@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from "react";
 import { 
   Box, 
   Container, 
@@ -28,9 +28,12 @@ import FileUploader from './components/FileUploader';
 import ExampleList from './components/ExampleList';
 import TrainingPanel from './components/TrainingPanel';
 import TrainingResultDisplay from './components/TrainingResult';
-import ModelControls from './components/ModelControls';
+import { ModelControls } from './components/ModelControls';
 import LandingPage from './components/LandingPage';
-import { TrainingResult, NetworkNode, NetworkLink } from './types';
+import ExamplesTrainingView from './components/ExamplesTrainingView';
+import TrainingResult from './components/TrainingResult';
+import { NetworkNode, NetworkLink, ApiExample, Example, ModelHistory, TrainingResult as TrainingResultType } from './types';
+import axios from "axios";
 
 // Vytvorenie tmavého motívu
 const darkTheme = createTheme({
@@ -92,7 +95,7 @@ function App() {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState<boolean>(false);
   const [isUpdatingModel, setIsUpdatingModel] = useState<boolean>(false);
-  const [trainingResult, setTrainingResult] = useState<TrainingResult | null>(null);
+  const [trainingResult, setTrainingResult] = useState<TrainingResultType | null>(null);
   const [modelStatus, setModelStatus] = useState<{
     model_initialized: boolean;
     used_examples_count: number;
@@ -102,19 +105,92 @@ function App() {
     positive_examples_count: number;
     negative_examples_count: number;
   } | null>(null);
-  const [modelHistory, setModelHistory] = useState<Array<any>>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [modelHistory, setModelHistory] = useState<ModelHistory>({ current_index: -1, total_entries: 0 });
+  const [graphUpdateKey, setGraphUpdateKey] = useState(0);
   
   // State for model visualization
   const [nodes, setNodes] = useState<NetworkNode[]>([]);
   const [links, setLinks] = useState<NetworkLink[]>([]);
   const [trainingSteps, setTrainingSteps] = useState<any[]>([]);
 
+  const fetchExamples = useCallback(async () => {
+    try {
+      setIsUpdatingModel(true);
+      const response = await axios.get<{ examples: ApiExample[] }>("/api/examples");
+      const apiExamples = response.data.examples || [];
+      
+      if (apiExamples.length > 0) {
+        const mappedExamples: Example[] = apiExamples.map((ex) => ({
+          id: ex.id,
+          name: ex.name,
+          formula: ex.formula,
+          isPositive: ex.is_positive,
+          selected: false,
+          usedInTraining: ex.used_in_training,
+        }));
+        setExamples(mappedExamples);
+        console.log("Loaded examples:", mappedExamples.length);
+      } else {
+        console.log("No examples found in API response");
+      }
+    } catch (error) {
+      console.error("Error fetching examples:", error);
+      showWarning("Nastala chyba pri načítaní príkladov");
+    } finally {
+      setIsUpdatingModel(false);
+    }
+  }, []);
+
+  const fetchModelInfo = useCallback(async () => {
+    try {
+      setIsUpdatingModel(true);
+      const response = await axios.get("/api/model/info");
+      const history = response.data.history || { current_index: -1, total_entries: 0 };
+      setModelHistory(history);
+    } catch (error) {
+      console.error("Error fetching model info:", error);
+    } finally {
+      setIsUpdatingModel(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showExamples) {
+      fetchExamples();
+      fetchModelInfo();
+    }
+  }, [showExamples, fetchExamples, fetchModelInfo]);
+
+  // Načítaj príklady pri prvom otvorení
+  useEffect(() => {
+    const checkForExamples = async () => {
+      try {
+        // Len kontrola, či existujú príklady na serveri
+        const response = await axios.get<{ examples: ApiExample[] }>("/api/examples");
+        const apiExamples = response.data.examples || [];
+        
+        if (apiExamples.length > 0) {
+          // Ak existujú príklady, nastav showExamples na true a načítaj ich
+          setShowExamples(true);
+        }
+      } catch (error) {
+        console.error("Error checking for examples:", error);
+      }
+    };
+    
+    checkForExamples();
+  }, []);
+
   // Handle file upload
   const handleFileUpload = (content: string) => {
-          setFileContent(content);
+    setFileContent(content);
     setFile(new File([content], "uploaded-file.txt"));
     showSuccess('Súbor bol úspešne nahraný.');
+    
+    // Skúsime hneď spracovať príklady pre lepšiu odozvu
+    if (content) {
+      processDataset();
+    }
   };
 
   // Process dataset
@@ -129,6 +205,13 @@ function App() {
     try {
       // Process the file content to extract examples
       const parsedExamples = processExamples(fileContent);
+      
+      if (parsedExamples.length === 0) {
+        showWarning('Nenašli sa žiadne príklady v súbore. Skontrolujte formát súboru.');
+        setIsProcessing(false);
+        return;
+      }
+      
       setExamples(parsedExamples);
       setShowExamples(true);
       
@@ -138,14 +221,14 @@ function App() {
       setIsUpdatingModel(true);
       
       try {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         const modelStatusResult = await fetchModelStatus();
         if (modelStatusResult.success && modelStatusResult.data) {
           setModelStatus(modelStatusResult.data);
         }
         
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         const datasetResult = await fetchDataset();
         if (datasetResult.success && datasetResult.data?.examples) {
@@ -295,10 +378,8 @@ function App() {
         used_examples_count: trainingResults.data.used_examples_count
       };
       
-      // Remove states ahead if we've gone back and then trained
-      const newHistory = modelHistory.slice(0, historyIndex + 1);
-      setModelHistory([...newHistory, newModelState]);
-      setHistoryIndex(newHistory.length);
+      // Update model history via API will handle history changes
+      await fetchModelInfo();
       
       showSuccess(trainingResults.data.message || 'Model bol úspešne natrénovaný.');
     } catch (error) {
@@ -321,152 +402,149 @@ function App() {
   // Reset app
   const handleReset = async () => {
     try {
-      setIsLoading(true);
-      const result = await resetModel();
+      setIsUpdatingModel(true);
       
-      if (result.success) {
-        // Reset visualization
-        setNodes([]);
-        setLinks([]);
-        
-        // Reset history
-        setModelHistory([]);
-        setHistoryIndex(-1);
-        
-        // Reset training steps
-        setTrainingSteps([]);
-        
-        // Reset training result
+      // Informujeme používateľa, že začíname resetovať model
+      showInfo("Prebieha resetovanie modelu a histórie...");
+      
+      // Resetujeme model na serveri
+      await axios.post("/api/model/reset");
+      await fetchModelInfo();
+      setGraphUpdateKey(prev => prev + 1);
+      
+      // Reset visualization
+      setNodes([]);
+      setLinks([]);
+      
+      // Reset history
+      setModelHistory({ current_index: -1, total_entries: 0 });
+      
+      // Reset training steps
+      setTrainingSteps([]);
+      
+      // Reset training result
     setTrainingResult(null);
-        
-        // Reset all examples - set usedInTraining to false
-        resetExamples();
-        
-        showSuccess("Hypotéza bola vymazaná");
-        
-        // Update model status
-        await fetchModelStatus(true);
-      } else {
-        showError("Nepodarilo sa vymazať hypotézu: " + (result.data?.message || "Neznáma chyba"));
-      }
+      
+      // Reset all examples - set usedInTraining to false
+      resetExamples();
+      
+      // Update model status
+      await fetchModelStatus(true);
+      
+      // Zobrazíme úspešnú notifikáciu s kompletnou informáciou
+      showSuccess("Model a história boli úspešne vymazané. Príklady boli resetované a môžu byť znova použité na trénovanie.");
     } catch (error) {
-      console.error("Chyba pri mazání hypotézy:", error);
-      showError("Nastala chyba pri mazaní hypotézy");
+      console.error("Chyba pri resetovaní modelu:", error);
+      showError("Nastala chyba pri resetovaní modelu a histórie. Skúste to znova neskôr.");
     } finally {
-      setIsLoading(false);
+      setIsUpdatingModel(false);
     }
   };
 
   // Step back in model history
   const handleStepBack = async () => {
-    if (historyIndex > 0 || modelHistory.length === 0) {
+    if (modelHistory.current_index > 0 || modelHistory.total_entries === 0) {
       try {
-        setIsLoading(true);
-        const response = await stepBack();
+        setIsUpdatingModel(true);
+        const response = await axios.post("/api/model/history/step_back");
         
-        if (response.success && response.data) {
-          // Set new history index
-          setHistoryIndex(response.data.current_index);
+        // Aktualizujeme stav použitých príkladov
+        if (response.data.success && response.data.used_example_ids) {
+          // Vytvoríme nový stav príkladov s aktualizovaným príznakom usedInTraining
+          const updatedExamples = examples.map(example => ({
+            ...example,
+            usedInTraining: response.data.used_example_ids.includes(example.id)
+          }));
+          setExamples(updatedExamples);
+          showInfo(`Model obnovený na stav z histórie (krok ${response.data.current_index + 1}/${modelHistory.total_entries})`);
           
-          // Update application state from response
+          // Aktualizujeme trénovací výsledok
+          if (response.data.model_hypothesis) {
+            setTrainingResult(prevResult => ({
+              ...prevResult || {},
+              success: true,
+              message: 'Model obnovený z histórie',
+              model_updated: response.data.model_updated,
+              model_hypothesis: response.data.model_hypothesis,
+              model_visualization: response.data.model_visualization,
+              training_steps: response.data.training_steps
+            }));
+          }
+          
+          // Aktualizujeme vizualizáciu modelu
           if (response.data.model_visualization) {
             setNodes(response.data.model_visualization.nodes || []);
             setLinks(response.data.model_visualization.links || []);
           }
           
-          // Update other relevant states
+          // Aktualizujeme kroky trénovania
           if (response.data.training_steps) {
             setTrainingSteps(response.data.training_steps);
-            // Update trainingResult to show history steps
-            if (trainingResult) {
-              setTrainingResult({
-                ...trainingResult,
-                training_steps: response.data.training_steps,
-                model_visualization: response.data.model_visualization
-              });
-            } else {
-              setTrainingResult({
-                success: true,
-                message: "Model obnovený na predchádzajúci krok",
-                model_updated: true,
-                training_steps: response.data.training_steps,
-                model_visualization: response.data.model_visualization
-              });
-            }
           }
-          
-          // Update dataset to show used examples
-          await fetchDataset(true);
-          
-          // Update model status
-          await fetchModelStatus(true);
-          
-          showSuccess("Model obnovený na predchádzajúci krok");
-        } else {
-          showWarning(response.data?.message || "Nepodarilo sa vrátiť o krok späť");
         }
+        
+        // Aktualizujeme informácie o modeli a histórii
+        await fetchModelInfo();
+        setGraphUpdateKey(prev => prev + 1);
       } catch (error) {
         console.error("Chyba pri kroku späť:", error);
         showError("Nastala chyba pri kroku späť");
       } finally {
-        setIsLoading(false);
+        setIsUpdatingModel(false);
       }
     }
   };
 
   // Step forward in model history
   const handleStepForward = async () => {
-    if (historyIndex < modelHistory.length - 1 || modelHistory.length === 0) {
+    if (modelHistory.current_index < modelHistory.total_entries - 1 || modelHistory.total_entries === 0) {
       try {
-        setIsLoading(true);
-        const response = await stepForward();
+        setIsUpdatingModel(true);
+        const response = await axios.post("/api/model/history/step_forward");
         
-        if (response.success && response.data) {
-          // Set new history index
-          setHistoryIndex(response.data.current_index);
+        // Aktualizujeme stav použitých príkladov
+        if (response.data.success && response.data.used_example_ids) {
+          // Vytvoríme nový stav príkladov s aktualizovaným príznakom usedInTraining
+          const updatedExamples = examples.map(example => ({
+            ...example,
+            usedInTraining: response.data.used_example_ids.includes(example.id)
+          }));
+          setExamples(updatedExamples);
+          showInfo(`Model posunutý na stav z histórie (krok ${response.data.current_index + 1}/${modelHistory.total_entries})`);
           
-          // Update application state from response
+          // Aktualizujeme trénovací výsledok
+          if (response.data.model_hypothesis) {
+            setTrainingResult(prevResult => ({
+              ...prevResult || {},
+              success: true,
+              message: 'Model obnovený z histórie',
+              model_updated: response.data.model_updated,
+              model_hypothesis: response.data.model_hypothesis,
+              model_visualization: response.data.model_visualization,
+              training_steps: response.data.training_steps
+            }));
+          }
+          
+          // Aktualizujeme vizualizáciu modelu
           if (response.data.model_visualization) {
             setNodes(response.data.model_visualization.nodes || []);
             setLinks(response.data.model_visualization.links || []);
           }
           
-          // Update other relevant states
+          // Aktualizujeme kroky trénovania
           if (response.data.training_steps) {
             setTrainingSteps(response.data.training_steps);
-            // Update trainingResult to show history steps
-            if (trainingResult) {
-              setTrainingResult({
-                ...trainingResult,
-                training_steps: response.data.training_steps,
-                model_visualization: response.data.model_visualization
-              });
-            } else {
-              setTrainingResult({
-                success: true,
-                message: "Model posunutý na nasledujúci krok",
-                model_updated: true,
-                training_steps: response.data.training_steps,
-                model_visualization: response.data.model_visualization
-              });
-            }
           }
-          
-          // Update dataset to show used examples
-          await fetchDataset(true);
-          
-          // Update model status
-          await fetchModelStatus(true);
-          
-          showSuccess("Model posunutý na nasledujúci krok");
-        } else {
-          showWarning(response.data?.message || "Nepodarilo sa posunúť o krok vpred");
         }
+        
+        // Aktualizujeme informácie o modeli a histórii
+        await fetchModelInfo();
+        setGraphUpdateKey(prev => prev + 1);
       } catch (error) {
         console.error("Chyba pri kroku vpred:", error);
         showError("Nastala chyba pri kroku vpred");
       } finally {
-        setIsLoading(false);
+        setIsUpdatingModel(false);
       }
     }
   };
@@ -483,31 +561,11 @@ function App() {
 
   // Refresh graph
   const handleRefreshGraph = () => {
-    if (trainingResult && trainingResult.model_visualization) {
-      const modifiedVisualization = {
-        nodes: [...trainingResult.model_visualization.nodes],
-        links: [...trainingResult.model_visualization.links]
-      };
-      
-      setTrainingResult(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          model_visualization: modifiedVisualization
-        };
-      });
-    }
+    setGraphUpdateKey(prev => prev + 1);
   };
   
   // Additional loading state for UI operations
   const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  useEffect(() => {
-    // If examples are shown, get model status and dataset
-    if (showExamples) {
-      updateModelAfterTraining();
-    }
-  }, [showExamples]);
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -584,58 +642,9 @@ function App() {
             </Typography>
             <Box sx={{ width: '100%' }}>
               <CircularProgress size={24} sx={{ mb: 2 }} />
-            </Box>
           </Box>
-        )}
-        
-        {/* App header - zobrazí sa len ak je showExamples true */}
-        {showExamples && (
-          <>
-        <Box 
-          sx={{ 
-            p: 2, 
-            borderBottom: '1px solid #333',
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 2
-          }}
-        >
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
-            PL1-Winston Learner
-          </Typography>
-          
-              {/* Model history navigation buttons */}
-              {modelHistory.length > 0 && (
-                <ModelControls 
-                  historyIndex={historyIndex}
-                  historyLength={modelHistory.length}
-                  isLoading={isLoading || apiLoading}
-                  onStepBack={handleStepBack}
-                  onStepForward={handleStepForward}
-                  onReset={handleReset}
-                />
+            </Box>
           )}
-        </Box>
-        
-        <Container 
-          sx={{ 
-            py: 6, 
-            width: '100%', 
-            maxWidth: '100% !important',
-            px: { xs: 2, sm: 4, md: 6 }
-          }}
-        >
-          <Typography variant="h3" align="center" gutterBottom>
-            PL1 Learning System
-          </Typography>
-          <Typography variant="h5" align="center" color="text.secondary" paragraph>
-            Systém pre učenie konceptov pomocou symbolickej notácie predikátovej logiky prvého rádu
-          </Typography>
-        </Container>
-          </>
-        )}
         
         {/* Conditional rendering of content */}
         {!showExamples ? (
@@ -647,186 +656,27 @@ function App() {
             onProcessDataset={processDataset}
           />
         ) : (
-          // Examples and training interface
-          <Grid container spacing={4} sx={{ mt: 4, width: '100%', mx: 0 }}>
-            <Grid item xs={12}>
-              <Paper elevation={3} sx={{ 
-                p: { xs: 2, sm: 3, md: 4 },
-                height: 'auto',
-                overflow: 'visible'
-              }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h5">
-                    Príklady v datasete
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Button 
-                        variant="outlined" 
-                        color="primary" 
-                        onClick={goToUploadScreen}
-                        startIcon={<span style={{ fontSize: '1.2rem' }}>📁</span>}
-                        size="small"
-                      >
-                        Nahrať nový dataset
-                      </Button>
-                    </Box>
-                  </Box>
-                </Box>
-                
-                <Box sx={{ mb: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={examples.every(ex => ex.selected)}
-                        indeterminate={examples.some(ex => ex.selected) && !examples.every(ex => ex.selected)}
-                        onChange={(e) => selectAll(e.target.checked)}
-                      />
-                    }
-                    label="Vybrať všetky príklady"
-                  />
-                </Box>
-                
-                <Divider sx={{ mb: 2 }} />
-                
-                <Box sx={{ 
-                  maxHeight: '65vh',
-                  overflow: 'auto',
-                  pr: 1
-                }}>
-                  {examples.map((example) => (
-                    <Card key={example.id} sx={{ 
-                      mb: 1.5, 
-                      backgroundColor: example.usedInTraining ? 'rgba(25, 118, 210, 0.08)' : 'background.paper',
-                      boxShadow: example.usedInTraining 
-                        ? '0 0 0 1px rgba(25, 118, 210, 0.5), 0 2px 4px rgba(0,0,0,0.2)'
-                        : '0 2px 4px rgba(0,0,0,0.2)',
-                      position: 'relative',
-                      transition: 'all 0.2s ease',
-                      opacity: example.usedInTraining ? 0.9 : 1,
-                      '&:hover': {
-                        boxShadow: example.usedInTraining 
-                          ? '0 0 0 1px rgba(25, 118, 210, 0.7), 0 4px 8px rgba(0,0,0,0.3)'
-                          : '0 4px 8px rgba(0,0,0,0.3)',
-                      }
-                    }}>
-                      {example.usedInTraining && (
-                        <Box sx={{ 
-                          position: 'absolute', 
-                          top: 0, 
-                          right: 0, 
-                          backgroundColor: 'primary.main', 
-                          color: 'white',
-                          px: 1,
-                          py: 0.5,
-                          borderBottomLeftRadius: 8,
-                          fontSize: '0.7rem',
-                          fontWeight: 'bold',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5
-                        }}>
-                          <span style={{ fontSize: '1rem' }}>✓</span> Použité v trénovaní
-                        </Box>
-                      )}
-                      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                          <Checkbox
-                            checked={example.selected}
-                            onChange={() => toggleExampleSelection(example.id)}
-                            disabled={example.usedInTraining}
-                            sx={{ 
-                              pt: 0, 
-                              mt: 0, 
-                              mr: 1,
-                              '&.Mui-checked': {
-                                color: example.usedInTraining ? 'primary.dark' : 'primary.main',
-                              },
-                              '&.Mui-disabled': {
-                                color: example.usedInTraining ? 'primary.main' : 'text.disabled',
-                              }
-                            }}
-                          />
-                          <Box sx={{ width: '100%' }}>
-                            <Box sx={{ 
-                              display: 'flex', 
-                              justifyContent: 'space-between', 
-                              alignItems: 'center', 
-                              mb: 0.5 
-                            }}>
-                              <Typography 
-                                variant="subtitle1" 
-                                sx={{ 
-                                  fontWeight: 'bold', 
-                                  fontSize: '0.95rem',
-                                  color: example.usedInTraining ? 'primary.main' : 'text.primary'
-                                }}
-                              >
-                                {example.name}
-                                <Chip 
-                                  label={example.isPositive ? "Pozitívny" : "Negatívny"} 
-                                  color={example.isPositive ? "success" : "error"}
-                                  size="small"
-                                  sx={{ ml: 1, height: '20px', '& .MuiChip-label': { px: 1, py: 0.5, fontSize: '0.7rem' } }}
-                                />
-                              </Typography>
-                            </Box>
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                whiteSpace: 'pre-wrap', 
-                                backgroundColor: example.usedInTraining ? 'rgba(25, 118, 210, 0.05)' : 'rgba(0, 0, 0, 0.2)', 
-                                p: 1.5, 
-                                borderRadius: 1,
-                                fontFamily: 'monospace',
-                                fontSize: '0.85rem',
-                                width: '100%',
-                                overflowX: 'hidden',
-                                lineHeight: 1.4,
-                                border: example.usedInTraining ? '1px solid rgba(25, 118, 210, 0.2)' : 'none'
-                              }}
-                            >
-                              {example.formula}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Box>
-                
-                <Box sx={{ mt: 2, mb: 2 }}>
-                  <TrainingPanel 
-                    isTraining={isTraining}
-                    onTrain={handleTrainModel}
-                    selectedExamplesCount={getSelectedCounts().selectedCount}
-                    usedInTrainingCount={getSelectedCounts().usedSelectedCount}
-                  />
-                </Box>
-                
-                {isUpdatingModel && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                    <Alert severity="info" sx={{ width: 'auto' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <CircularProgress size={20} sx={{ mr: 2 }} />
-                        <Typography variant="body2">
-                          Aktualizujem informácie o modeli a použitých príkladoch...
-                        </Typography>
-                      </Box>
-                    </Alert>
-                  </Box>
-                )}
-                
-                <TrainingResultDisplay 
-                  result={trainingResult}
-                  onRefreshGraph={handleRefreshGraph}
-                />
-              </Paper>
-            </Grid>
-          </Grid>
+          // Use the new ExamplesTrainingView component with ModelControls
+          <ExamplesTrainingView 
+            examples={examples}
+            isTraining={isTraining}
+            isUpdatingModel={isUpdatingModel}
+            trainingResult={trainingResult}
+            trainingSteps={trainingSteps}
+            isLoading={isLoading}
+            historyIndex={modelHistory.current_index}
+            historyLength={modelHistory.total_entries}
+            onExampleSelect={toggleExampleSelection}
+            onSelectAll={selectAll}
+            onTrain={handleTrainModel}
+            onStepBack={handleStepBack}
+            onStepForward={handleStepForward}
+            onReset={handleReset}
+            onFileUpload={goToUploadScreen}
+          />
         )}
-      </Box>
-      
+                </Box>
+                
       {/* Notifications */}
       <Snackbar
         open={notification.open}

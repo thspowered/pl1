@@ -88,18 +88,19 @@ export const useExamples = () => {
   };
 
   // Toggle example selection
-  const toggleExampleSelection = (id: number) => {
-    const example = examples.find(ex => ex.id === id);
-    
-    // If example was already used in training, we can't deselect it
-    if (example && example.usedInTraining) {
-      return false;
-    }
-    
+  const toggleExampleSelection = (id: number, selected?: boolean) => {
     setExamples(prevExamples => 
-      prevExamples.map(example => 
-        example.id === id ? { ...example, selected: !example.selected } : example
-      )
+      prevExamples.map(example => {
+        if (example.id === id) {
+          // Ak je príklad už použitý v trénovaní, nemôžeme ho odznačiť
+          if (example.usedInTraining && selected === false) {
+            return example;
+          }
+          // Použijeme explicitne zadanú hodnotu alebo negáciu existujúcej
+          return { ...example, selected: selected !== undefined ? selected : !example.selected };
+        }
+        return example;
+      })
     );
     
     return true;

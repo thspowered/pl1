@@ -33,6 +33,7 @@ dataset_examples = []  # Zoznam všetkých príkladov v datasete
 training_history = []  # História trénovania (použité príklady)
 model_history = []  # Historie stavů modelu pro navigaci vpřed/zpět
 current_history_index = -1  # Aktuální index v historii modelu
+MAX_HISTORY_SIZE = 30  # Maximálny počet krokov v histórií
 
 # Dátové modely pre API
 class PL1Example(BaseModel):
@@ -1021,26 +1022,32 @@ async def reset_model():
     
     return {"success": True, "message": "Model a historie byly úplně resetovány."}
 
+@app.post("/api/model/reset")
+async def model_reset():
+    """API endpoint pre reset modelu na ceste /api/model/reset, ktorý používa frontend."""
+    return await reset_model()
+
 @app.get("/api/model-history")
 async def get_model_history():
-    """Vrátí historii stavů modelu pro navigaci."""
+    """Vráti históriu stavov modelu pre navigáciu späť/vpred."""
+    
     global model_history, current_history_index
     
-    # Vrátíme základní informace o historii - ne kompletní modely (ty by byly moc velké)
-    history_info = []
+    history_entries = []
+    # Zozbieraj informácie o všetkých záznamoch v histórii
     for i, entry in enumerate(model_history):
-        history_info.append({
+        entry_info = {
             "index": i,
             "timestamp": entry.get("timestamp", ""),
-            "is_current": i == current_history_index,
-            "objects_count": len(entry.get("model_state", {}).get("objects", [])) if entry.get("model_state") else 0,
-            "links_count": len(entry.get("model_state", {}).get("links", [])) if entry.get("model_state") else 0,
-            "used_examples_count": entry.get("used_examples_count", 0)
-        })
+            "used_examples_count": entry.get("used_examples_count", 0),
+            "training_steps": len(entry.get("training_steps", [])) if entry.get("training_steps") else 0
+        }
+        history_entries.append(entry_info)
     
     return {
-        "history": history_info,
+        "success": True,
         "current_index": current_history_index,
+        "history_entries": history_entries,
         "total_entries": len(model_history)
     }
 
@@ -1075,14 +1082,25 @@ async def step_back_in_history():
     # Získání vizualizace pro frontend
     visualization = generate_model_visualization(current_model)
     
+    # Získaní trénovanej formuly
+    model_hypothesis = current_model.to_formula() if current_model else None
+    
     return {
         "success": True,
         "message": f"Model obnoven na stav z historie (index {current_history_index}).",
         "current_index": current_history_index,
         "model_visualization": visualization,
         "training_steps": history_entry.get("training_steps", []),
-        "used_examples_count": history_entry.get("used_examples_count", 0)
+        "used_examples_count": history_entry.get("used_examples_count", 0),
+        "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
+        "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
+        "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
+
+@app.post("/api/model/history/step_back")
+async def model_step_back():
+    """API endpoint pre krok späť v histórii modelu na ceste /api/model/history/step_back, ktorý používa frontend."""
+    return await step_back_in_history()
 
 @app.post("/api/model-history/step-forward")
 async def step_forward_in_history():
@@ -1115,14 +1133,25 @@ async def step_forward_in_history():
     # Získání vizualizace pro frontend
     visualization = generate_model_visualization(current_model)
     
+    # Získaní trénovanej formuly
+    model_hypothesis = current_model.to_formula() if current_model else None
+    
     return {
         "success": True,
         "message": f"Model posunut na stav z historie (index {current_history_index}).",
         "current_index": current_history_index,
         "model_visualization": visualization,
         "training_steps": history_entry.get("training_steps", []),
-        "used_examples_count": history_entry.get("used_examples_count", 0)
+        "used_examples_count": history_entry.get("used_examples_count", 0),
+        "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
+        "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
+        "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
+
+@app.post("/api/model/history/step_forward")
+async def model_step_forward():
+    """API endpoint pre krok vpred v histórii modelu na ceste /api/model/history/step_forward, ktorý používa frontend."""
+    return await step_forward_in_history()
 
 @app.get("/api/model-status")
 async def get_model_status():
@@ -1285,7 +1314,7 @@ async def analyze_example(example_id: int):
 
 # Funkcia pre uloženie stavu modelu do historie
 def save_model_to_history(model_state, visualization=None, steps=None, examples_count=0):
-    global model_history, current_history_index, dataset_examples
+    global model_history, current_history_index, dataset_examples, MAX_HISTORY_SIZE
     
     # Pokud jsme se vrátili zpět a pak děláme novou změnu, odstraníme historii vpřed
     if current_history_index < len(model_history) - 1:
@@ -1304,10 +1333,45 @@ def save_model_to_history(model_state, visualization=None, steps=None, examples_
         "timestamp": datetime.now().isoformat()
     })
     
-    # Aktualizujeme index
-    current_history_index = len(model_history) - 1
-    print(f"Saved model to history at index {current_history_index} with {len(used_example_ids)} used examples")
+    # Obmedzíme veľkosť histórie
+    if len(model_history) > MAX_HISTORY_SIZE:
+        # Odstraníme najstarší záznam a upravíme current_history_index
+        model_history.pop(0)
+        current_history_index = max(0, current_history_index - 1)
+    else:
+        # Aktualizujeme index
+        current_history_index = len(model_history) - 1
+    
+    print(f"Saved model to history at index {current_history_index} with {len(used_example_ids)} used examples (history size: {len(model_history)}/{MAX_HISTORY_SIZE})")
     return current_history_index
+
+# Nový endpoint pre získanie informácií o modeli a histórii
+@app.get("/api/model/info")
+async def model_info():
+    """Vráti informácie o modeli a histórii pre frontend."""
+    
+    global model_history, current_history_index
+    
+    # Vytvorenie rovnakej odpovede ako v prípade /api/model-history
+    history_entries = []
+    for i, entry in enumerate(model_history):
+        entry_info = {
+            "index": i,
+            "timestamp": entry.get("timestamp", ""),
+            "used_examples_count": entry.get("used_examples_count", 0),
+            "training_steps": len(entry.get("training_steps", [])) if entry.get("training_steps") else 0
+        }
+        history_entries.append(entry_info)
+    
+    # Vrátime históriu v očakávanom formáte
+    return {
+        "success": True,
+        "history": {
+            "current_index": current_history_index,
+            "total_entries": len(model_history),
+            "entries": history_entries
+        }
+    }
 
 # Spustenie aplikácie (pre lokálny vývoj)
 if __name__ == "__main__":
