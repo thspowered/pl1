@@ -325,6 +325,129 @@ class Model:
         # Spoj predikáty konjunkciou
         return " ∧ ".join(predicates)
 
+    def extract_model_rules(self) -> Dict[str, str]:
+        """
+        Extrahuje identifikačné pravidlá pre jednotlivé modely áut.
+        
+        Vráti slovník, kde kľúče sú názvy modelov a hodnoty sú
+        textové reprezentácie pravidiel v logike prvého rádu.
+        
+        Táto metóda extrahuje pravidlá pre všetky modely z formuly vygenerovanej
+        metódou to_formula().
+        """
+        rules = {}
+        
+        # Najprv získame známe modely, ktoré chceme hľadať v pravidlách
+        known_models = {"BMW", "Series3", "Series5", "Series7", "X5", "X7"}
+        
+        # Vygeneruj formulu z modelu
+        formula_text = self.to_formula()
+        
+        # Spracuj MUST (Μ) a MUST_NOT (Ν) vzťahy pre jednotlivé modely
+        import re
+        
+        # Pre každý známy model vytvoríme pravidlo
+        for model_name in known_models:
+            # Hľadáme všetky MUST (Μ) spojenia pre tento model
+            must_pattern = re.compile(r'Μ\s*\(\s*' + re.escape(model_name) + r'\s*,\s*(\w+)\s*\)')
+            must_relations = must_pattern.findall(formula_text)
+            
+            # Hľadáme všetky MUST_NOT (Ν) spojenia pre tento model
+            must_not_pattern = re.compile(r'Ν\s*\(\s*' + re.escape(model_name) + r'\s*,\s*(\w+)\s*\)')
+            must_not_relations = must_not_pattern.findall(formula_text)
+            
+            # Vytvor podmienky pre pravidlo
+            conditions = []
+            
+            # Základné komponenty sú vždy v pravidlách
+            basic_components = ["DriveSystem", "Engine", "Transmission"]
+            
+            # Analyzujeme MUST vzťahy - tie sú najdôležitejšie pre identifikačné pravidlá
+            must_components = set(must_relations)
+            
+            # Pre X5 a X7 modely musíme mať XDrive
+            if model_name.startswith("X"):
+                if "XDrive" in must_components:
+                    conditions.append(f"HAS(x, XDrive)")
+                else:
+                    conditions.append(f"HAS(x, XDrive)")
+            
+            # Pre Series modely určíme potrebný DriveSystem
+            elif model_name.startswith("Series"):
+                if "AWD" in must_components:
+                    conditions.append(f"HAS(x, AWD)")
+                elif "RWD" in must_components:
+                    conditions.append(f"HAS(x, RWD)")
+                elif model_name == "Series7":
+                    conditions.append(f"HAS(x, AWD)")
+                else:
+                    conditions.append(f"HAS(x, RWD)")
+            
+            # Pridáme špecifické engine typy, ak sú v MUST vzťahoch
+            engine_types = ["PetrolEngine", "DieselEngine", "HybridEngine"]
+            model_engines = []
+            
+            for engine in engine_types:
+                if engine in must_components:
+                    model_engines.append(engine)
+            
+            # Ak máme konkrétne motory, pridáme ich
+            if model_engines:
+                if len(model_engines) == 1:
+                    conditions.append(f"HAS(x, {model_engines[0]})")
+                else:
+                    engine_condition = " ∨ ".join([f"HAS(x, {engine})" for engine in model_engines])
+                    conditions.append(f"({engine_condition})")
+            else:
+                # Ak nemáme špecifické motory, pridáme všeobecný Engine
+                conditions.append(f"HAS(x, Engine)")
+            
+            # Pridáme špecifické prevodovky ak sú v MUST vzťahoch
+            transmission_types = ["AutomaticTransmission", "ManualTransmission"]
+            model_transmissions = []
+            
+            for transmission in transmission_types:
+                if transmission in must_components:
+                    model_transmissions.append(transmission)
+            
+            # Ak máme konkrétne prevodovky, pridáme ich
+            if model_transmissions:
+                if len(model_transmissions) == 1:
+                    conditions.append(f"HAS(x, {model_transmissions[0]})")
+                else:
+                    transmission_condition = " ∨ ".join([f"HAS(x, {trans})" for trans in model_transmissions])
+                    conditions.append(f"({transmission_condition})")
+            else:
+                # Ak nemáme špecifické prevodovky, pridáme všeobecný Transmission
+                conditions.append(f"HAS(x, Transmission)")
+            
+            # Pridáme MUST_NOT podmienky
+            for component in must_not_relations:
+                conditions.append(f"¬HAS(x, {component})")
+            
+            # Vytvoríme konečné pravidlo
+            if conditions:
+                rule = " ∧ ".join(conditions) + f" → IS(x, {model_name})"
+                rules[model_name] = f"∀x: [\n  {rule}\n]"
+            else:
+                # Ak nemáme žiadne podmienky, použijeme základné pravidlo
+                if model_name == "BMW":
+                    basic_rule = f"HAS(x, Engine) ∧ HAS(x, Transmission) ∧ HAS(x, DriveSystem) → IS(x, {model_name})"
+                elif model_name.startswith("Series"):
+                    drive = "AWD" if model_name == "Series7" else "RWD"
+                    basic_rule = f"HAS(x, Engine) ∧ HAS(x, Transmission) ∧ HAS(x, {drive}) → IS(x, {model_name})"
+                elif model_name.startswith("X"):
+                    basic_rule = f"HAS(x, Engine) ∧ HAS(x, Transmission) ∧ HAS(x, XDrive) → IS(x, {model_name})"
+                else:
+                    basic_rule = f"HAS(x, Engine) ∧ HAS(x, Transmission) ∧ HAS(x, DriveSystem) → IS(x, {model_name})"
+                
+                rules[model_name] = f"∀x: [\n  {basic_rule}\n]"
+        
+        # Pre debug
+        print(f"Extracted rules from model: {rules}")
+        
+        return rules
+
     def to_semantic_network(self) -> Dict[str, Any]:
         """
         Konvertuje model na sémantickú sieť vhodnú pre vizualizáciu.

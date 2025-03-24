@@ -158,12 +158,16 @@ export const useApi = () => {
         message: data.message || 'Model bol natrénovaný.',
         model_updated: data.model_updated || false,
         model_hypothesis: data.model_hypothesis,
+        model_rules: data.model_rules,
         model_visualization: data.model_visualization || { nodes: [], links: [] },
         training_steps: data.training_steps || [],
         used_examples_count: data.used_examples_count,
         total_examples_count: data.total_examples_count,
         training_mode: retrainAll ? 'retrained' : 'incremental'
       };
+      
+      console.log('Training result received:', data);
+      console.log('Extracted model_rules:', data.model_rules);
       
       return { success: true, data: trainingResult };
     } catch (error) {

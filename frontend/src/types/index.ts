@@ -13,6 +13,7 @@ export interface TrainingResult {
   message: string;
   model_updated: boolean;
   model_hypothesis?: string; // Textová reprezentácia hypotézy modelu
+  model_rules?: Record<string, string>; // Identifikačné pravidlá pre jednotlivé modely áut
   model_visualization?: {
     nodes: Array<NetworkNode>;
     links: Array<NetworkLink>;

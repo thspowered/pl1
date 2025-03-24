@@ -466,9 +466,12 @@ function App() {
               message: 'Model obnovený z histórie',
               model_updated: response.data.model_updated,
               model_hypothesis: response.data.model_hypothesis,
+              model_rules: response.data.model_rules,
               model_visualization: response.data.model_visualization,
               training_steps: response.data.training_steps
             }));
+            
+            console.log('Model rules from step back:', response.data.model_rules);
           }
           
           // Aktualizujeme vizualizáciu modelu
@@ -520,9 +523,12 @@ function App() {
               message: 'Model obnovený z histórie',
               model_updated: response.data.model_updated,
               model_hypothesis: response.data.model_hypothesis,
+              model_rules: response.data.model_rules,
               model_visualization: response.data.model_visualization,
               training_steps: response.data.training_steps
             }));
+            
+            console.log('Model rules from step forward:', response.data.model_rules);
           }
           
           // Aktualizujeme vizualizáciu modelu
