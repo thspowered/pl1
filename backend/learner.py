@@ -144,62 +144,153 @@ class WinstonLearner:
         """
         Aplikuje enlarge-set heuristiku.
         
-        Rozšiřuje množinu přijatelných hodnot atributů na základě pozitivních příkladů.
-        Pokud má objekt v pozitivním příkladu atribut s jinou hodnotou než v modelu,
-        heuristika přidá tuto hodnotu do množiny přijatelných hodnot.
+        Heuristika sa používa keď objekt vo vyvíjajúcom sa modeli zodpovedá inému objektu v príklade
+        a tieto dva objekty nie sú navzájom prepojené prostredníctvom klasifikačného stromu.
+        Vytvorí množinu prijateľných hodnôt z atribútov objektov.
+        
+        Príklad: Ak BMW môže mať motor s výkonom 230 alebo 250, vytvorí sa množina {230, 250}
+        ako prijateľné hodnoty pre atribút výkonu motora.
         
         Args:
-            model: Aktuální model
-            good: Pozitivní příklad
+            model: Aktuálny model
+            good: Pozitívny príklad
             
         Returns:
             Aktualizovaný model
         """
         updated_model = model.copy()
         
-        # Nejprve projdeme pozitivní příklad a hledáme nové hodnoty atributů
+        # 1. Zbieranie hodnôt atribútov podľa tried objektov
+        class_attributes = {}
+        
+        # Najprv zozbierame hodnoty atribútov z existujúceho modelu
+        for model_obj in updated_model.objects:
+            if not model_obj.attributes:
+                continue
+                
+            class_name = model_obj.class_name
+            if class_name not in class_attributes:
+                class_attributes[class_name] = {}
+                
+            for attr_name, attr_value in model_obj.attributes.items():
+                if attr_name not in class_attributes[class_name]:
+                    class_attributes[class_name][attr_name] = set()
+                    
+                # Ak hodnota je už množina, pridáme všetky jej prvky
+                if isinstance(attr_value, set):
+                    class_attributes[class_name][attr_name].update(attr_value)
+                # Ak je to interval, ignorujeme (spracúva sa v close_interval)
+                elif not isinstance(attr_value, tuple):
+                    class_attributes[class_name][attr_name].add(attr_value)
+        
+        # 2. Pridáme hodnoty atribútov z pozitívneho príkladu
         for good_obj in good.objects:
             if not good_obj.attributes:
                 continue
                 
+            class_name = good_obj.class_name
+            if class_name not in class_attributes:
+                class_attributes[class_name] = {}
+                
             for attr_name, attr_value in good_obj.attributes.items():
-                # Přeskočíme numerické hodnoty (intervaly) a množiny - ty zpracováváme jinde
+                # Preskočíme numerické intervaly - tie spracúva close_interval
                 if isinstance(attr_value, tuple) or isinstance(attr_value, set):
                     continue
+                    
+                if attr_name not in class_attributes[class_name]:
+                    class_attributes[class_name][attr_name] = set()
+                    
+                class_attributes[class_name][attr_name].add(attr_value)
                 
-                # Najdeme všechny objekty stejné třídy v modelu
-                for model_obj in updated_model.objects:
-                    if model_obj.class_name == good_obj.class_name:
-                        # Pokud objekt ještě nemá atributy, vytvoříme slovník
-                        if not model_obj.attributes:
-                            model_obj.attributes = {}
-                        
-                        # Pokud atribut v objektu neexistuje, vytvoříme ho jako množinu s novou hodnotou
-                        if attr_name not in model_obj.attributes:
-                            model_obj.attributes[attr_name] = {attr_value}
-                            self.applied_heuristics.append("enlarge_set")
-                            self._debug_log(f"Vytvořena nová množina hodnot pro atribut {attr_name} třídy {good_obj.class_name}")
-                        else:
-                            current_value = model_obj.attributes[attr_name]
-                            
-                            # Pokud je současná hodnota interval (tuple), přeskočíme
-                            if isinstance(current_value, tuple):
-                                continue
-                            
-                            # Pokud je současná hodnota již množina, přidáme novou hodnotu
-                            if isinstance(current_value, set):
-                                if attr_value not in current_value:
-                                    current_value.add(attr_value)
-                                    self.applied_heuristics.append("enlarge_set")
-                                    self._debug_log(f"Rozšířena množina hodnot atributu {attr_name} pro třídu {good_obj.class_name} o hodnotu {attr_value}")
-                            
-                            # Pokud je současná hodnota jednoduchá (ne množina, ne interval)
-                            # a liší se od nové hodnoty, vytvoříme množinu obsahující obě hodnoty
-                            elif current_value != attr_value:
-                                model_obj.attributes[attr_name] = {current_value, attr_value}
-                                self.applied_heuristics.append("enlarge_set")
-                                self._debug_log(f"Rozšířena množina hodnot atributu {attr_name} pro třídu {good_obj.class_name} o hodnotu {attr_value}")
+        # 3. Aplikácia zozbieraných množín hodnôt naspäť do modelu
+        heuristic_applied = False
         
+        for model_obj in updated_model.objects:
+            class_name = model_obj.class_name
+            
+            # Ak pre túto triedu nemáme zozbierané atribúty, preskočíme
+            if class_name not in class_attributes:
+                continue
+                
+            if not model_obj.attributes:
+                model_obj.attributes = {}
+                
+            # Pre každý atribút, ktorý máme pre túto triedu
+            for attr_name, values_set in class_attributes[class_name].items():
+                # Ak máme viac ako jednu hodnotu, vytvoríme množinu
+                if len(values_set) > 1:
+                    # Aktuálna hodnota v objekte
+                    current_value = model_obj.attributes.get(attr_name)
+                    
+                    # Ak aktuálna hodnota nie je množina, aktualizujeme ju
+                    if not isinstance(current_value, set):
+                        model_obj.attributes[attr_name] = values_set
+                        heuristic_applied = True
+                        self._debug_log(f"Vytvorená množina hodnôt pre atribút {attr_name} triedy {class_name}: {values_set}")
+                    # Ak už máme množinu, skontrolujeme, či treba pridať nové hodnoty
+                    elif current_value != values_set:
+                        # Pridáme chýbajúce hodnoty
+                        missing_values = values_set - current_value
+                        if missing_values:
+                            current_value.update(missing_values)
+                            heuristic_applied = True
+                            self._debug_log(f"Rozšírená množina hodnôt atribútu {attr_name} pre triedu {class_name} o {missing_values}")
+                # Ak máme len jednu hodnotu a atribút ešte neexistuje, pridáme ho
+                elif len(values_set) == 1 and attr_name not in model_obj.attributes:
+                    model_obj.attributes[attr_name] = next(iter(values_set))
+                    heuristic_applied = True
+                    self._debug_log(f"Pridaný nový atribút {attr_name} s hodnotou {next(iter(values_set))} pre objekt triedy {class_name}")
+        
+        # 4. Osobitné spracovanie pre možnosti ekvivalentných komponentov (napr. rôzne typy motorov)
+        # Zbierame komponenty podľa nadradených tried
+        component_classes = {}
+        
+        # Nájdeme všetky komponenty v modeli a príklade
+        for obj in updated_model.objects + good.objects:
+            # Získame rodičovskú triedu
+            parent_class = self.classification_tree.get_parent(obj.class_name)
+            
+            # Ak nemá rodiča, preskočíme
+            if not parent_class:
+                continue
+                
+            # Pridáme triedu komponenty pod jej rodiča
+            if parent_class not in component_classes:
+                component_classes[parent_class] = set()
+                
+            component_classes[parent_class].add(obj.class_name)
+        
+        # Ak máme viac ako jeden typ komponentu pre rodičovskú triedu, vytvoríme pravidlo
+        for parent_class, subclasses in component_classes.items():
+            if len(subclasses) > 1:
+                self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {subclasses}")
+                
+                # Pre každý objekt v modeli, ktorý má MUST spojenie s touto komponentou
+                for link in updated_model.links:
+                    if link.link_type == LinkType.MUST and link.target == parent_class:
+                        source_class = link.source
+                        
+                        # Pre každý objekt tejto triedy aktualizujeme informáciu o povolených podtriedach
+                        for obj in updated_model.objects:
+                            if obj.class_name == source_class:
+                                if not obj.attributes:
+                                    obj.attributes = {}
+                                    
+                                # Vytvoríme alebo aktualizujeme atribút allowed_components
+                                attr_name = f"allowed_{parent_class.lower()}_types"
+                                
+                                if attr_name not in obj.attributes or not isinstance(obj.attributes[attr_name], set):
+                                    obj.attributes[attr_name] = subclasses
+                                    heuristic_applied = True
+                                    self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {subclasses}")
+                                elif subclasses - obj.attributes[attr_name]:
+                                    obj.attributes[attr_name].update(subclasses)
+                                    heuristic_applied = True
+                                    self._debug_log(f"Rozšírená množina povolených komponentov {attr_name} pre triedu {source_class}")
+        
+        if heuristic_applied:
+            self.applied_heuristics.append("enlarge_set")
+            
         return updated_model
 
     def _apply_close_interval(self, model: Model, good: Model, near_miss: Model = None) -> Model:

@@ -1,0 +1,105 @@
+#---------- PÁR 1: X5 s benzínovým motorom a manuálnou prevodovkou ----------
+# Pozitívny príklad: BMW X5 s benzínovým motorom a manuálnou prevodovkou
+Ι(c₁, X5) ∧ 
+Π(c₁, e₁) ∧ Ι(e₁, PetrolEngine) ∧ 
+Π(c₁, t₁) ∧ Ι(t₁, ManualTransmission) ∧ 
+Π(c₁, d₁) ∧ Ι(d₁, XDrive) ∧ 
+Π(e₁, t₁) ∧ 
+Α(c₁, color, blue) ∧ 
+Α(e₁, power, 250) ∧ 
+Α(e₁, cylinders, 6)
+
+#---------- PÁR 2: X5 s naftovým motorom a automatickou prevodovkou ----------
+# Pozitívny príklad: BMW X5 s naftovým motorom a automatickou prevodovkou
+Ι(c₂, X5) ∧ 
+Π(c₂, e₂) ∧ Ι(e₂, DieselEngine) ∧ 
+Π(c₂, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧ 
+Π(c₂, d₂) ∧ Ι(d₂, XDrive) ∧ 
+Π(e₂, t₂) ∧ 
+Α(c₂, color, black) ∧ 
+Α(e₂, power, 280) ∧ 
+Α(e₂, cylinders, 6)
+
+#---------- PÁR 3: X7 s hybridným motorom a automatickou prevodovkou ----------
+# Pozitívny príklad: BMW X7 s hybridným motorom a automatickou prevodovkou
+Ι(c₃, X7) ∧ 
+Π(c₃, e₃) ∧ Ι(e₃, HybridEngine) ∧ 
+Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧ 
+Π(c₃, d₃) ∧ Ι(d₃, XDrive) ∧ 
+Π(e₃, t₃) ∧ 
+Α(c₃, color, silver) ∧ 
+Α(e₃, power, 320) ∧ 
+Α(e₃, cylinders, 6)
+
+#---------- PÁR 4: Series5 s benzínovým motorom a automatickou prevodovkou ----------
+# Pozitívny príklad: BMW Series5 s benzínovým motorom a automatickou prevodovkou
+Ι(c₄, Series5) ∧ Π(c₄, e₄) ∧ Ι(e₄, PetrolEngine) ∧ 
+Π(c₄, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧ 
+Π(c₄, d₄) ∧ Ι(d₄, RWD) ∧ 
+Π(e₄, t₄) ∧ 
+Α(c₄, color, red) ∧ 
+Α(e₄, power, 230) ∧ 
+Α(e₄, cylinders, 4)
+
+#---------- PÁR 5: Series7 s veľkým benzínovým motorom a automatickou prevodovkou ----------
+# Pozitívny príklad: BMW Series7 s veľkým benzínovým motorom a automatickou prevodovkou
+Ι(c₅, Series7) ∧ 
+Π(c₅, e₅) ∧ Ι(e₅, PetrolEngine) ∧ 
+Π(c₅, t₅) ∧ Ι(t₅, AutomaticTransmission) ∧ 
+Π(c₅, d₅) ∧ Ι(d₅, AWD) ∧ 
+Π(e₅, t₅) ∧ 
+Α(c₅, color, black) ∧ 
+Α(e₅, power, 400) ∧ 
+Α(e₅, cylinders, 8)
+
+
+# Negatívny príklad: BMW X5 s benzínovým motorom a automatickou prevodovkou
+Ι(c₆, X5) ∧ 
+Π(c₆, e₆) ∧ Ι(e₆, PetrolEngine) ∧ 
+Π(c₆, t₆) ∧ Ι(t₆, AutomaticTransmission) ∧ 
+Π(c₆, d₆) ∧ Ι(d₆, XDrive) ∧ 
+Π(e₆, t₆) ∧ 
+Α(c₆, color, white) ∧ 
+Α(e₆, power, 260) ∧ 
+Α(e₆, cylinders, 6) ∧
+Ν(PetrolEngine, AutomaticTransmission)
+
+
+# Negatívny príklad: BMW X5 bez motora
+Ι(c₇, X5) ∧ 
+Π(c₇, t₇) ∧ Ι(t₇, ManualTransmission) ∧ 
+Π(c₇, d₇) ∧ Ι(d₇, XDrive) ∧ 
+Α(c₇, color, green)
+
+
+# Negatívny príklad: BMW X7 s naftovým motorom a manuálnou prevodovkou
+Ι(c₈, X7) ∧ 
+Π(c₈, e₈) ∧ Ι(e₈, DieselEngine) ∧ 
+Π(c₈, t₈) ∧ Ι(t₈, ManualTransmission) ∧ 
+Π(c₈, d₈) ∧ Ι(d₈, XDrive) ∧ 
+Π(e₈, t₈) ∧ 
+Α(c₈, color, blue) ∧ 
+Α(e₈, power, 300) ∧ 
+Α(e₈, cylinders, 6) ∧
+Ν(X7, ManualTransmission)
+
+
+# Negatívny príklad: BMW X5 s RWD namiesto XDrive
+Ι(c₉, X5) ∧ 
+Π(c₉, e₉) ∧ Ι(e₉, PetrolEngine) ∧ 
+Π(c₉, t₉) ∧ Ι(t₉, ManualTransmission) ∧ 
+Π(c₉, d₉) ∧ Ι(d₉, RWD) ∧ 
+Π(e₉, t₉) ∧ 
+Α(c₉, color, silver) ∧ 
+Α(e₉, power, 245) ∧ 
+Α(e₉, cylinders, 6) ∧
+Ν(X5, RWD)
+
+
+# Negatívny príklad: BMW Series 7 s manuálnou prevodovkou
+Ι(c₁₀, Series5) ∧ 
+Π(c₁₀, e₁₀) ∧ Ι(e₁₀, PetrolEngine) ∧ 
+Π(c₁₀, d₁₀) ∧ Ι(d₁₀, RWD) ∧ 
+Α(c₁₀, color, white) ∧ 
+Α(e₁₀, power, 220) ∧ 
+Α(e₁₀, cylinders, 4)
