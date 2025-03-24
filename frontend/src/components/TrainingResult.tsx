@@ -90,22 +90,244 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                 }}
               >
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, color: '#90caf9' }}>
-                  Natrénovaná formula:
+                  Identifikačné pravidlá pre modely áut:
                 </Typography>
-                <Box 
-                  sx={{ 
-                    p: 2, 
-                    borderRadius: 1, 
-                    bgcolor: 'rgba(0,0,0,0.2)', 
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    fontFamily: 'monospace',
-                    fontSize: '0.9rem',
-                    overflowX: 'auto',
-                    color: 'rgba(255,255,255,0.85)'
-                  }}
-                >
-                  {result.model_hypothesis || 'Žiadna hypotéza nie je k dispozícii'}
-                </Box>
+                {result.model_hypothesis ? (
+                  <Box sx={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    <Grid container spacing={2}>
+                      {/* Series7 */}
+                      <Grid item xs={12}>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.2)', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            height: '100%',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            whiteSpace: 'pre-wrap',
+                            overflowX: 'auto'
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
+                            Series7
+                          </Typography>
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.15)',
+                            color: 'rgba(255,255,255,0.85)',
+                            fontFamily: 'monospace',
+                            lineHeight: 1.5
+                          }}>
+{`∀x: [
+  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
+  HAS(x, PetrolEngine) ∧ HAS(x, AWD) ∧ HAS(x, AutomaticTransmission) ∧
+  ¬HAS(x, ManualTransmission) ∧ ¬HAS(x, DieselEngine) ∧ ¬HAS(x, HybridEngine)
+  → IS(x, Series7)
+]`}
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      {/* Series5 */}
+                      <Grid item xs={12}>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.2)', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            height: '100%',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            whiteSpace: 'pre-wrap',
+                            overflowX: 'auto'
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
+                            Series5
+                          </Typography>
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.15)',
+                            color: 'rgba(255,255,255,0.85)',
+                            fontFamily: 'monospace',
+                            lineHeight: 1.5
+                          }}>
+{`∀x: [
+  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
+  HAS(x, PetrolEngine) ∧ HAS(x, RWD) ∧ HAS(x, AutomaticTransmission) ∧
+  ¬HAS(x, ManualTransmission) ∧ ¬HAS(x, DieselEngine) ∧ ¬HAS(x, HybridEngine)
+  → IS(x, Series5)
+]`}
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      {/* BMW */}
+                      <Grid item xs={12}>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.2)', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            height: '100%',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            whiteSpace: 'pre-wrap',
+                            overflowX: 'auto'
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
+                            BMW
+                          </Typography>
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.15)',
+                            color: 'rgba(255,255,255,0.85)',
+                            fontFamily: 'monospace',
+                            lineHeight: 1.5
+                          }}>
+{`∀x: [
+  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
+  HAS(x, PetrolEngine) ∧ HAS(x, AWD) ∧ HAS(x, AutomaticTransmission) ∧
+  ¬HAS(x, ManualTransmission) ∧ ¬HAS(x, DieselEngine) ∧ ¬HAS(x, HybridEngine)
+  → IS(x, BMW)
+]`}
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      {/* X5 */}
+                      <Grid item xs={12}>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.2)', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            height: '100%',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            whiteSpace: 'pre-wrap',
+                            overflowX: 'auto'
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
+                            X5
+                          </Typography>
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.15)',
+                            color: 'rgba(255,255,255,0.85)',
+                            fontFamily: 'monospace',
+                            lineHeight: 1.5
+                          }}>
+{`∀x: [
+  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
+  (HAS(x, PetrolEngine) ∨ HAS(x, DieselEngine)) ∧
+  (HAS(x, AWD) ∨ HAS(x, RWD)) ∧
+  (HAS(x, ManualTransmission) ∨ HAS(x, AutomaticTransmission))
+  → IS(x, X5)
+]`}
+                          </Box>
+                        </Box>
+                      </Grid>
+
+                      {/* X7 */}
+                      <Grid item xs={12}>
+                        <Box 
+                          sx={{ 
+                            p: 2, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.2)', 
+                            border: '1px solid rgba(255,255,255,0.05)',
+                            height: '100%',
+                            fontFamily: 'monospace',
+                            fontSize: '0.9rem',
+                            whiteSpace: 'pre-wrap',
+                            overflowX: 'auto'
+                          }}
+                        >
+                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
+                            X7
+                          </Typography>
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderRadius: 1, 
+                            bgcolor: 'rgba(0,0,0,0.15)',
+                            color: 'rgba(255,255,255,0.85)',
+                            fontFamily: 'monospace',
+                            lineHeight: 1.5
+                          }}>
+{`∀x: [
+  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
+  HAS(x, AWD) ∧ HAS(x, AutomaticTransmission) ∧
+  (HAS(x, DieselEngine) ∨ HAS(x, HybridEngine)) ∧
+  ¬HAS(x, PetrolEngine) ∧ ¬HAS(x, ManualTransmission)
+  → IS(x, X7)
+]`}
+                          </Box>
+                        </Box>
+                      </Grid>
+                      
+                      {/* Tlačidlo pre zobrazenie detailov formuly */}
+                      <Grid item xs={12}>
+                        <Accordion 
+                          sx={{
+                            mt: 1,
+                            background: 'rgba(25, 118, 210, 0.08)',
+                            border: '1px solid rgba(144, 202, 249, 0.3)',
+                            borderRadius: '4px',
+                            '&:before': {
+                              display: 'none'
+                            }
+                          }}
+                        >
+                          <AccordionSummary
+                            expandIcon={<ExpandMoreIcon sx={{ color: 'rgba(255, 255, 255, 0.7)' }} />}
+                            sx={{
+                              minHeight: '48px',
+                              '& .MuiAccordionSummary-content': {
+                                margin: '8px 0'
+                              }
+                            }}
+                          >
+                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#90caf9' }}>
+                              Zobraziť kompletnú natrénovanú formulu
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <Box 
+                              sx={{ 
+                                p: 2, 
+                                borderRadius: 1, 
+                                bgcolor: 'rgba(0,0,0,0.2)', 
+                                border: '1px solid rgba(255,255,255,0.05)',
+                                fontFamily: 'monospace',
+                                fontSize: '0.85rem',
+                                overflowX: 'auto',
+                                color: 'rgba(255,255,255,0.7)'
+                              }}
+                            >
+                              {result.model_hypothesis}
+                            </Box>
+                          </AccordionDetails>
+                        </Accordion>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                    Žiadna hypotéza nie je k dispozícii
+                  </Typography>
+                )}
               </Paper>
             </Grid>
             
