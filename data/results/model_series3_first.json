@@ -1,0 +1,214 @@
+{
+  "objects": [
+    {
+      "name": "t\u2081",
+      "class_name": "ManualTransmission",
+      "attributes": null
+    },
+    {
+      "name": "e\u2081",
+      "class_name": "PetrolEngine",
+      "attributes": {
+        "cylinders": "4",
+        "power": "190",
+        "allowed_transmission_types": [
+          "AutomaticTransmission",
+          "ManualTransmission"
+        ]
+      }
+    },
+    {
+      "name": "c\u2081",
+      "class_name": "Series3",
+      "attributes": {
+        "color": "blue",
+        "weight": "1600",
+        "allowed_transmission_types": [
+          "AutomaticTransmission",
+          "ManualTransmission"
+        ],
+        "allowed_drivesystem_types": [
+          "RWD",
+          "XDrive",
+          "AWD"
+        ],
+        "allowed_engine_types": [
+          "DieselEngine",
+          "PetrolEngine"
+        ]
+      }
+    },
+    {
+      "name": "d\u2081",
+      "class_name": "RWD",
+      "attributes": null
+    }
+  ],
+  "links": [
+    {
+      "source": "e\u2081",
+      "target": "t\u2081",
+      "link_type": "regular"
+    },
+    {
+      "source": "t\u2081",
+      "target": "ManualTransmission",
+      "link_type": "must_be_a"
+    },
+    {
+      "source": "e\u2081",
+      "target": "PetrolEngine",
+      "link_type": "must_be_a"
+    },
+    {
+      "source": "c\u2081",
+      "target": "e\u2081",
+      "link_type": "regular"
+    },
+    {
+      "source": "c\u2081",
+      "target": "d\u2081",
+      "link_type": "regular"
+    },
+    {
+      "source": "c\u2081",
+      "target": "t\u2081",
+      "link_type": "regular"
+    },
+    {
+      "source": "c\u2081",
+      "target": "Series3",
+      "link_type": "must_be_a"
+    },
+    {
+      "source": "d\u2081",
+      "target": "RWD",
+      "link_type": "must_be_a"
+    },
+    {
+      "source": "PetrolEngine",
+      "target": "Transmission",
+      "link_type": "must"
+    },
+    {
+      "source": "Series3",
+      "target": "Engine",
+      "link_type": "must"
+    },
+    {
+      "source": "Series3",
+      "target": "DriveSystem",
+      "link_type": "must"
+    },
+    {
+      "source": "Series3",
+      "target": "Transmission",
+      "link_type": "must"
+    },
+    {
+      "source": "Series3",
+      "target": "RWD",
+      "link_type": "must"
+    },
+    {
+      "source": "c\u2081",
+      "target": "d\u2081",
+      "link_type": "must"
+    },
+    {
+      "source": "Series7",
+      "target": "DriveSystem",
+      "link_type": "must"
+    },
+    {
+      "source": "Series7",
+      "target": "Transmission",
+      "link_type": "must"
+    },
+    {
+      "source": "Series7",
+      "target": "Engine",
+      "link_type": "must"
+    },
+    {
+      "source": "Series7",
+      "target": "AWD",
+      "link_type": "must"
+    },
+    {
+      "source": "c\u2082",
+      "target": "d\u2082",
+      "link_type": "must"
+    },
+    {
+      "source": "Series7",
+      "target": "AutomaticTransmission",
+      "link_type": "must"
+    },
+    {
+      "source": "c\u2082",
+      "target": "t\u2082",
+      "link_type": "must"
+    },
+    {
+      "source": "PetrolEngine",
+      "target": "AutomaticTransmission",
+      "link_type": "must"
+    },
+    {
+      "source": "e\u2082",
+      "target": "t\u2082",
+      "link_type": "must"
+    },
+    {
+      "source": "Series7",
+      "target": "PetrolEngine",
+      "link_type": "must"
+    },
+    {
+      "source": "c\u2082",
+      "target": "e\u2082",
+      "link_type": "must"
+    },
+    {
+      "source": "BMW",
+      "target": "Engine",
+      "link_type": "must"
+    },
+    {
+      "source": "BMW",
+      "target": "Transmission",
+      "link_type": "must"
+    },
+    {
+      "source": "BMW",
+      "target": "DriveSystem",
+      "link_type": "must"
+    },
+    {
+      "source": "X5",
+      "target": "Transmission",
+      "link_type": "must"
+    },
+    {
+      "source": "X5",
+      "target": "Engine",
+      "link_type": "must"
+    },
+    {
+      "source": "X5",
+      "target": "DriveSystem",
+      "link_type": "must"
+    },
+    {
+      "source": "DieselEngine",
+      "target": "Transmission",
+      "link_type": "must"
+    },
+    {
+      "source": "Engine",
+      "target": "Transmission",
+      "link_type": "must"
+    }
+  ]
+}

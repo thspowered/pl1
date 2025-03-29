@@ -3,9 +3,9 @@ import requests
 import json
 import time
 from pprint import pprint
-from backend.model import Model, Link, LinkType, Object, ClassificationTree
-from backend.learner import WinstonLearner
-from backend.pl1_parser import parse_pl1_formula
+from pl1.backend.model import Model, Link, LinkType, Object, ClassificationTree
+from pl1.backend.learner import WinstonLearner
+from pl1.backend.pl1_parser import parse_pl1_formula
 
 # Základné nastavenia
 BASE_URL = "http://localhost:8000"

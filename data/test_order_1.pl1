@@ -1,0 +1,65 @@
+# X5 - Benzínový 6-valcový motor, automatická prevodovka, XDrive
+Ι(c₁, X5) ∧ 
+Π(c₁, e₁) ∧ Ι(e₁, PetrolEngine) ∧ 
+Π(c₁, t₁) ∧ Ι(t₁, AutomaticTransmission) ∧ 
+Π(c₁, d₁) ∧ Ι(d₁, XDrive) ∧ 
+Π(e₁, t₁) ∧ 
+Α(c₁, color, "black") ∧
+Α(c₁, weight, 2200) ∧ 
+Α(e₁, cylinders, 6) ∧ 
+Α(e₁, power, 300)
+
+# X5 - Naftový 6-valcový motor, automatická prevodovka, XDrive
+Ι(c₂, X5) ∧ 
+Π(c₂, e₂) ∧ Ι(e₂, DieselEngine) ∧ 
+Π(c₂, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧ 
+Π(c₂, d₂) ∧ Ι(d₂, XDrive) ∧ 
+Π(e₂, t₂) ∧ 
+Α(c₂, color, "silver") ∧
+Α(c₂, weight, 2250) ∧ 
+Α(e₂, cylinders, 6) ∧ 
+Α(e₂, power, 280)
+
+# Series7 - Benzínový 8-valcový motor, automatická prevodovka, AWD
+Ι(c₃, Series7) ∧ 
+Π(c₃, e₃) ∧ Ι(e₃, PetrolEngine) ∧ 
+Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧ 
+Π(c₃, d₃) ∧ Ι(d₃, AWD) ∧ 
+Π(e₃, t₃) ∧ 
+Α(c₃, color, "black") ∧
+Α(c₃, weight, 2000) ∧ 
+Α(e₃, cylinders, 8) ∧ 
+Α(e₃, power, 450)
+
+# Series3 - Benzínový 4-valcový motor, manuálna prevodovka, RWD
+Ι(c₄, Series3) ∧ 
+Π(c₄, e₄) ∧ Ι(e₄, PetrolEngine) ∧ 
+Π(c₄, t₄) ∧ Ι(t₄, ManualTransmission) ∧ 
+Π(c₄, d₄) ∧ Ι(d₄, RWD) ∧ 
+Π(e₄, t₄) ∧ 
+Α(c₄, color, "blue") ∧
+Α(c₄, weight, 1600) ∧ 
+Α(e₄, cylinders, 4) ∧ 
+Α(e₄, power, 190)
+
+# Negatívny príklad 1: X5 s manuálnou prevodovkou (X5 má vždy automatickú)
+Ι(n₁, X5) ∧ 
+Π(n₁, ne₁) ∧ Ι(ne₁, PetrolEngine) ∧ 
+Π(n₁, nt₁) ∧ Ι(nt₁, ManualTransmission) ∧ 
+Π(n₁, nd₁) ∧ Ι(nd₁, XDrive) ∧ 
+Π(ne₁, nt₁) ∧ 
+Α(n₁, color, "blue") ∧
+Α(n₁, weight, 2200) ∧ 
+Α(ne₁, cylinders, 6) ∧ 
+Ν(X5, ManualTransmission)
+
+# Negatívny príklad 2: Series3 s AWD (Series3 má vždy RWD)
+Ι(n₂, Series3) ∧ 
+Π(n₂, ne₂) ∧ Ι(ne₂, PetrolEngine) ∧ 
+Π(n₂, nt₂) ∧ Ι(nt₂, ManualTransmission) ∧ 
+Π(n₂, nd₂) ∧ Ι(nd₂, AWD) ∧ 
+Π(ne₂, nt₂) ∧ 
+Α(n₂, color, "red") ∧
+Α(n₂, weight, 1650) ∧ 
+Α(ne₂, cylinders, 4) ∧ 
+Ν(Series3, AWD) 

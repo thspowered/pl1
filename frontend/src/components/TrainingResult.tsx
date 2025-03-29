@@ -19,13 +19,194 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TrainingResult as TrainingResultType } from '../types';
 import SigmaNetwork from './SigmaNetwork';
+import { useMemo, useEffect } from 'react';
 
 interface TrainingResultProps {
   result: TrainingResultType | null;
   onRefreshGraph?: () => void;
 }
 
+// Funkcia na parsovanie identifikačných pravidiel pre konkrétny model auta
+const extractModelRules = (hypothesis: string | null, modelName: string): string | null => {
+  if (!hypothesis) return null;
+  
+  // Pokúsime sa nájsť vzorce, ktoré obsahujú IS(x, modelName)
+  // Upravená verzia regexu, ktorá by mala byť flexibilnejšia
+  try {
+    // Skúsime najprv nájsť sekciu, ktorá vedie k danému modelu
+    const regex = new RegExp(`.*→\\s*IS\\s*\\(.*?,\\s*${modelName}\\s*\\)`, 'i');
+    const match = hypothesis.match(regex);
+    
+    if (match && match[0]) {
+      // Vyčistíme a naformátujeme pravidlo
+      let rule = match[0].trim();
+      
+      // Odstránime prípadné úvodné logické spojky, ak sa začína s ∧ alebo ∨
+      rule = rule.replace(/^(\s*[∧∨]\s*)/, '');
+      
+      // Pridanie kvantifikátora a zátvoriek pre štandardnú logickú formulu
+      return `∀x: [\n  ${rule}\n]`;
+    }
+    
+    // Alternatívny prístup - hľadanie častí pre IS(x, modelName)
+    const simpleRegex = new RegExp(`IS\\s*\\(.*?,\\s*${modelName}\\s*\\)`, 'i');
+    const simpleMatch = hypothesis.match(simpleRegex);
+    
+    if (simpleMatch && simpleMatch[0]) {
+      // Získame širší kontext okolo nájdeného výrazu
+      const index = hypothesis.indexOf(simpleMatch[0]);
+      const startIndex = Math.max(0, hypothesis.lastIndexOf(')') >= 0 ? hypothesis.lastIndexOf(')', index - 100) : index - 100);
+      const endIndex = Math.min(hypothesis.length, index + simpleMatch[0].length + 1);
+      let context = hypothesis.substring(startIndex, endIndex).trim();
+      
+      // Upravíme kontext tak, aby bol validný výraz
+      if (!context.includes('→')) {
+        context = `... → ${simpleMatch[0]}`;
+      }
+      
+      return `∀x: [\n  ${context}\n]`;
+    }
+  } catch (error) {
+    console.error(`Chyba pri parsovaní pravidiel pre ${modelName}:`, error);
+  }
+  
+  return null;
+};
+
+// Nová funkcia na extrakciu pravidiel v štýle ∀x: [ conditions → IS(x, model) ]
+const extractModelRulesAlternative = (hypothesis: string | null): Record<string, string> => {
+  if (!hypothesis) return {};
+  
+  const results: Record<string, string> = {};
+  
+  // Vzor pre jednoduché pravidlá ako boli ukázané v obraze
+  // Hľadá vzory: HAS(x, something) ∧ ... → IS(x, ModelName)
+  try {
+    // Hľadáme časti s IS(x, <model>)
+    const modelRegex = /IS\s*\(\s*\w+\s*,\s*(\w+)\s*\)/g;
+    let match;
+    
+    // Pre každý model nájdený v hypotéze
+    while ((match = modelRegex.exec(hypothesis)) !== null) {
+      const modelName = match[1]; // Získaj názov modelu
+      if (!modelName) continue;
+      
+      // Hľadáme pravidlo pred IS(x, model)
+      const rulePart = hypothesis.substring(Math.max(0, match.index - 300), match.index).trim();
+      const arrowIndex = rulePart.lastIndexOf('→');
+      
+      if (arrowIndex >= 0) {
+        // Berieme časť za poslednou šípkou a pridáme IS výraz
+        const conditions = rulePart.substring(arrowIndex + 1).trim();
+        const completeRule = `${conditions} → ${match[0]}`;
+        
+        // Formátujeme ako v príklade
+        results[modelName] = `∀x: [\n  ${completeRule}\n]`;
+      } else {
+        // Ak nenájdeme šípku, vezmeme aspoň časť pred výrazom IS
+        const lastConjunction = Math.max(
+          rulePart.lastIndexOf('∧'),
+          rulePart.lastIndexOf('∨'),
+          rulePart.lastIndexOf('¬')
+        );
+        
+        if (lastConjunction >= 0) {
+          const partialConditions = rulePart.substring(lastConjunction).trim();
+          const completeRule = `${partialConditions} → ${match[0]}`;
+          
+          // Formátujeme ako v príklade
+          results[modelName] = `∀x: [\n  ${completeRule}\n]`;
+        }
+      }
+    }
+    
+    // Ak sme nenašli žiadne výsledky, skúsime ešte jeden alternatívny prístup
+    if (Object.keys(results).length === 0) {
+      // Skúsime nájsť vzor podobný tomu z obrazu
+      const fullRuleRegex = /∀x:\s*\[\s*([^→]*?)→\s*IS\s*\(\s*\w+\s*,\s*(\w+)\s*\)\s*\]/g;
+      
+      while ((match = fullRuleRegex.exec(hypothesis)) !== null) {
+        const conditions = match[1]?.trim();
+        const modelName = match[2]?.trim();
+        
+        if (conditions && modelName) {
+          results[modelName] = `∀x: [\n  ${conditions} → IS(x, ${modelName})\n]`;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Chyba pri alternatívnej extrakcii pravidiel:", error);
+  }
+  
+  return results;
+};
+
 const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) => {
+  // Vypíšeme hypothesis pre debugging
+  useEffect(() => {
+    if (result?.model_hypothesis) {
+      console.log("Model hypothesis:", result.model_hypothesis);
+    }
+    if (result?.model_rules) {
+      console.log("Model rules received from backend:", result.model_rules);
+      console.log("Type of model_rules:", typeof result.model_rules);
+      console.log("Keys in model_rules:", Object.keys(result.model_rules));
+    }
+  }, [result?.model_hypothesis, result?.model_rules]);
+
+  // Skúsime aj alternatívnu metódu extrakcie
+  const alternativeRules = useMemo(() => {
+    return result?.model_hypothesis 
+      ? extractModelRulesAlternative(result.model_hypothesis)
+      : {};
+  }, [result?.model_hypothesis]);
+
+  // Dynamicky získaj pravidlá
+  const modelRules = useMemo(() => {
+    // Ak máme pravidlá priamo z backendu, použijeme ich prioritne
+    if (result?.model_rules && Object.keys(result.model_rules).length > 0) {
+      console.log("Using rules directly from backend:", result.model_rules);
+      return result.model_rules;
+    }
+    
+    console.log("No rules from backend, falling back to extraction");
+    
+    // Inak sa pokúsime extrahovať ich z hypotézy (fallback pre spätnú kompatibilitu)
+    if (!result?.model_hypothesis) return {};
+    
+    const rules = {
+      'BMW': extractModelRules(result.model_hypothesis, 'BMW'),
+      'Series3': extractModelRules(result.model_hypothesis, 'Series3'),
+      'Series5': extractModelRules(result.model_hypothesis, 'Series5'),
+      'Series7': extractModelRules(result.model_hypothesis, 'Series7'),
+      'X5': extractModelRules(result.model_hypothesis, 'X5'),
+      'X7': extractModelRules(result.model_hypothesis, 'X7')
+    };
+    
+    // Debug log pre extrahované pravidlá
+    console.log("Extrahované pravidlá pôvodnou metódou:", rules);
+    console.log("Extrahované pravidlá alternatívnou metódou:", alternativeRules);
+    
+    // Ak máme viac pravidiel z alternatívnej metódy, použijeme tie
+    const validRulesCount = Object.keys(rules).filter(k => rules[k as keyof typeof rules] !== null).length;
+    const alternativeRulesCount = Object.keys(alternativeRules).length;
+    
+    console.log(`Porovnanie metód: pôvodná (${validRulesCount}) vs. alternatívna (${alternativeRulesCount})`);
+    
+    if (alternativeRulesCount > validRulesCount) {
+      console.log("Using alternative extraction method");
+      return alternativeRules;
+    }
+    
+    console.log("Using original extraction method");
+    return rules;
+  }, [result?.model_hypothesis, alternativeRules, result?.model_rules]);
+  
+  // Zistíme, či vôbec máme nejaké extrahované pravidlá
+  const hasRules = useMemo(() => {
+    return Object.values(modelRules).some(rule => rule !== null && rule !== undefined);
+  }, [modelRules]);
+  
   if (!result) {
     return (
       <Paper 
@@ -94,188 +275,57 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                 </Typography>
                 {result.model_hypothesis ? (
                   <Box sx={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    {!hasRules && (
+                      <Alert 
+                        severity="info" 
+                        sx={{ 
+                          mb: 2,
+                          borderRadius: 1,
+                          background: 'rgba(25, 118, 210, 0.15)',
+                          border: '1px solid rgba(25, 118, 210, 0.3)',
+                          color: 'white',
+                          '& .MuiAlert-icon': { color: '#90caf9' },
+                        }}
+                      >
+                        Neboli nájdené žiadne pravidlá pre konkrétne modely. Pozrite si kompletnú formulu nižšie.
+                      </Alert>
+                    )}
+                    
                     <Grid container spacing={2}>
-                      {/* Series7 */}
-                      <Grid item xs={12}>
-                        <Box 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.2)', 
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            height: '100%',
-                            fontFamily: 'monospace',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'pre-wrap',
-                            overflowX: 'auto'
-                          }}
-                        >
-                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
-                            Series7
-                          </Typography>
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.15)',
-                            color: 'rgba(255,255,255,0.85)',
-                            fontFamily: 'monospace',
-                            lineHeight: 1.5
-                          }}>
-{`∀x: [
-  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
-  HAS(x, PetrolEngine) ∧ HAS(x, AWD) ∧ HAS(x, AutomaticTransmission) ∧
-  ¬HAS(x, ManualTransmission) ∧ ¬HAS(x, DieselEngine) ∧ ¬HAS(x, HybridEngine)
-  → IS(x, Series7)
-]`}
-                          </Box>
-                        </Box>
-                      </Grid>
-
-                      {/* Series5 */}
-                      <Grid item xs={12}>
-                        <Box 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.2)', 
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            height: '100%',
-                            fontFamily: 'monospace',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'pre-wrap',
-                            overflowX: 'auto'
-                          }}
-                        >
-                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
-                            Series5
-                          </Typography>
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.15)',
-                            color: 'rgba(255,255,255,0.85)',
-                            fontFamily: 'monospace',
-                            lineHeight: 1.5
-                          }}>
-{`∀x: [
-  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
-  HAS(x, PetrolEngine) ∧ HAS(x, RWD) ∧ HAS(x, AutomaticTransmission) ∧
-  ¬HAS(x, ManualTransmission) ∧ ¬HAS(x, DieselEngine) ∧ ¬HAS(x, HybridEngine)
-  → IS(x, Series5)
-]`}
-                          </Box>
-                        </Box>
-                      </Grid>
-
-                      {/* BMW */}
-                      <Grid item xs={12}>
-                        <Box 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.2)', 
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            height: '100%',
-                            fontFamily: 'monospace',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'pre-wrap',
-                            overflowX: 'auto'
-                          }}
-                        >
-                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
-                            BMW
-                          </Typography>
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.15)',
-                            color: 'rgba(255,255,255,0.85)',
-                            fontFamily: 'monospace',
-                            lineHeight: 1.5
-                          }}>
-{`∀x: [
-  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
-  HAS(x, PetrolEngine) ∧ HAS(x, AWD) ∧ HAS(x, AutomaticTransmission) ∧
-  ¬HAS(x, ManualTransmission) ∧ ¬HAS(x, DieselEngine) ∧ ¬HAS(x, HybridEngine)
-  → IS(x, BMW)
-]`}
-                          </Box>
-                        </Box>
-                      </Grid>
-
-                      {/* X5 */}
-                      <Grid item xs={12}>
-                        <Box 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.2)', 
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            height: '100%',
-                            fontFamily: 'monospace',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'pre-wrap',
-                            overflowX: 'auto'
-                          }}
-                        >
-                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
-                            X5
-                          </Typography>
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.15)',
-                            color: 'rgba(255,255,255,0.85)',
-                            fontFamily: 'monospace',
-                            lineHeight: 1.5
-                          }}>
-{`∀x: [
-  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
-  (HAS(x, PetrolEngine) ∨ HAS(x, DieselEngine)) ∧
-  (HAS(x, AWD) ∨ HAS(x, RWD)) ∧
-  (HAS(x, ManualTransmission) ∨ HAS(x, AutomaticTransmission))
-  → IS(x, X5)
-]`}
-                          </Box>
-                        </Box>
-                      </Grid>
-
-                      {/* X7 */}
-                      <Grid item xs={12}>
-                        <Box 
-                          sx={{ 
-                            p: 2, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.2)', 
-                            border: '1px solid rgba(255,255,255,0.05)',
-                            height: '100%',
-                            fontFamily: 'monospace',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'pre-wrap',
-                            overflowX: 'auto'
-                          }}
-                        >
-                          <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
-                            X7
-                          </Typography>
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderRadius: 1, 
-                            bgcolor: 'rgba(0,0,0,0.15)',
-                            color: 'rgba(255,255,255,0.85)',
-                            fontFamily: 'monospace',
-                            lineHeight: 1.5
-                          }}>
-{`∀x: [
-  HAS(x, DriveSystem) ∧ HAS(x, Engine) ∧ HAS(x, Transmission) ∧
-  HAS(x, AWD) ∧ HAS(x, AutomaticTransmission) ∧
-  (HAS(x, DieselEngine) ∨ HAS(x, HybridEngine)) ∧
-  ¬HAS(x, PetrolEngine) ∧ ¬HAS(x, ManualTransmission)
-  → IS(x, X7)
-]`}
-                          </Box>
-                        </Box>
-                      </Grid>
+                      {/* Dynamicky vygenerované komponenty pre každý model auta */}
+                      {Object.entries(modelRules).map(([modelName, rule]) => 
+                        rule ? (
+                          <Grid item xs={12} key={modelName}>
+                            <Box 
+                              sx={{ 
+                                p: 2, 
+                                borderRadius: 1, 
+                                bgcolor: 'rgba(0,0,0,0.2)', 
+                                border: '1px solid rgba(255,255,255,0.05)',
+                                height: '100%',
+                                fontFamily: 'monospace',
+                                fontSize: '0.9rem',
+                                whiteSpace: 'pre-wrap',
+                                overflowX: 'auto'
+                              }}
+                            >
+                              <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
+                                {modelName}
+                              </Typography>
+                              <Box sx={{ 
+                                p: 1.5, 
+                                borderRadius: 1, 
+                                bgcolor: 'rgba(0,0,0,0.15)',
+                                color: 'rgba(255,255,255,0.85)',
+                                fontFamily: 'monospace',
+                                lineHeight: 1.5
+                              }}>
+                                {rule}
+                              </Box>
+                            </Box>
+                          </Grid>
+                        ) : null
+                      )}
                       
                       {/* Tlačidlo pre zobrazenie detailov formuly */}
                       <Grid item xs={12}>

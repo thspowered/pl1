@@ -38,7 +38,7 @@ MAX_HISTORY_SIZE = 30  # Maximálny počet krokov v histórií
 # Dátové modely pre API
 class PL1Example(BaseModel):
     formula: str
-    is_positive: bool
+    is_positive: Optional[bool] = True
     name: Optional[str] = None
 
 class TrainingRequest(BaseModel):
@@ -847,6 +847,9 @@ async def train_model(training_request: TrainingRequest):
         # Vytvor textovú reprezentáciu hypotézy
         model_hypothesis = current_model.to_formula()
         
+        # Extrahuj identifikačné pravidlá pre modely áut
+        model_rules = current_model.extract_model_rules()
+        
         # Aktualizuj informácie o použitých príkladoch
         for example_id in example_ids:
             if example_id < len(dataset_examples):
@@ -870,6 +873,7 @@ async def train_model(training_request: TrainingRequest):
             "model_updated": True,
             "model_visualization": model_visualization,
             "model_hypothesis": model_hypothesis,
+            "model_rules": model_rules,  # Pridané extrahované pravidlá
             "training_steps": training_steps,
             "training_mode": "batch" if len(example_ids) > 1 else "single",
             "used_examples_count": used_count,
@@ -1084,6 +1088,9 @@ async def step_back_in_history():
     
     # Získaní trénovanej formuly
     model_hypothesis = current_model.to_formula() if current_model else None
+
+    # Extrahuj identifikačné pravidlá pre modely áut
+    model_rules = current_model.extract_model_rules() if current_model else {}
     
     return {
         "success": True,
@@ -1094,6 +1101,7 @@ async def step_back_in_history():
         "used_examples_count": history_entry.get("used_examples_count", 0),
         "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
         "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
+        "model_rules": model_rules,  # Pridané extrahované pravidlá 
         "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 
@@ -1135,6 +1143,9 @@ async def step_forward_in_history():
     
     # Získaní trénovanej formuly
     model_hypothesis = current_model.to_formula() if current_model else None
+
+    # Extrahuj identifikačné pravidlá pre modely áut
+    model_rules = current_model.extract_model_rules() if current_model else {}
     
     return {
         "success": True,
@@ -1145,6 +1156,7 @@ async def step_forward_in_history():
         "used_examples_count": history_entry.get("used_examples_count", 0),
         "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
         "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
+        "model_rules": model_rules,  # Pridané extrahované pravidlá
         "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 

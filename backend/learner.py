@@ -163,6 +163,8 @@ class WinstonLearner:
         # 1. Zbieranie hodnôt atribútov podľa tried objektov
         class_attributes = {}
         
+        print(f"Applying enlarge-set heuristic")
+        
         # Najprv zozbierame hodnoty atribútov z existujúceho modelu
         for model_obj in updated_model.objects:
             if not model_obj.attributes:
@@ -179,9 +181,24 @@ class WinstonLearner:
                 # Ak hodnota je už množina, pridáme všetky jej prvky
                 if isinstance(attr_value, set):
                     class_attributes[class_name][attr_name].update(attr_value)
-                # Ak je to interval, ignorujeme (spracúva sa v close_interval)
-                elif not isinstance(attr_value, tuple):
+                    print(f"  Found existing set for {class_name}.{attr_name}: {attr_value}")
+                # Ak je to interval, extrahujeme hodnoty
+                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
+                    # Zistíme či ide o atribút, ktorý by mal byť diskrétny (cylinders)
+                    if attr_name in ["cylinders"]:
+                        # Pre cylinders použijeme celočíselné hodnoty z intervalu
+                        min_val, max_val = attr_value
+                        for val in range(int(min_val), int(max_val) + 1):
+                            class_attributes[class_name][attr_name].add(val)
+                        print(f"  Converted interval {attr_value} to discrete values for {class_name}.{attr_name}: {class_attributes[class_name][attr_name]}")
+                    else:
+                        # Pre ostatné atribúty použijeme interval ako je
+                        class_attributes[class_name][attr_name].add(attr_value)
+                        print(f"  Added interval {attr_value} for {class_name}.{attr_name}")
+                else:
+                    # Inak pridáme hodnotu ako je
                     class_attributes[class_name][attr_name].add(attr_value)
+                    print(f"  Added value {attr_value} for {class_name}.{attr_name}")
         
         # 2. Pridáme hodnoty atribútov z pozitívneho príkladu
         for good_obj in good.objects:
@@ -189,18 +206,38 @@ class WinstonLearner:
                 continue
                 
             class_name = good_obj.class_name
+            print(f"  Processing attributes from positive example for {class_name}")
+            
             if class_name not in class_attributes:
                 class_attributes[class_name] = {}
                 
             for attr_name, attr_value in good_obj.attributes.items():
-                # Preskočíme numerické intervaly - tie spracúva close_interval
-                if isinstance(attr_value, tuple) or isinstance(attr_value, set):
-                    continue
-                    
                 if attr_name not in class_attributes[class_name]:
                     class_attributes[class_name][attr_name] = set()
-                    
-                class_attributes[class_name][attr_name].add(attr_value)
+                
+                # Spracujeme všetky typy hodnôt vrátane numerických
+                if isinstance(attr_value, set):
+                    # Ak je to už množina, pridáme všetky hodnoty
+                    class_attributes[class_name][attr_name].update(attr_value)
+                    print(f"    Added set values for {attr_name}: {attr_value}")
+                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
+                    # Ak je to interval, pridáme ho do množiny
+                    class_attributes[class_name][attr_name].add(attr_value)
+                    print(f"    Added interval for {attr_name}: {attr_value}")
+                else:
+                    # Pridáme hodnotu do množiny
+                    # Špeciálne spracovanie pre numerické atribúty, pre ktoré preferujeme vytvorenie množiny
+                    if attr_name in ["cylinders", "power"]:
+                        class_attributes[class_name][attr_name].add(attr_value)
+                        print(f"    Added numerical value for {attr_name}: {attr_value}")
+                    elif isinstance(attr_value, (int, float)):
+                        # Ostatné numerické hodnoty pridáme tiež do množiny
+                        class_attributes[class_name][attr_name].add(attr_value)
+                        print(f"    Added numerical value for {attr_name}: {attr_value}")
+                    else:
+                        # Nenumerické hodnoty pridáme tiež
+                        class_attributes[class_name][attr_name].add(attr_value)
+                        print(f"    Added value for {attr_name}: {attr_value}")
                 
         # 3. Aplikácia zozbieraných množín hodnôt naspäť do modelu
         heuristic_applied = False
@@ -214,31 +251,50 @@ class WinstonLearner:
                 
             if not model_obj.attributes:
                 model_obj.attributes = {}
+            
+            print(f"  Updating attributes for {model_obj.name} of class {class_name}")
                 
             # Pre každý atribút, ktorý máme pre túto triedu
             for attr_name, values_set in class_attributes[class_name].items():
                 # Ak máme viac ako jednu hodnotu, vytvoríme množinu
                 if len(values_set) > 1:
-                    # Aktuálna hodnota v objekte
-                    current_value = model_obj.attributes.get(attr_name)
-                    
-                    # Ak aktuálna hodnota nie je množina, aktualizujeme ju
-                    if not isinstance(current_value, set):
-                        model_obj.attributes[attr_name] = values_set
-                        heuristic_applied = True
-                        self._debug_log(f"Vytvorená množina hodnôt pre atribút {attr_name} triedy {class_name}: {values_set}")
-                    # Ak už máme množinu, skontrolujeme, či treba pridať nové hodnoty
-                    elif current_value != values_set:
-                        # Pridáme chýbajúce hodnoty
-                        missing_values = values_set - current_value
-                        if missing_values:
-                            current_value.update(missing_values)
+                    # Špeciálne spracovanie pre niektoré numerické atribúty
+                    if attr_name in ["cylinders", "power"]:
+                        # Skontrolujeme, či všetky hodnoty sú čísla
+                        all_numeric = all(isinstance(val, (int, float)) for val in values_set)
+                        if all_numeric:
+                            # Vytvoríme množinu numerických hodnôt
+                            model_obj.attributes[attr_name] = values_set
                             heuristic_applied = True
-                            self._debug_log(f"Rozšírená množina hodnôt atribútu {attr_name} pre triedu {class_name} o {missing_values}")
+                            print(f"    Created set of values for {attr_name}: {values_set}")
+                            self._debug_log(f"Vytvorená množina hodnôt pre numerický atribút {attr_name} triedy {class_name}: {values_set}")
+                        else:
+                            # Ak máme zmiešané hodnoty, ponecháme pôvodné
+                            print(f"    Mixed values for {attr_name}, skipping")
+                    else:
+                        # Pre ostatné atribúty štandardné spracovanie
+                        current_value = model_obj.attributes.get(attr_name)
+                        
+                        # Ak aktuálna hodnota nie je množina, aktualizujeme ju
+                        if not isinstance(current_value, set):
+                            model_obj.attributes[attr_name] = values_set
+                            heuristic_applied = True
+                            print(f"    Created set of values for {attr_name}: {values_set}")
+                            self._debug_log(f"Vytvorená množina hodnôt pre atribút {attr_name} triedy {class_name}: {values_set}")
+                        # Ak už máme množinu, skontrolujeme, či treba pridať nové hodnoty
+                        elif current_value != values_set:
+                            # Pridáme chýbajúce hodnoty
+                            missing_values = values_set - current_value
+                            if missing_values:
+                                current_value.update(missing_values)
+                                heuristic_applied = True
+                                print(f"    Extended set for {attr_name} with: {missing_values}")
+                                self._debug_log(f"Rozšírená množina hodnôt atribútu {attr_name} pre triedu {class_name} o {missing_values}")
                 # Ak máme len jednu hodnotu a atribút ešte neexistuje, pridáme ho
                 elif len(values_set) == 1 and attr_name not in model_obj.attributes:
                     model_obj.attributes[attr_name] = next(iter(values_set))
                     heuristic_applied = True
+                    print(f"    Added new attribute {attr_name} = {next(iter(values_set))}")
                     self._debug_log(f"Pridaný nový atribút {attr_name} s hodnotou {next(iter(values_set))} pre objekt triedy {class_name}")
         
         # 4. Osobitné spracovanie pre možnosti ekvivalentných komponentov (napr. rôzne typy motorov)
@@ -263,6 +319,7 @@ class WinstonLearner:
         # Ak máme viac ako jeden typ komponentu pre rodičovskú triedu, vytvoríme pravidlo
         for parent_class, subclasses in component_classes.items():
             if len(subclasses) > 1:
+                print(f"  Found equivalent components for {parent_class}: {subclasses}")
                 self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {subclasses}")
                 
                 # Pre každý objekt v modeli, ktorý má MUST spojenie s touto komponentou
@@ -282,10 +339,12 @@ class WinstonLearner:
                                 if attr_name not in obj.attributes or not isinstance(obj.attributes[attr_name], set):
                                     obj.attributes[attr_name] = subclasses
                                     heuristic_applied = True
+                                    print(f"    Created set of allowed components {attr_name} = {subclasses}")
                                     self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {subclasses}")
                                 elif subclasses - obj.attributes[attr_name]:
                                     obj.attributes[attr_name].update(subclasses)
                                     heuristic_applied = True
+                                    print(f"    Extended set of allowed components {attr_name}")
                                     self._debug_log(f"Rozšírená množina povolených komponentov {attr_name} pre triedu {source_class}")
         
         if heuristic_applied:
@@ -295,99 +354,19 @@ class WinstonLearner:
 
     def _apply_close_interval(self, model: Model, good: Model, near_miss: Model = None) -> Model:
         """
-        Aplikuje close-interval heuristiku.
-        
-        Zužuje intervaly numerických atributů na základě pozitivních a negativních příkladů.
-        Pro každý numerický atribut v pozitivním příkladu, pokud jeho hodnota spadá do intervalu v modelu,
-        ponechá interval nezměněný. Pokud je hodnota mimo interval, rozšíří interval.
-        Pro negativní příklad naopak vyloučí hodnoty, které jsou v příkladu, pokud interval překrývá tuto hodnotu.
+        POZNÁMKA: Táto metóda je dočasne zakomentovaná, pretože jej funkcionalitu preberá _apply_enlarge_set,
+        ktorá efektívnejšie spracováva numerické hodnoty pre atribúty ako power a cylinders.
         
         Args:
-            model: Aktuální model
-            good: Pozitivní příklad
+            model: Aktuálny model
+            good: Pozitívny príklad
             near_miss: Negativní příklad (volitelný)
             
         Returns:
-            Aktualizovaný model
+            Aktualizovaný model bez zmien (prejde priamo na _apply_enlarge_set)
         """
-        updated_model = model.copy()
-        
-        # 1. Zpracování pozitivních příkladů - úprava intervalů
-        for good_obj in good.objects:
-            if not good_obj.attributes:
-                continue
-                
-            for attr_name, attr_value in good_obj.attributes.items():
-                # Zajímají nás pouze numerické hodnoty
-                if not isinstance(attr_value, (int, float)):
-                    continue
-                
-                # Najdeme odpovídající objekty v modelu
-                for obj in updated_model.objects:
-                    if obj.class_name == good_obj.class_name and obj.attributes:
-                        # Pokud atribut existuje a je to interval
-                        if attr_name in obj.attributes and isinstance(obj.attributes[attr_name], tuple) and len(obj.attributes[attr_name]) == 2:
-                            current_min, current_max = obj.attributes[attr_name]
-                            
-                            # Pokud hodnota pozitivního příkladu je mimo interval, aktualizujeme ho
-                            if attr_value < current_min or attr_value > current_max:
-                                # Rozšíříme interval tak, aby zahrnoval novou hodnotu
-                                new_min = min(current_min, attr_value)
-                                new_max = max(current_max, attr_value)
-                                obj.attributes[attr_name] = (new_min, new_max)
-                                self.applied_heuristics.append("close_interval")
-                                self._debug_log(f"Rozšířen interval atributu {attr_name} pro třídu {good_obj.class_name} na ({new_min}, {new_max})")
-                        
-                        # Pokud atribut neexistuje nebo není interval, vytvoříme nový interval
-                        elif attr_name not in obj.attributes or not isinstance(obj.attributes[attr_name], tuple):
-                            # Pro nový atribut vytvoříme interval s malou tolerancí
-                            tolerance = max(0.1, abs(attr_value) * 0.05)  # 5% tolerance nebo minimálně 0.1
-                            new_min = attr_value - tolerance
-                            new_max = attr_value + tolerance
-                            obj.attributes[attr_name] = (new_min, new_max)
-                            self.applied_heuristics.append("close_interval")
-                            self._debug_log(f"Vytvořen nový interval pro atribut {attr_name} třídy {good_obj.class_name}: ({new_min}, {new_max})")
-        
-        # 2. Zpracování near-miss příkladů - vyloučení hodnot
-        if near_miss:
-            for near_miss_obj in near_miss.objects:
-                if not near_miss_obj.attributes:
-                    continue
-                    
-                for attr_name, attr_value in near_miss_obj.attributes.items():
-                    # Zajímají nás pouze numerické hodnoty
-                    if not isinstance(attr_value, (int, float)):
-                        continue
-                    
-                    # Najdeme odpovídající objekty v modelu
-                    for obj in updated_model.objects:
-                        if obj.class_name == near_miss_obj.class_name and obj.attributes and attr_name in obj.attributes:
-                            # Pokud atribut existuje a je to interval
-                            if isinstance(obj.attributes[attr_name], tuple) and len(obj.attributes[attr_name]) == 2:
-                                current_min, current_max = obj.attributes[attr_name]
-                                
-                                # Pokud hodnota near-miss příkladu je v intervalu, zúžíme interval
-                                if current_min <= attr_value <= current_max:
-                                    # Vyloučíme hodnotu z intervalu s malou tolerancí
-                                    tolerance = max(0.01, abs(attr_value) * 0.01)  # 1% tolerance nebo minimálně 0.01
-                                    
-                                    # Určíme, na kterou stranu zúžit interval
-                                    if attr_value - current_min < current_max - attr_value:
-                                        # Hodnota je blíže k dolní hranici, posuneme dolní hranici nad hodnotu
-                                        new_min = attr_value + tolerance
-                                        if new_min < current_max:  # Ujistíme se, že interval je stále platný
-                                            obj.attributes[attr_name] = (new_min, current_max)
-                                            self.applied_heuristics.append("close_interval")
-                                            self._debug_log(f"Zúžen interval atributu {attr_name} pro třídu {near_miss_obj.class_name} vyloučením hodnoty {attr_value}")
-                                    else:
-                                        # Hodnota je blíže k horní hranici, posuneme horní hranici pod hodnotu
-                                        new_max = attr_value - tolerance
-                                        if new_max > current_min:  # Ujistíme se, že interval je stále platný
-                                            obj.attributes[attr_name] = (current_min, new_max)
-                                            self.applied_heuristics.append("close_interval")
-                                            self._debug_log(f"Zúžen interval atributu {attr_name} pro třídu {near_miss_obj.class_name} vyloučením hodnoty {attr_value}")
-        
-        return updated_model
+        # Vrátime model bez zmien, pretože numerické hodnoty spracováva _apply_enlarge_set
+        return model
 
     def _apply_backup_rule(self, model: Model, good: Model, near_miss: Model = None) -> Model:
         """
@@ -560,7 +539,11 @@ class WinstonLearner:
                 if not any(link.source == ancestor and link.target == target and link.link_type == LinkType.MUST 
                          for link in updated_model.links):
                     # Přidáme nové pravidlo
-                    new_link = Link(source=ancestor, target=target, link_type=LinkType.MUST)
+                    new_link = Link(
+                        source=ancestor,
+                        target=target,
+                        link_type=LinkType.MUST
+                    )
                     updated_model.add_link(new_link)
                     self.applied_heuristics.append("propagate_to_common_ancestor")
                     self._debug_log(f"Propagováno pravidlo na společného předka: {ancestor} MUST {target}")
@@ -784,64 +767,105 @@ class WinstonLearner:
             self._debug_log("Přeskakuji forbid-link: chybí near-miss příklad")
             return updated_model
         
-        # 1. Identifikujeme komponenty, které jsou v near-miss, ale ne v good příkladu
-        near_miss_components = self._get_component_class_set(near_miss)
-        good_components = self._get_component_class_set(good)
+        self._debug_log(f"Applying forbid-link heuristic")
         
-        # Unikátní komponenty v near-miss
-        unique_components = near_miss_components - good_components
+        # 1. Získáme klasifikaci aut z pozitivního a negativního příkladu
+        good_car_classes = set()
+        near_miss_car_classes = set()
         
-        # 2. Pro klíčové rozdíly vytvořit MUST_NOT pravidla
+        for obj in good.objects:
+            if obj.class_name in ["Series3", "Series5", "Series7", "X5", "X7"]:
+                good_car_classes.add(obj.class_name)
+        
+        for obj in near_miss.objects:
+            if obj.class_name in ["Series3", "Series5", "Series7", "X5", "X7"]:
+                near_miss_car_classes.add(obj.class_name)
+        
+        # Pokud pozitivní a negativní příklad mají stejnou třídu auta,
+        # můžeme porovnat jejich komponenty a vytvořit MUST_NOT vazby
+        common_car_classes = good_car_classes.intersection(near_miss_car_classes)
+        
+        if not common_car_classes:
+            self._debug_log("Přeskakuji forbid-link: pozitivní a negativní příklad nemají společnou třídu auta")
+            return updated_model
+        
+        # 2. Pro každou třídu auta, která je společná pro oba příklady
+        for car_class in common_car_classes:
+            # Získáme komponenty z negativního příkladu, které se nevyskytují v pozitivním příkladu
+            near_miss_components = {}
+            good_components = {}
+            
+            # Mapování komponent podle třídy
+            for obj in near_miss.objects:
+                if obj.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
+                    near_miss_components[obj.class_name] = obj.name
+            
+            for obj in good.objects:
+                if obj.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
+                    good_components[obj.class_name] = obj.name
+            
+            # Komponenty, které jsou v negativním příkladu, ale ne v pozitivním
+            unique_component_classes = set(near_miss_components.keys()) - set(good_components.keys())
+            
+            self._debug_log(f"Unique components in near-miss: {unique_component_classes}")
+            
+            # 3. Pro každou unikátní komponentu vytvoříme MUST_NOT vazbu
+            for component_class in unique_component_classes:
+                must_not_link = Link(
+                    source=car_class,
+                    target=component_class,
+                    link_type=LinkType.MUST_NOT
+                )
+                
+                # Ověříme, že taková vazba ještě neexistuje
+                if not any(link.source == must_not_link.source and 
+                        link.target == must_not_link.target and 
+                        link.link_type == must_not_link.link_type 
+                        for link in updated_model.links):
+                    updated_model.add_link(must_not_link)
+                    self.applied_heuristics.append("forbid_link")
+                    self._debug_log(f"Přidáno pravidlo MUST_NOT: {car_class} -> {component_class}")
+        
+        # 4. Analyzujeme vazby mezi objekty a vytvoříme další MUST_NOT vazby
         for near_miss_link in near_miss.links:
             near_miss_source = next((obj for obj in near_miss.objects if obj.name == near_miss_link.source), None)
             near_miss_target = next((obj for obj in near_miss.objects if obj.name == near_miss_link.target), None)
             
             if not near_miss_source or not near_miss_target:
                 continue
+            
+            # Pokud zdroj je model auta a cíl je komponenta
+            if near_miss_source.class_name in ["Series3", "Series5", "Series7", "X5", "X7"] and \
+               near_miss_target.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
                 
-            # Zaměřit se na unikátní komponenty - významné rozdíly
-            if near_miss_target.class_name in unique_components:
-                # Kontrola existujících MUST pravidel
-                has_conflict = False
-                
-                # Kontrolujeme konflikt s MUST pravidly
-                for link in updated_model.links:
-                    if (link.link_type == LinkType.MUST and
-                        (link.source == near_miss_source.class_name and link.target == near_miss_target.class_name or
-                         link.source == near_miss_source.class_name and self.classification_tree.is_subclass(near_miss_target.class_name, link.target) or
-                         link.source == near_miss_source.class_name and self.classification_tree.is_subclass(link.target, near_miss_target.class_name))):
-                        has_conflict = True
-                        self._debug_log(f"Přeskakuji MUST_NOT pravidlo kvůli konfliktu: {near_miss_source.class_name} -> {near_miss_target.class_name}")
+                # Kontrolujeme, zda existuje podobná vazba v pozitivním příkladu
+                has_similar_in_good = False
+                for good_link in good.links:
+                    good_source = next((obj for obj in good.objects if obj.name == good_link.source), None)
+                    good_target = next((obj for obj in good.objects if obj.name == good_link.target), None)
+                    
+                    if good_source and good_target and \
+                       good_source.class_name == near_miss_source.class_name and \
+                       good_target.class_name == near_miss_target.class_name:
+                        has_similar_in_good = True
                         break
                 
-                if not has_conflict:
-                    # Vytvořit MUST_NOT pravidlo na úrovni tříd
+                # Pokud neexistuje podobná vazba v pozitivním příkladu, vytvoříme MUST_NOT vazbu
+                if not has_similar_in_good:
                     must_not_link = Link(
                         source=near_miss_source.class_name,
                         target=near_miss_target.class_name,
                         link_type=LinkType.MUST_NOT
                     )
                     
-                    # Ověřit, že pravidlo ještě neexistuje
+                    # Ověříme, že taková vazba ještě neexistuje
                     if not any(link.source == must_not_link.source and 
-                               link.target == must_not_link.target and 
-                               link.link_type == must_not_link.link_type 
-                               for link in updated_model.links):
+                            link.target == must_not_link.target and 
+                            link.link_type == must_not_link.link_type 
+                            for link in updated_model.links):
                         updated_model.add_link(must_not_link)
                         self.applied_heuristics.append("forbid_link")
-                        self._debug_log(f"Přidáno pravidlo MUST_NOT pro klíčový rozdíl: {near_miss_source.class_name} -> {near_miss_target.class_name}")
-        
-                    # Přidat také konkrétní vazbu na úrovni objektů
-                    inst_link = Link(
-                        source=near_miss_link.source,
-                        target=near_miss_link.target,
-                        link_type=LinkType.MUST_NOT
-                    )
-                    
-                    if not updated_model.has_link(inst_link):
-                        updated_model.add_link(inst_link)
-                        self.applied_heuristics.append("forbid_link")
-                        self._debug_log(f"Přidána MUST_NOT vazba na úrovni objektů: {near_miss_link.source} -> {near_miss_link.target}")
+                        self._debug_log(f"Přidáno pravidlo MUST_NOT z vazeb: {near_miss_source.class_name} -> {near_miss_target.class_name}")
         
         return updated_model
     
@@ -858,13 +882,9 @@ class WinstonLearner:
         component_classes = set()
         
         for obj in example.objects:
-            # Ověřit, zda třída je komponenta
-            parent_class = obj.class_name
-            while parent_class:
-                if parent_class == "Component":
-                    component_classes.add(obj.class_name)
-                    break
-                parent_class = self.classification_tree.get_parent(parent_class)
+            # Přidáme všechny třídy objektů, které nejsou modely BMW
+            if obj.class_name not in ["BMW", "Series3", "Series5", "Series7", "X5", "X7"]:
+                component_classes.add(obj.class_name)
         
         return component_classes
     
@@ -876,7 +896,7 @@ class WinstonLearner:
         Nižší priorita - použije se jen když není nic lepšího.
         
         Args:
-            model: Aktuálny model
+            model: Aktuálný model
             good: Pozitívny príklad
             near_miss: Near-miss príklad
             

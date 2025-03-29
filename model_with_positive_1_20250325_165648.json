@@ -1,0 +1,17 @@
+{
+  "objects": [
+    {
+      "name": "t\u2081",
+      "class_name": "ManualTransmission",
+      "attributes": null
+    },
+    {
+      "name": "d\u2081",
+      "class_name": "XDrive",
+      "attributes": null
+    },
+    {
+      "name": "c\u2081",
+      "class_name": "X5",
+      "attributes": {
+        "color": 

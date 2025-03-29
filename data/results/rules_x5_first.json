@@ -1,0 +1,8 @@
+{
+  "Series3": "\u2200x: [\n  HAS(x, Engine) \u2227 HAS(x, RWD) \u2227 HAS(x, Transmission) \u2192 IS(x, Series3)\n]",
+  "Series5": "\u2200x: [\n  HAS(x, Engine) \u2227 HAS(x, RWD) \u2227 HAS(x, Transmission) \u2192 IS(x, Series5)\n]",
+  "Series7": "\u2200x: [\n  HAS(x, AWD) \u2227 HAS(x, Engine) \u2227 HAS(x, Transmission) \u2192 IS(x, Series7)\n]",
+  "X7": "\u2200x: [\n  HAS(x, Engine) \u2227 HAS(x, Transmission) \u2227 HAS(x, XDrive) \u2192 IS(x, X7)\n]",
+  "X5": "\u2200x: [\n  HAS(x, AutomaticTransmission) \u2227 HAS(x, DieselEngine) \u2227 HAS(x, XDrive) \u2227 \u2200y: [HAS(x, y) \u2227 IS(y, PetrolEngine) \u2192 ATTR(y, allowed_transmission_types) \u2208 {\"AutomaticTransmission\", \"ManualTransmission\"}] \u2227 \u2200y: [HAS(x, y) \u2227 IS(y, PetrolEngine) \u2192 ATTR(y, cylinders) = \"6\"] \u2227 \u2200y: [HAS(x, y) \u2227 IS(y, PetrolEngine) \u2192 ATTR(y, power) = \"300\"] \u2192 IS(x, X5)\n]",
+  "BMW": "\u2200x: [\n  HAS(x, Engine) \u2227 HAS(x, Transmission) \u2192 IS(x, BMW)\n]"
+}

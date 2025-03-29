@@ -158,12 +158,16 @@ export const useApi = () => {
         message: data.message || 'Model bol natrénovaný.',
         model_updated: data.model_updated || false,
         model_hypothesis: data.model_hypothesis,
+        model_rules: data.model_rules,
         model_visualization: data.model_visualization || { nodes: [], links: [] },
         training_steps: data.training_steps || [],
         used_examples_count: data.used_examples_count,
         total_examples_count: data.total_examples_count,
         training_mode: retrainAll ? 'retrained' : 'incremental'
       };
+      
+      console.log('Training result received:', data);
+      console.log('Extracted model_rules:', data.model_rules);
       
       return { success: true, data: trainingResult };
     } catch (error) {
@@ -228,6 +232,28 @@ export const useApi = () => {
     }
   };
 
+  // Porovná príklad s natrénovaným modelom
+  const compareExample = async (formula: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await axios.post(`${API_BASE_URL}/api/compare`, {
+        formula: formula,
+        is_positive: true, // pre porovnanie nie je dôležité, či je príklad pozitívny alebo negatívny
+        name: "Porovnávaný príklad"
+      });
+      
+      return { success: true, data: response.data };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Neznáma chyba';
+      setError(`Chyba pri porovnávaní príkladu: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     error,
@@ -237,6 +263,7 @@ export const useApi = () => {
     trainModel,
     resetModel,
     stepBack,
-    stepForward
+    stepForward,
+    compareExample
   };
 }; 

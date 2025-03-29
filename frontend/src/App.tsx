@@ -18,7 +18,9 @@ import {
   Chip,
   FormControlLabel,
   Checkbox,
-  Switch
+  Switch,
+  Tabs,
+  Tab
 } from '@mui/material';
 import { useApi } from './hooks/useApi';
 import { useExamples } from './hooks/useExamples';
@@ -32,6 +34,7 @@ import { ModelControls } from './components/ModelControls';
 import LandingPage from './components/LandingPage';
 import ExamplesTrainingView from './components/ExamplesTrainingView';
 import TrainingResult from './components/TrainingResult';
+import CompareExample from './components/CompareExample';
 import { NetworkNode, NetworkLink, ApiExample, Example, ModelHistory, TrainingResult as TrainingResultType } from './types';
 import axios from "axios";
 
@@ -64,7 +67,8 @@ function App() {
     trainModel, 
     resetModel, 
     stepBack, 
-    stepForward 
+    stepForward,
+    compareExample 
   } = useApi();
   
   const {
@@ -107,6 +111,9 @@ function App() {
   } | null>(null);
   const [modelHistory, setModelHistory] = useState<ModelHistory>({ current_index: -1, total_entries: 0 });
   const [graphUpdateKey, setGraphUpdateKey] = useState(0);
+  
+  // Nový stav pre aktívnu podstránku
+  const [activeView, setActiveView] = useState<string>("training");
   
   // State for model visualization
   const [nodes, setNodes] = useState<NetworkNode[]>([]);
@@ -466,9 +473,12 @@ function App() {
               message: 'Model obnovený z histórie',
               model_updated: response.data.model_updated,
               model_hypothesis: response.data.model_hypothesis,
+              model_rules: response.data.model_rules,
               model_visualization: response.data.model_visualization,
               training_steps: response.data.training_steps
             }));
+            
+            console.log('Model rules from step back:', response.data.model_rules);
           }
           
           // Aktualizujeme vizualizáciu modelu
@@ -520,9 +530,12 @@ function App() {
               message: 'Model obnovený z histórie',
               model_updated: response.data.model_updated,
               model_hypothesis: response.data.model_hypothesis,
+              model_rules: response.data.model_rules,
               model_visualization: response.data.model_visualization,
               training_steps: response.data.training_steps
             }));
+            
+            console.log('Model rules from step forward:', response.data.model_rules);
           }
           
           // Aktualizujeme vizualizáciu modelu
@@ -656,27 +669,75 @@ function App() {
             onProcessDataset={processDataset}
           />
         ) : (
-          // Use the new ExamplesTrainingView component with ModelControls
-          <ExamplesTrainingView 
-            examples={examples}
-            isTraining={isTraining}
-            isUpdatingModel={isUpdatingModel}
-            trainingResult={trainingResult}
-            trainingSteps={trainingSteps}
-            isLoading={isLoading}
-            historyIndex={modelHistory.current_index}
-            historyLength={modelHistory.total_entries}
-            onExampleSelect={toggleExampleSelection}
-            onSelectAll={selectAll}
-            onTrain={handleTrainModel}
-            onStepBack={handleStepBack}
-            onStepForward={handleStepForward}
-            onReset={handleReset}
-            onFileUpload={goToUploadScreen}
-          />
+          <Box sx={{ width: '100%' }}>
+            {/* Tabs na prepínanie medzi podstránkami */}
+            <Paper 
+              sx={{ 
+                mb: 3, 
+                borderRadius: '12px 12px 0 0',
+                overflow: 'hidden',
+                backgroundColor: 'rgba(18,18,18,0.8)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderBottom: 'none'
+              }}
+            >
+              <Tabs
+                value={activeView}
+                onChange={(_, newValue) => setActiveView(newValue)}
+                textColor="primary"
+                indicatorColor="primary"
+                variant="fullWidth"
+                sx={{ 
+                  minHeight: '56px',
+                  '& .MuiTab-root': {
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    fontSize: '1rem',
+                    minHeight: '56px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    '&.Mui-selected': {
+                      color: '#90caf9'
+                    }
+                  }
+                }}
+              >
+                <Tab label="Trénovanie modelu" value="training" />
+                <Tab label="Porovnanie príkladu" value="compare" />
+              </Tabs>
+            </Paper>
+            
+            {/* Zobrazenie aktívnej podstránky */}
+            {activeView === "training" ? (
+              // Use the new ExamplesTrainingView component with ModelControls
+              <ExamplesTrainingView 
+                examples={examples}
+                isTraining={isTraining}
+                isUpdatingModel={isUpdatingModel}
+                trainingResult={trainingResult}
+                trainingSteps={trainingSteps}
+                isLoading={isLoading}
+                historyIndex={modelHistory.current_index}
+                historyLength={modelHistory.total_entries}
+                onExampleSelect={toggleExampleSelection}
+                onSelectAll={selectAll}
+                onTrain={handleTrainModel}
+                onStepBack={handleStepBack}
+                onStepForward={handleStepForward}
+                onReset={handleReset}
+                onFileUpload={goToUploadScreen}
+              />
+            ) : (
+              // Zobrazenie stránky pre porovnanie príkladu
+              <CompareExample 
+                onCompare={compareExample}
+                isLoading={apiLoading}
+              />
+            )}
+          </Box>
         )}
-                </Box>
-                
+      </Box>
+      
       {/* Notifications */}
       <Snackbar
         open={notification.open}
@@ -714,8 +775,8 @@ function App() {
           {notification.message}
         </Alert>
       </Snackbar>
-  </ThemeProvider>
-);
+    </ThemeProvider>
+  );
 }
 
 export default App;

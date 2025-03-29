@@ -1,0 +1,236 @@
+# X5 - Benzínový 6-valcový motor, automatická prevodovka, XDrive
+Ι(c₁, X5) ∧ 
+Π(c₁, e₁) ∧ Ι(e₁, PetrolEngine) ∧ 
+Π(c₁, t₁) ∧ Ι(t₁, AutomaticTransmission) ∧ 
+Π(c₁, d₁) ∧ Ι(d₁, XDrive) ∧ 
+Π(e₁, t₁) ∧ 
+Α(c₁, color, "black") ∧
+Α(c₁, allowed_colors, {"black", "white", "silver", "blue"}) ∧ 
+Α(c₁, weight, 2200) ∧ 
+Α(c₁, seats, 5) ∧ 
+Α(c₁, ground_clearance, 210) ∧ 
+Α(e₁, cylinders, 6) ∧ 
+Α(e₁, power, 300) ∧ 
+Α(e₁, torque, 450) ∧
+Α(t₁, gears, 8) ∧
+Α(c₁, safety_features, {"ABS", "ESP", "LaneDepartureWarning", "AdaptiveCruiseControl"}) ∧
+Α(c₁, entertainment, {"NavigationSystem", "PremiumAudio"})
+
+# X5 - Naftový 6-valcový motor, automatická prevodovka, XDrive
+Ι(c₂, X5) ∧ 
+Π(c₂, e₂) ∧ Ι(e₂, DieselEngine) ∧ 
+Π(c₂, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧ 
+Π(c₂, d₂) ∧ Ι(d₂, XDrive) ∧ 
+Π(e₂, t₂) ∧ 
+Α(c₂, color, "silver") ∧
+Α(c₂, allowed_colors, {"black", "white", "silver", "blue"}) ∧ 
+Α(c₂, weight, 2250) ∧ 
+Α(c₂, seats, 5) ∧ 
+Α(c₂, ground_clearance, 210) ∧ 
+Α(e₂, cylinders, 6) ∧ 
+Α(e₂, power, 280) ∧ 
+Α(e₂, torque, 580) ∧
+Α(t₂, gears, 8) ∧
+Α(c₂, safety_features, {"ABS", "ESP", "LaneDepartureWarning", "AdaptiveCruiseControl"}) ∧
+Α(c₂, entertainment, {"NavigationSystem", "PremiumAudio"})
+
+# X7 - Benzínový 8-valcový motor, automatická prevodovka, XDrive
+Ι(c₃, X7) ∧ 
+Π(c₃, e₃) ∧ Ι(e₃, PetrolEngine) ∧ 
+Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧ 
+Π(c₃, d₃) ∧ Ι(d₃, XDrive) ∧ 
+Π(e₃, t₃) ∧ 
+Α(c₃, color, "black") ∧
+Α(c₃, allowed_colors, {"black", "white", "silver"}) ∧ 
+Α(c₃, weight, 2400) ∧ 
+Α(c₃, seats, 7) ∧ 
+Α(c₃, ground_clearance, 220) ∧ 
+Α(e₃, cylinders, 8) ∧ 
+Α(e₃, power, 400) ∧ 
+Α(e₃, torque, 550) ∧
+Α(t₃, gears, 8) ∧
+Α(c₃, safety_features, {"ABS", "ESP", "LaneDepartureWarning", "AdaptiveCruiseControl", "NightVision"}) ∧
+Α(c₃, entertainment, {"NavigationSystem", "PremiumAudio", "RearScreens"})
+
+# X7 - Hybridný 6-valcový motor, automatická prevodovka, XDrive
+Ι(c₄, X7) ∧ 
+Π(c₄, e₄) ∧ Ι(e₄, HybridEngine) ∧ 
+Π(c₄, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧ 
+Π(c₄, d₄) ∧ Ι(d₄, XDrive) ∧ 
+Π(e₄, t₄) ∧ 
+Α(c₄, color, "white") ∧
+Α(c₄, allowed_colors, {"black", "white", "silver"}) ∧ 
+Α(c₄, weight, 2450) ∧ 
+Α(c₄, seats, 7) ∧ 
+Α(c₄, ground_clearance, 220) ∧ 
+Α(e₄, cylinders, 6) ∧ 
+Α(e₄, power, 380) ∧ 
+Α(e₄, torque, 600) ∧
+Α(e₄, electric_range, 60) ∧
+Α(t₄, gears, 8) ∧
+Α(c₄, safety_features, {"ABS", "ESP", "LaneDepartureWarning", "AdaptiveCruiseControl", "NightVision"}) ∧
+Α(c₄, entertainment, {"NavigationSystem", "PremiumAudio", "RearScreens"})
+
+# Series3 - Benzínový 4-valcový motor, manuálna prevodovka, RWD
+Ι(c₅, Series3) ∧ 
+Π(c₅, e₅) ∧ Ι(e₅, PetrolEngine) ∧ 
+Π(c₅, t₅) ∧ Ι(t₅, ManualTransmission) ∧ 
+Π(c₅, d₅) ∧ Ι(d₅, RWD) ∧ 
+Π(e₅, t₅) ∧ 
+Α(c₅, color, "blue") ∧
+Α(c₅, allowed_colors, {"black", "white", "blue", "red"}) ∧ 
+Α(c₅, weight, 1600) ∧ 
+Α(c₅, seats, 5) ∧ 
+Α(c₅, ground_clearance, 150) ∧ 
+Α(e₅, cylinders, 4) ∧ 
+Α(e₅, power, 190) ∧ 
+Α(e₅, torque, 300) ∧
+Α(t₅, gears, 6) ∧
+Α(c₅, safety_features, {"ABS", "ESP"}) ∧
+Α(c₅, entertainment, {"BasicAudio", "NavigationSystem"})
+
+# Series3 - Benzínový 4-valcový motor, automatická prevodovka, RWD
+Ι(c₆, Series3) ∧ 
+Π(c₆, e₆) ∧ Ι(e₆, PetrolEngine) ∧ 
+Π(c₆, t₆) ∧ Ι(t₆, AutomaticTransmission) ∧ 
+Π(c₆, d₆) ∧ Ι(d₆, RWD) ∧ 
+Π(e₆, t₆) ∧ 
+Α(c₆, color, "red") ∧
+Α(c₆, allowed_colors, {"black", "white", "blue", "red"}) ∧ 
+Α(c₆, weight, 1620) ∧ 
+Α(c₆, seats, 5) ∧ 
+Α(c₆, ground_clearance, 150) ∧ 
+Α(e₆, cylinders, 4) ∧ 
+Α(e₆, power, 185) ∧ 
+Α(e₆, torque, 290) ∧
+Α(t₆, gears, 8) ∧
+Α(c₆, safety_features, {"ABS", "ESP"}) ∧
+Α(c₆, entertainment, {"BasicAudio", "NavigationSystem"})
+
+# Series5 - Benzínový 6-valcový motor, automatická prevodovka, RWD
+Ι(c₇, Series5) ∧ 
+Π(c₇, e₇) ∧ Ι(e₇, PetrolEngine) ∧ 
+Π(c₇, t₇) ∧ Ι(t₇, AutomaticTransmission) ∧ 
+Π(c₇, d₇) ∧ Ι(d₇, RWD) ∧ 
+Π(e₇, t₇) ∧ 
+Α(c₇, color, "silver") ∧
+Α(c₇, allowed_colors, {"black", "white", "silver", "grey"}) ∧ 
+Α(c₇, weight, 1800) ∧ 
+Α(c₇, seats, 5) ∧ 
+Α(c₇, ground_clearance, 160) ∧ 
+Α(e₇, cylinders, 6) ∧ 
+Α(e₇, power, 245) ∧ 
+Α(e₇, torque, 400) ∧
+Α(t₇, gears, 8) ∧
+Α(c₇, safety_features, {"ABS", "ESP", "LaneDepartureWarning"}) ∧
+Α(c₇, entertainment, {"PremiumAudio", "NavigationSystem"})
+
+# Series5 - Naftový 6-valcový motor, automatická prevodovka, AWD
+Ι(c₈, Series5) ∧ 
+Π(c₈, e₈) ∧ Ι(e₈, DieselEngine) ∧ 
+Π(c₈, t₈) ∧ Ι(t₈, AutomaticTransmission) ∧ 
+Π(c₈, d₈) ∧ Ι(d₈, AWD) ∧ 
+Π(e₈, t₈) ∧ 
+Α(c₈, color, "grey") ∧
+Α(c₈, allowed_colors, {"black", "white", "silver", "grey"}) ∧ 
+Α(c₈, weight, 1850) ∧ 
+Α(c₈, seats, 5) ∧ 
+Α(c₈, ground_clearance, 160) ∧ 
+Α(e₈, cylinders, 6) ∧ 
+Α(e₈, power, 265) ∧ 
+Α(e₈, torque, 550) ∧
+Α(t₈, gears, 8) ∧
+Α(c₈, safety_features, {"ABS", "ESP", "LaneDepartureWarning"}) ∧
+Α(c₈, entertainment, {"PremiumAudio", "NavigationSystem"})
+
+# Series7 - Benzínový 8-valcový motor, automatická prevodovka, AWD
+Ι(c₉, Series7) ∧ 
+Π(c₉, e₉) ∧ Ι(e₉, PetrolEngine) ∧ 
+Π(c₉, t₉) ∧ Ι(t₉, AutomaticTransmission) ∧ 
+Π(c₉, d₉) ∧ Ι(d₉, AWD) ∧ 
+Π(e₉, t₉) ∧ 
+Α(c₉, color, "black") ∧
+Α(c₉, allowed_colors, {"black", "white", "grey"}) ∧ 
+Α(c₉, weight, 2000) ∧ 
+Α(c₉, seats, 5) ∧ 
+Α(c₉, ground_clearance, 160) ∧ 
+Α(e₉, cylinders, 8) ∧ 
+Α(e₉, power, 450) ∧ 
+Α(e₉, torque, 650) ∧
+Α(t₉, gears, 8) ∧
+Α(c₉, safety_features, {"ABS", "ESP", "LaneDepartureWarning", "AdaptiveCruiseControl", "NightVision"}) ∧
+Α(c₉, entertainment, {"PremiumAudio", "NavigationSystem", "RearScreens"})
+
+# Series7 - Hybridný 6-valcový motor, automatická prevodovka, AWD
+Ι(c₁₀, Series7) ∧ 
+Π(c₁₀, e₁₀) ∧ Ι(e₁₀, HybridEngine) ∧ 
+Π(c₁₀, t₁₀) ∧ Ι(t₁₀, AutomaticTransmission) ∧ 
+Π(c₁₀, d₁₀) ∧ Ι(d₁₀, AWD) ∧ 
+Π(e₁₀, t₁₀) ∧ 
+Α(c₁₀, color, "white") ∧
+Α(c₁₀, allowed_colors, {"black", "white", "grey"}) ∧ 
+Α(c₁₀, weight, 2050) ∧ 
+Α(c₁₀, seats, 5) ∧ 
+Α(c₁₀, ground_clearance, 160) ∧ 
+Α(e₁₀, cylinders, 6) ∧ 
+Α(e₁₀, power, 420) ∧ 
+Α(e₁₀, torque, 600) ∧
+Α(e₁₀, electric_range, 70) ∧
+Α(t₁₀, gears, 8) ∧
+Α(c₁₀, safety_features, {"ABS", "ESP", "LaneDepartureWarning", "AdaptiveCruiseControl", "NightVision"}) ∧
+Α(c₁₀, entertainment, {"PremiumAudio", "NavigationSystem", "RearScreens"})
+
+# Negatívny príklad 1: X5 s manuálnou prevodovkou (X5 má vždy automatickú)
+Ι(n₁, X5) ∧ 
+Π(n₁, ne₁) ∧ Ι(ne₁, PetrolEngine) ∧ 
+Π(n₁, nt₁) ∧ Ι(nt₁, ManualTransmission) ∧ 
+Π(n₁, nd₁) ∧ Ι(nd₁, XDrive) ∧ 
+Π(ne₁, nt₁) ∧ 
+Α(n₁, color, "blue") ∧
+Α(n₁, weight, 2200) ∧ 
+Α(ne₁, cylinders, 6) ∧ 
+Ν(X5, ManualTransmission)
+
+# Negatívny príklad 2: X7 s 4-valcovým motorom (X7 má vždy 6+ valcov)
+Ι(n₂, X7) ∧ 
+Π(n₂, ne₂) ∧ Ι(ne₂, PetrolEngine) ∧ 
+Π(n₂, nt₂) ∧ Ι(nt₂, AutomaticTransmission) ∧ 
+Π(n₂, nd₂) ∧ Ι(nd₂, XDrive) ∧ 
+Π(ne₂, nt₂) ∧ 
+Α(n₂, color, "black") ∧
+Α(n₂, weight, 2400) ∧ 
+Α(ne₂, cylinders, 4) ∧ 
+Ν(X7, PetrolEngine) ∧ Ν(PetrolEngine, cylinders)
+
+# Negatívny príklad 3: Series3 s AWD (Series3 má vždy RWD)
+Ι(n₃, Series3) ∧ 
+Π(n₃, ne₃) ∧ Ι(ne₃, PetrolEngine) ∧ 
+Π(n₃, nt₃) ∧ Ι(nt₃, ManualTransmission) ∧ 
+Π(n₃, nd₃) ∧ Ι(nd₃, AWD) ∧ 
+Π(ne₃, nt₃) ∧ 
+Α(n₃, color, "red") ∧
+Α(n₃, weight, 1650) ∧ 
+Α(ne₃, cylinders, 4) ∧ 
+Ν(Series3, AWD)
+
+# Negatívny príklad 4: Series5 s 8-valcovým motorom (Series5 má vždy 6 valcov)
+Ι(n₄, Series5) ∧ 
+Π(n₄, ne₄) ∧ Ι(ne₄, PetrolEngine) ∧ 
+Π(n₄, nt₄) ∧ Ι(nt₄, AutomaticTransmission) ∧ 
+Π(n₄, nd₄) ∧ Ι(nd₄, RWD) ∧ 
+Π(ne₄, nt₄) ∧ 
+Α(n₄, color, "grey") ∧
+Α(n₄, weight, 1900) ∧ 
+Α(ne₄, cylinders, 8) ∧ 
+Ν(Series5, cylinders)
+
+# Negatívny príklad 5: Series7 s manuálnou prevodovkou (Series7 má vždy automatickú)
+Ι(n₅, Series7) ∧ 
+Π(n₅, ne₅) ∧ Ι(ne₅, PetrolEngine) ∧ 
+Π(n₅, nt₅) ∧ Ι(nt₅, ManualTransmission) ∧ 
+Π(n₅, nd₅) ∧ Ι(nd₅, AWD) ∧ 
+Π(ne₅, nt₅) ∧ 
+Α(n₅, color, "black") ∧
+Α(n₅, weight, 2000) ∧ 
+Α(ne₅, cylinders, 8) ∧ 
+Ν(Series7, ManualTransmission)

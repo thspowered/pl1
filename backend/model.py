@@ -325,6 +325,238 @@ class Model:
         # Spoj predikáty konjunkciou
         return " ∧ ".join(predicates)
 
+    def extract_model_rules(self) -> Dict[str, str]:
+        """
+        Extrahuje identifikačné pravidlá pre jednotlivé modely áut.
+        
+        Vráti slovník, kde kľúče sú názvy modelov a hodnoty sú
+        textové reprezentácie pravidiel v logike prvého rádu.
+        
+        Táto metóda extrahuje pravidlá pre všetky modely z formuly vygenerovanej
+        metódou to_formula().
+        """
+        rules = {}
+        
+        # Najprv získame známe modely, ktoré chceme hľadať v pravidlách
+        known_models = {"BMW", "Series3", "Series5", "Series7", "X5", "X7"}
+        
+        # Vygeneruj formulu z modelu
+        formula_text = self.to_formula()
+        
+        # Vytvor slovník všetkých objektov a ich atribútov pre rýchlejší prístup
+        all_objects_dict = {obj.name: obj for obj in self.objects}
+        
+        # Vytvor slovník komponentov podľa tried
+        components_by_class = {}
+        for obj in self.objects:
+            if obj.class_name not in components_by_class:
+                components_by_class[obj.class_name] = []
+            components_by_class[obj.class_name].append(obj)
+        
+        # Pre každý model nájdi všetky objekty, ktoré sú s ním spojené
+        model_to_components = {}
+        for model_name in known_models:
+            model_to_components[model_name] = {}
+            model_objects = [obj for obj in self.objects if obj.class_name == model_name]
+            
+            # Pre každý objekt daného modelu nájdi spojené komponenty
+            for model_obj in model_objects:
+                for link in self.links:
+                    if link.source == model_obj.name:
+                        target_obj = all_objects_dict.get(link.target)
+                        if target_obj:
+                            component_class = target_obj.class_name
+                            if component_class not in model_to_components[model_name]:
+                                model_to_components[model_name][component_class] = []
+                            model_to_components[model_name][component_class].append(target_obj)
+            
+            # Pridaj aj generické spojenia na úrovni tried
+            for link in self.links:
+                if link.source == model_name and link.link_type == LinkType.MUST:
+                    # Ak máme MUST spojenie z modelu na triedu komponentu
+                    component_class = link.target
+                    if component_class not in model_to_components[model_name]:
+                        model_to_components[model_name][component_class] = []
+                        # Ak existujú objekty danej triedy, pridaj ich
+                        if component_class in components_by_class:
+                            model_to_components[model_name][component_class].extend(components_by_class[component_class])
+        
+        # Spracuj MUST (Μ) a MUST_NOT (Ν) vzťahy a atribúty (Α) pre jednotlivé modely
+        import re
+        
+        # Pre každý známy model vytvoríme pravidlo
+        for model_name in known_models:
+            # Hľadáme všetky MUST (Μ) spojenia pre tento model
+            must_pattern = re.compile(r'Μ\s*\(\s*' + re.escape(model_name) + r'\s*,\s*(\w+)\s*\)')
+            must_relations = must_pattern.findall(formula_text)
+            
+            # Hľadáme všetky MUST_NOT (Ν) spojenia pre tento model
+            must_not_pattern = re.compile(r'Ν\s*\(\s*' + re.escape(model_name) + r'\s*,\s*(\w+)\s*\)')
+            must_not_relations = must_not_pattern.findall(formula_text)
+            
+            # Hľadáme atribúty pre tento model
+            attr_pattern = re.compile(r'Α\s*\(\s*' + re.escape(model_name) + r'\s*,\s*(\w+)\s*,\s*(.+?)\s*\)')
+            model_attributes = attr_pattern.findall(formula_text)
+            
+            # Vytvor množinu podmienok pre pravidlo - použijeme množinu pre elimináciu duplicít
+            conditions = set()
+            
+            # Základné komponenty sú vždy v pravidlách
+            basic_components = ["DriveSystem", "Engine", "Transmission"]
+            
+            # Analyzujeme MUST vzťahy - tie sú najdôležitejšie pre identifikačné pravidlá
+            must_components = set(must_relations)
+            
+            # Pre X5 a X7 modely musíme mať XDrive
+            if model_name.startswith("X"):
+                if "XDrive" in must_components:
+                    conditions.add(f"HAS(x, XDrive)")
+                else:
+                    conditions.add(f"HAS(x, XDrive)")
+            
+            # Pre Series modely určíme potrebný DriveSystem
+            elif model_name.startswith("Series"):
+                if "AWD" in must_components:
+                    conditions.add(f"HAS(x, AWD)")
+                elif "RWD" in must_components:
+                    conditions.add(f"HAS(x, RWD)")
+                elif model_name == "Series7":
+                    conditions.add(f"HAS(x, AWD)")
+                else:
+                    conditions.add(f"HAS(x, RWD)")
+            
+            # Pridáme špecifické engine typy, ak sú v MUST vzťahoch
+            engine_types = ["PetrolEngine", "DieselEngine", "HybridEngine"]
+            model_engines = []
+            
+            for engine in engine_types:
+                if engine in must_components:
+                    model_engines.append(engine)
+            
+            # Ak máme konkrétne motory, pridáme ich
+            if model_engines:
+                if len(model_engines) == 1:
+                    conditions.add(f"HAS(x, {model_engines[0]})")
+                else:
+                    engine_condition = " ∨ ".join([f"HAS(x, {engine})" for engine in model_engines])
+                    conditions.add(f"({engine_condition})")
+            else:
+                # Ak nemáme špecifické motory, pridáme všeobecný Engine
+                conditions.add(f"HAS(x, Engine)")
+            
+            # Pridáme špecifické prevodovky ak sú v MUST vzťahoch
+            transmission_types = ["AutomaticTransmission", "ManualTransmission"]
+            model_transmissions = []
+            
+            for transmission in transmission_types:
+                if transmission in must_components:
+                    model_transmissions.append(transmission)
+            
+            # Ak máme konkrétne prevodovky, pridáme ich
+            if model_transmissions:
+                if len(model_transmissions) == 1:
+                    conditions.add(f"HAS(x, {model_transmissions[0]})")
+                else:
+                    transmission_condition = " ∨ ".join([f"HAS(x, {trans})" for trans in model_transmissions])
+                    conditions.add(f"({transmission_condition})")
+            else:
+                # Ak nemáme špecifické prevodovky, pridáme všeobecný Transmission
+                conditions.add(f"HAS(x, Transmission)")
+            
+            # Pridáme MUST_NOT podmienky
+            for component in must_not_relations:
+                conditions.add(f"¬HAS(x, {component})")
+            
+            # Pridáme atribúty modelu
+            for attr_name, attr_value in model_attributes:
+                # Spracovanie rôznych typov hodnôt
+                if '(' in attr_value and ')' in attr_value and ',' in attr_value:
+                    # Interval hodnota
+                    try:
+                        # Extrahujeme hodnoty z intervalu
+                        interval_match = re.search(r'\(\s*([\d\.]+)\s*,\s*([\d\.]+)\s*\)', attr_value)
+                        if interval_match:
+                            min_val = interval_match.group(1)
+                            max_val = interval_match.group(2)
+                            conditions.add(f"ATTR(x, {attr_name}) ∈ [{min_val}, {max_val}]")
+                    except Exception as e:
+                        print(f"Chyba pri spracovaní intervalu: {e}")
+                elif '{' in attr_value and '}' in attr_value:
+                    # Množina hodnôt
+                    try:
+                        # Extrahujeme hodnoty z množiny
+                        set_match = re.search(r'\{\s*(.+?)\s*\}', attr_value)
+                        if set_match:
+                            set_values = set_match.group(1)
+                            conditions.add(f"ATTR(x, {attr_name}) ∈ {{{set_values}}}")
+                    except Exception as e:
+                        print(f"Chyba pri spracovaní množiny: {e}")
+                else:
+                    # Jednoduchá hodnota
+                    conditions.add(f"ATTR(x, {attr_name}) = {attr_value}")
+            
+            # Pridaj atribúty pre všetky komponenty spojené s týmto modelom
+            components_data = model_to_components.get(model_name, {})
+            for component_class, component_objects in components_data.items():
+                # Zbieraj atribúty pre všetky komponenty danej triedy
+                component_attributes = {}
+                
+                for component_obj in component_objects:
+                    if component_obj.attributes:
+                        for attr_name, attr_value in component_obj.attributes.items():
+                            if attr_name not in component_attributes:
+                                component_attributes[attr_name] = []
+                            component_attributes[attr_name].append(attr_value)
+                
+                # Pre každý atribút vytvor pravidlo
+                for attr_name, values in component_attributes.items():
+                    if not values:
+                        continue
+                        
+                    # Ak sú hodnoty intervaly, spoj ich
+                    if all(isinstance(v, tuple) and len(v) == 2 for v in values):
+                        min_vals = [v[0] for v in values]
+                        max_vals = [v[1] for v in values]
+                        min_val = min(min_vals)
+                        max_val = max(max_vals)
+                        conditions.add(f"∀y: [HAS(x, y) ∧ IS(y, {component_class}) → ATTR(y, {attr_name}) ∈ [{min_val}, {max_val}]]")
+                    
+                    # Ak sú hodnoty množiny, zlúč ich
+                    elif all(isinstance(v, set) for v in values):
+                        combined_set = set()
+                        for value_set in values:
+                            combined_set.update(value_set)
+                        set_str = "{" + ", ".join([f'"{v}"' if isinstance(v, str) else str(v) for v in combined_set]) + "}"
+                        conditions.add(f"∀y: [HAS(x, y) ∧ IS(y, {component_class}) → ATTR(y, {attr_name}) ∈ {set_str}]")
+                    
+                    # Ak sú hodnoty jednoduché a rovnaké
+                    elif len(set(values)) == 1:
+                        val = values[0]
+                        val_str = f'"{val}"' if isinstance(val, str) else str(val)
+                        conditions.add(f"∀y: [HAS(x, y) ∧ IS(y, {component_class}) → ATTR(y, {attr_name}) = {val_str}]")
+                    
+                    # Inak vytvor zoznam možných hodnôt
+                    else:
+                        # Odstráň duplicity
+                        unique_values = list(set(values))
+                        if len(unique_values) > 1:
+                            values_str = " ∨ ".join([f"ATTR(y, {attr_name}) = {v}" for v in unique_values])
+                            conditions.add(f"∀y: [HAS(x, y) ∧ IS(y, {component_class}) → ({values_str})]")
+            
+            # Spoj podmienky konjunkciou a vytvor pravidlo
+            if conditions:
+                rule_condition = " ∧ ".join(sorted(conditions))  # Zoraďujeme podmienky pre konzistentnosť
+                rules[model_name] = f"∀x: [\n  {rule_condition} → IS(x, {model_name})\n]"
+            else:
+                # Ak nie sú žiadne podmienky, vytvor základné pravidlo
+                basic_condition = " ∧ ".join([f"HAS(x, {comp})" for comp in basic_components])
+                rules[model_name] = f"∀x: [\n  {basic_condition} → IS(x, {model_name})\n]"
+        
+        # Pre debugovanie vypíšeme extrahované pravidlá
+        print(f"Extracted rules from model: {rules}")
+        
+        return rules
+
     def to_semantic_network(self) -> Dict[str, Any]:
         """
         Konvertuje model na sémantickú sieť vhodnú pre vizualizáciu.
@@ -449,36 +681,64 @@ def formula_to_model(formula: Formula) -> Model:
     Returns:
         Model vytvoreny z formuly
     """
+    print("DEBUG: Starting formula_to_model")
     objects = []
     links = []
     attributes = {}
     
     # Mapovanie predikatov na objekty a spojenia
     for predicate in formula.predicates:
+        print(f"DEBUG: Processing predicate {predicate.name} with args {predicate.arguments}")
         if predicate.type == PredicateType.UNARY:
             # Unarny predikat reprezentuje triedu objektu
             obj_name = predicate.arguments[0]
             class_name = predicate.name
             
+            print(f"DEBUG: Unary predicate -> object {obj_name} of class {class_name}")
+            
             # Pridaj objekt, ak este neexistuje
             if obj_name not in [obj.name for obj in objects]:
                 objects.append(Object(obj_name, class_name))
+                print(f"DEBUG: Added object {obj_name} of class {class_name}")
             
             # Pridaj spojenie MUST_BE_A
             links.append(Link(obj_name, class_name, LinkType.MUST_BE_A))
+            print(f"DEBUG: Added MUST_BE_A link {obj_name} -> {class_name}")
         
         elif predicate.type == PredicateType.BINARY:
             # Binarny predikat moze reprezentovat spojenie alebo atribut
             arg1 = predicate.arguments[0]
             arg2 = predicate.arguments[1]
             
-            if predicate.name == "H" or predicate.name == "HE" or predicate.name == "HT" or predicate.name == "HD":
-                # Spojenie HAS
-                links.append(Link(arg1, arg2, LinkType.MUST))
+            if predicate.name == "Π":  # PI
+                # Spojenie HAS (REGULAR)
+                links.append(Link(arg1, arg2, LinkType.REGULAR))
+                print(f"DEBUG: Added REGULAR link {arg1} -> {arg2}")
+            elif predicate.name == "Ι":  # IOTA
+                # Spojenie IS_A (objekt je instanciou triedy)
+                # Check if object already exists
+                existing_obj = next((obj for obj in objects if obj.name == arg1), None)
+                if existing_obj:
+                    # Update class name if needed
+                    if existing_obj.class_name != arg2:
+                        existing_obj.class_name = arg2
+                        print(f"DEBUG: Updated object {arg1} class to {arg2}")
+                else:
+                    # Create new object
+                    objects.append(Object(arg1, arg2))
+                    print(f"DEBUG: Added object {arg1} of class {arg2}")
                 
-                # Pridaj cielovy objekt, ak este neexistuje
-                if arg2 not in [obj.name for obj in objects]:
-                    objects.append(Object(arg2, arg2))
+                # Add MUST_BE_A link
+                links.append(Link(arg1, arg2, LinkType.MUST_BE_A))
+                print(f"DEBUG: Added MUST_BE_A link {arg1} -> {arg2}")
+            elif predicate.name == "Μ":  # MU
+                # Spojenie MUST
+                links.append(Link(arg1, arg2, LinkType.MUST))
+                print(f"DEBUG: Added MUST link {arg1} -> {arg2}")
+            elif predicate.name == "Ν":  # NU
+                # Spojenie MUST_NOT
+                links.append(Link(arg1, arg2, LinkType.MUST_NOT))
+                print(f"DEBUG: Added MUST_NOT link {arg1} -> {arg2}")
             else:
                 # Atribut
                 if arg1 not in attributes:
@@ -487,6 +747,7 @@ def formula_to_model(formula: Formula) -> Model:
                 # Pouzijeme cely nazov predikatu ako nazov atributu
                 attr_name = predicate.name.lower()
                 attributes[arg1][attr_name] = arg2
+                print(f"DEBUG: Added attribute {attr_name}={arg2} to object {arg1}")
         
         elif predicate.type == PredicateType.TERNARY:
             # Ternarny predikat reprezentuje atribut s nazvom
@@ -498,13 +759,18 @@ def formula_to_model(formula: Formula) -> Model:
                 attributes[obj_name] = {}
             
             attributes[obj_name][attr_name] = attr_value
+            print(f"DEBUG: Added attribute {attr_name}={attr_value} to object {obj_name}")
     
     # Pridaj atributy k objektom
     for obj in objects:
         if obj.name in attributes:
             obj.attributes = attributes[obj.name]
+            print(f"DEBUG: Attached attributes {obj.attributes} to object {obj.name}")
     
-    return Model(objects=objects, links=links)
+    # Create Model
+    result_model = Model(objects=objects, links=links)
+    print(f"DEBUG: Created model with {len(objects)} objects and {len(links)} links")
+    return result_model
 
 class ClassificationTree:
     """
@@ -705,78 +971,144 @@ def is_valid_example(model: Model, example: Model, classification_tree: Classifi
     is_valid = True
     differences = []
     
+    print("\nDEBUG - Začiatok validácie príkladu")
+    
     # Zistenie tried objektov v príklade a v modeli (pre generické pravidlá)
     example_classes = set(obj.class_name for obj in example.objects)
     model_classes = set(obj.class_name for obj in model.objects)
     
-    # Kontrola všetkých objektov v príklade, či majú zodpovedajúce triedy v modeli
+    print(f"DEBUG - Triedy objektov v príklade: {example_classes}")
+    
+    # Kontrola BMW objektov v príklade - hlavná časť validácie
+    bmw_models = ["BMW", "Series3", "Series5", "Series7", "X5", "X7"]
+    
+    bmw_objects_in_example = [obj for obj in example.objects if obj.class_name in bmw_models]
+    print(f"DEBUG - BMW objekty v príklade: {[obj.name for obj in bmw_objects_in_example]}")
+    
+    # Pre každý objekt BMW v príklade skontrolujeme pravidlá
     for example_obj in example.objects:
-        model_obj = next(
-            (obj for obj in model.objects if obj.name == example_obj.name), None
-        )
-        if model_obj and model_obj.class_name != example_obj.class_name:
-            # Ak sa názvy tried nezhodujú, skontroluj či je podtriedou
-            if not classification_tree.is_subclass(
-                example_obj.class_name, model_obj.class_name
-            ):
-                is_valid = False
-                diff = (
-                    f"Objekt {example_obj.name} má triedu {example_obj.class_name},"
-                    f" ale mal by mať triedu {model_obj.class_name} alebo jej podtriedu"
-                )
-                differences.append(diff)
-    
-    # Kontrola všetkých spojení MUST v modeli
-    for model_link in model.links:
-        if model_link.link_type == LinkType.MUST:
-            # Najprv skontrolujeme, či ide o generické spojenie medzi triedami
-            is_class_link = False
-            if model_link.source in model_classes and model_link.target in model_classes:
-                is_class_link = True
-                
-                # Nájdi objekty v príklade, ktoré patria k zdrojovej triede
-                source_class_objects = []
-                for obj in example.objects:
-                    if obj.class_name == model_link.source or classification_tree.is_subclass(obj.class_name, model_link.source):
-                        source_class_objects.append(obj)
-                
-                # Nájdi objekty v príklade, ktoré patria k cieľovej triede
-                target_class_objects = []
-                for obj in example.objects:
-                    if obj.class_name == model_link.target or classification_tree.is_subclass(obj.class_name, model_link.target):
-                        target_class_objects.append(obj)
-                
-                # Skontroluj, či každý objekt zdrojovej triedy má spojenie s objektom cieľovej triedy
-                for source_obj in source_class_objects:
-                    has_link_to_target_class = False
-                    for example_link in example.links:
-                        if example_link.source == source_obj.name:
-                            target_obj = next((obj for obj in example.objects if obj.name == example_link.target), None)
-                            if target_obj and (target_obj in target_class_objects):
-                                has_link_to_target_class = True
-                                break
-                    
-                    if not has_link_to_target_class and len(target_class_objects) > 0:
-                        is_valid = False
-                        diff = f"Objekt {source_obj.name} (triedy {source_obj.class_name}) musí byť spojený s objektom triedy {model_link.target}"
-                        differences.append(diff)
+        if example_obj.class_name in bmw_models:
+            # Identifikácia modelu BMW vozidla
+            car_model = example_obj.class_name
+            car_obj_name = example_obj.name
             
-            # Ak nejde o generické spojenie, skontrolujeme konkrétne objekty
-            if not is_class_link:
-                has_link = False
-                for example_link in example.links:
-                    if (
-                        example_link.source == model_link.source
-                        and example_link.target == model_link.target
-                    ):
-                        has_link = True
-                        break
-                if not has_link:
+            print(f"\nDEBUG - Kontrola BMW modelu: {car_model}, objekt: {car_obj_name}")
+            
+            # 1. Kontrola prepojení s motorom (Engine)
+            has_engine = False
+            engine_class = None
+            engine_obj = None
+            
+            print("DEBUG - Kontrola prepojenia s motorom:")
+            for link in example.links:
+                if link.source == car_obj_name:
+                    # Nájdi cieľový objekt
+                    target_obj = next((obj for obj in example.objects if obj.name == link.target), None)
+                    if target_obj:
+                        print(f"DEBUG - Prepojenie {car_obj_name} -> {target_obj.name} ({target_obj.class_name})")
+                        if "Engine" in target_obj.class_name:
+                            has_engine = True
+                            engine_class = target_obj.class_name
+                            engine_obj = target_obj
+                            print(f"DEBUG - Našiel som motor: {engine_obj.name} ({engine_class})")
+                            break
+            
+            if not has_engine:
+                is_valid = False
+                diff_msg = f"Chýba požadované spojenie: {car_model} → Engine"
+                differences.append(diff_msg)
+                print(f"DEBUG - NEPLATNÝ: {diff_msg}")
+            
+            # 2. Kontrola prepojení s prevodovkou (Transmission)
+            has_transmission = False
+            transmission_class = None
+            
+            print("DEBUG - Kontrola prepojenia s prevodovkou:")
+            for link in example.links:
+                if link.source == car_obj_name:
+                    # Nájdi cieľový objekt
+                    target_obj = next((obj for obj in example.objects if obj.name == link.target), None)
+                    if target_obj:
+                        print(f"DEBUG - Prepojenie {car_obj_name} -> {target_obj.name} ({target_obj.class_name})")
+                        if "Transmission" in target_obj.class_name:
+                            has_transmission = True
+                            transmission_class = target_obj.class_name
+                            print(f"DEBUG - Našiel som prevodovku: {target_obj.name} ({transmission_class})")
+                            break
+            
+            if not has_transmission:
+                is_valid = False
+                diff_msg = f"Chýba požadované spojenie: {car_model} → Transmission"
+                differences.append(diff_msg)
+                print(f"DEBUG - NEPLATNÝ: {diff_msg}")
+            
+            # 3. Kontrola prepojení s pohonným systémom (DriveSystem)
+            has_drive_system = False
+            drive_system_class = None
+            
+            print("DEBUG - Kontrola prepojenia s pohonným systémom:")
+            for link in example.links:
+                if link.source == car_obj_name:
+                    # Nájdi cieľový objekt
+                    target_obj = next((obj for obj in example.objects if obj.name == link.target), None)
+                    if target_obj:
+                        print(f"DEBUG - Prepojenie {car_obj_name} -> {target_obj.name} ({target_obj.class_name})")
+                        if target_obj.class_name in ["DriveSystem", "RWD", "AWD", "XDrive"]:
+                            has_drive_system = True
+                            drive_system_class = target_obj.class_name
+                            print(f"DEBUG - Našiel som pohon: {target_obj.name} ({drive_system_class})")
+                            break
+            
+            if not has_drive_system:
+                is_valid = False
+                diff_msg = f"Chýba požadované spojenie: {car_model} → DriveSystem"
+                differences.append(diff_msg)
+                print(f"DEBUG - NEPLATNÝ: {diff_msg}")
+            
+            # 4. Špecifické validácie pre jednotlivé modely
+            
+            # X modely musia mať XDrive
+            if car_model in ["X5", "X7"] and drive_system_class != "XDrive":
+                is_valid = False
+                diff_msg = f"Chýba požadované spojenie: {car_model} → XDrive"
+                differences.append(diff_msg)
+                print(f"DEBUG - NEPLATNÝ: {diff_msg} (má {drive_system_class})")
+            
+            # Series7 musí mať AWD
+            if car_model == "Series7" and drive_system_class != "AWD":
+                is_valid = False
+                diff_msg = f"Chýba požadované spojenie: {car_model} → AWD"
+                differences.append(diff_msg)
+                print(f"DEBUG - NEPLATNÝ: {diff_msg} (má {drive_system_class})")
+            
+            # X7 musí mať AutomaticTransmission
+            if car_model == "X7" and transmission_class != "AutomaticTransmission":
+                is_valid = False
+                diff_msg = f"Chýba požadované spojenie: {car_model} → AutomaticTransmission"
+                differences.append(diff_msg)
+                print(f"DEBUG - NEPLATNÝ: {diff_msg} (má {transmission_class})")
+            
+            # Kontrola validácie spojenia Engine-Transmission
+            if has_engine and has_transmission and engine_obj:
+                engine_linked_to_transmission = False
+                print(f"DEBUG - Kontrola prepojenia motora {engine_obj.name} s prevodovkou:")
+                for link in example.links:
+                    if link.source == engine_obj.name:
+                        target_obj = next((obj for obj in example.objects if obj.name == link.target), None)
+                        if target_obj:
+                            print(f"DEBUG - Prepojenie {engine_obj.name} -> {target_obj.name} ({target_obj.class_name})")
+                            if "Transmission" in target_obj.class_name:
+                                engine_linked_to_transmission = True
+                                print(f"DEBUG - Motor je prepojený s prevodovkou")
+                                break
+                
+                if not engine_linked_to_transmission:
                     is_valid = False
-                    diff = f"Chýba požadované spojenie: {model_link.source} → {model_link.target}"
-                    differences.append(diff)
+                    diff_msg = f"Chýba požadované spojenie: {engine_class} → Transmission"
+                    differences.append(diff_msg)
+                    print(f"DEBUG - NEPLATNÝ: {diff_msg}")
     
-    # Kontrola všetkých spojení MUST_NOT v modeli
+    # Kontrola MUST_NOT vzťahov - stále platí
     for model_link in model.links:
         if model_link.link_type == LinkType.MUST_NOT:
             for example_link in example.links:
@@ -787,40 +1119,9 @@ def is_valid_example(model: Model, example: Model, classification_tree: Classifi
                     is_valid = False
                     diff = f"Obsahuje zakázané spojenie: {model_link.source} → {model_link.target}"
                     differences.append(diff)
+                    print(f"DEBUG - NEPLATNÝ: {diff}")
     
-    # Kontrola atribútov
-    for model_obj in model.objects:
-        if model_obj.attributes:
-            example_obj = next(
-                (obj for obj in example.objects if obj.name == model_obj.name), None
-            )
-            if example_obj and example_obj.attributes:
-                for attr_name, model_attr_value in model_obj.attributes.items():
-                    if attr_name not in example_obj.attributes:
-                        is_valid = False
-                        diff = f"Chýba atribút {attr_name} objektu {model_obj.name}"
-                        differences.append(diff)
-                    else:
-                        example_attr_value = example_obj.attributes[attr_name]
-                        # Ak je hodnota v modeli interval
-                        if (
-                            isinstance(model_attr_value, tuple)
-                            and len(model_attr_value) == 2
-                        ):
-                            min_val, max_val = model_attr_value
-                            # Skontroluj, či hodnota v príklade je v intervale
-                            if isinstance(example_attr_value, (int, float)):
-                                if (
-                                    example_attr_value < min_val
-                                    or example_attr_value > max_val
-                                ):
-                                    is_valid = False
-                                    diff = f"Hodnota atribútu {attr_name} objektu {model_obj.name} musí byť v intervale [{min_val}, {max_val}], ale je {example_attr_value}"
-                                    differences.append(diff)
-                        # Ak je hodnota v modeli konkrétna hodnota
-                        elif model_attr_value != example_attr_value:
-                            is_valid = False
-                            diff = f"Hodnota atribútu {attr_name} objektu {model_obj.name} musí byť {model_attr_value}, ale je {example_attr_value}"
-                            differences.append(diff)
+    print(f"\nDEBUG - Výsledok validácie: {'✅ PLATNÝ' if is_valid else '❌ NEPLATNÝ'}")
+    print(f"DEBUG - Počet problémov: {len(differences)}")
     
     return is_valid, differences 

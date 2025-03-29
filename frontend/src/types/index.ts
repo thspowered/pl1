@@ -13,6 +13,7 @@ export interface TrainingResult {
   message: string;
   model_updated: boolean;
   model_hypothesis?: string; // Textová reprezentácia hypotézy modelu
+  model_rules?: Record<string, string>; // Identifikačné pravidlá pre jednotlivé modely áut
   model_visualization?: {
     nodes: Array<NetworkNode>;
     links: Array<NetworkLink>;
@@ -80,4 +81,11 @@ export interface InfoPanelProps {
 export interface ModelHistory {
   current_index: number;
   total_entries: number;
+}
+
+// Výsledok porovnania príkladu s natrénovaným modelom
+export interface ComparisonResult {
+  is_valid: boolean;
+  explanation: string;
+  symbolic_differences: string[];
 } 
