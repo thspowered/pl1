@@ -25,7 +25,7 @@ import { ComparisonResult } from '../types';
 interface CompareExampleProps {
   onCompare: (formula: string) => Promise<{
     success: boolean;
-    data?: ComparisonResult;
+    data?: any;
     error?: string;
   }>;
   isLoading: boolean;
@@ -40,6 +40,50 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
     setFormula(event.target.value);
   };
 
+  // Adaptér pro převod odpovědi z backendu na formát očekávaný frontendem
+  const adaptBackendResponse = (response: any): ComparisonResult => {
+    // Zkontrolujeme, zda response obsahuje klíčové vlastnosti
+    if (response && typeof response.is_valid === 'boolean') {
+      // Vytvoříme symbolické rozdíly z violations a satisfied_rules
+      const violations = Array.isArray(response.violations) ? response.violations : [];
+      const satisfiedRules = Array.isArray(response.satisfied_rules) ? response.satisfied_rules : [];
+      
+      // Vytvoříme vysvětlení na základě porušení pravidel
+      let explanation = '';
+      if (response.is_valid) {
+        explanation = `Příklad je platný pro model ${response.model_type || 'auta'}.`;
+        if (satisfiedRules.length > 0) {
+          explanation += ` Splňuje ${satisfiedRules.length} pravidel.`;
+        }
+      } else {
+        explanation = `Příklad není platný pro model ${response.model_type || 'auta'}.`;
+        if (violations.length > 0) {
+          explanation += ` Porušuje ${violations.length} pravidel.`;
+        }
+      }
+      
+      // Zkombinujeme porušení a splněná pravidla do symbolických rozdílů
+      const symbolicDifferences = [
+        ...violations,
+        ...satisfiedRules.map((rule: string) => `✓ ${rule}`)
+      ];
+      
+      // Vrátíme objekt ve formátu ComparisonResult
+      return {
+        is_valid: response.is_valid,
+        explanation,
+        symbolic_differences: symbolicDifferences
+      };
+    }
+    
+    // Pokud odpověď nemá očekávanou strukturu, vrátíme výchozí objekt
+    return {
+      is_valid: false,
+      explanation: 'Neplatná odpověď ze serveru',
+      symbolic_differences: ['Chyba při zpracování odpovědi']
+    };
+  };
+
   const handleCompare = async () => {
     if (!formula.trim()) {
       setError('Prosím, zadajte formulu v predikátovej logike prvého rádu.');
@@ -50,7 +94,9 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
       const response = await onCompare(formula);
       
       if (response.success && response.data) {
-        setResult(response.data);
+        // Použijeme adaptér k převodu odpovědi do očekávaného formátu
+        const adaptedResult = adaptBackendResponse(response.data);
+        setResult(adaptedResult);
         setError(null);
       } else {
         setError(response.error || 'Nastala chyba pri porovnávaní príkladu.');
@@ -254,7 +300,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
                   </CardContent>
                 </Card>
 
-                {!result.is_valid && result.symbolic_differences.length > 0 && (
+                {result.symbolic_differences.length > 0 && (
                   <Paper sx={{ 
                     p: 2,
                     backgroundColor: 'rgba(0, 0, 0, 0.2)',
@@ -266,10 +312,10 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
                       sx={{ 
                         mb: 2, 
                         fontWeight: 600,
-                        color: '#f8bb86'  // Oranžová farba pre varovania
+                        color: result.is_valid ? '#66bb6a' : '#f8bb86'
                       }}
                     >
-                      Zistené problémy:
+                      {result.is_valid ? 'Splněná pravidla:' : 'Zistené problémy:'}
                     </Typography>
                     <List sx={{ 
                       p: 0,
@@ -284,10 +330,14 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
                       {result.symbolic_differences.map((diff, index) => (
                         <ListItem key={index}>
                           <ListItemIcon sx={{ minWidth: 36 }}>
-                            <ErrorOutlineIcon sx={{ color: '#f44336' }} />
+                            {diff.startsWith('✓') ? (
+                              <CheckCircleOutlineIcon sx={{ color: '#66bb6a' }} />
+                            ) : (
+                              <ErrorOutlineIcon sx={{ color: '#f44336' }} />
+                            )}
                           </ListItemIcon>
                           <ListItemText 
-                            primary={diff} 
+                            primary={diff.startsWith('✓') ? diff.substring(2) : diff} 
                             primaryTypographyProps={{
                               variant: 'body2',
                               sx: { 

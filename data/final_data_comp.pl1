@@ -212,6 +212,8 @@
 Α(c₁₀, has_navigation_system, true) ∧
 Α(c₁₀, has_rear_screens, true)
 
+
+
 # Negatívny príklad 1: X5 s manuálnou prevodovkou (X5 má vždy automatickú)
 Ι(n₁, X5) ∧ 
 Π(n₁, ne₁) ∧ Ι(ne₁, PetrolEngine) ∧ 

@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from backend.model import Model, Link, LinkType, Object, ClassificationTree, formula_to_model, is_valid_example
 from backend.pl1_parser import parse_pl1_formula, parse_pl1_dataset, Formula, Predicate
 from backend.learner import WinstonLearner
+from backend.example_validator import compare_example
 
 app = FastAPI(title="PL1 Learning System")
 
@@ -894,36 +895,38 @@ async def train_model(training_request: TrainingRequest):
         return {"status": "error", "message": str(e), "steps": training_steps}
 
 @app.post("/api/compare")
-async def compare_example(example: PL1Example):
-    """Porovná príklad s naučeným modelom a vráti výsledok."""
-    global current_model, classification_tree
+async def compare_example_endpoint(example: PL1Example):
+    """
+    Validuje PL1 příklad proti aktuálnímu modelu se zaměřením na konkrétní model auta.
+    
+    Args:
+        example: PL1 příklad k validaci
+        
+    Returns:
+        Výsledek validace s konkrétními vysvětleními pro daný model auta
+    """
+    global current_model
+    
+    if not example:
+        raise HTTPException(status_code=400, detail="Chybí příklad k validaci")
+    
+    if not current_model or not current_model.objects:
+        raise HTTPException(status_code=400, detail="Model není natrénován")
     
     try:
-        if not current_model.objects:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "Model ešte nebol natrénovaný."}
-            )
+        # Validace příkladu
+        result = compare_example(current_model, example.formula)
         
-        # Parsuj formulu a vytvor model z príkladu
-        formula = parse_pl1_formula(example.formula)
-        example_model = formula_to_model(formula)
-        
-        # Porovnaj s naučeným modelom použitím funkcie is_valid_example
-        is_valid, symbolic_differences = is_valid_example(current_model, example_model, classification_tree)
-        
-        # Vytvor vysvetlenie
-        explanation = "Príklad je platný podľa naučeného modelu." if is_valid else "Príklad nie je platný podľa naučeného modelu z nasledujúcich dôvodov:"
-        
-        return ComparisonResult(
-            is_valid=is_valid,
-            explanation=explanation,
-            symbolic_differences=symbolic_differences
-        )
-    
+        return {
+            "is_valid": result["is_valid"],
+            "model_type": result["model_type"],
+            "violations": result["violations"],
+            "satisfied_rules": result["satisfied_rules"],
+            "formula": result["formula"]
+        }
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Chyba pri porovnávaní príkladu: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chyba při validaci příkladu: {str(e)}")
 
 @app.get("/api/model")
 async def get_model():
