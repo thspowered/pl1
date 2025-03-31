@@ -37,45 +37,22 @@ class WinstonLearner:
 
     def update_model(self, model: Model, good: Model, near_miss: Model) -> Model:
         """
-        Aktualizuje model na základě pozitívneho príkladu a near-miss príkladu.
+        Aktualizuje model podle pozitivního a negativního příkladu.
         
-        Postupne aplikuje heuristiky v optimalizovanom pořadí na základe jejich důležitosti:
-        1. add_missing_objects - když model je prázdný, přidá všechny objekty z first example
-        2. check_consistency - zkontroluje a vyřeší konflikty v hierarchii
-        3. climb_tree - zobecnění na vyšší úroveň hierarchie včetně Device
-        4. require_link - přidá pozitivní vazby
-        5. close_interval - zúží intervaly numerických atributů
-        6. enlarge_set - rozšíří množiny přijatelných hodnot atributů
-        7. forbid_link - přidá negativní vazby
-        8. drop_link - odstraní nepotřebné vazby
-        9. propagate_to_common_ancestor - propaguje pravidla na nejvyšší společný předek
-        10. backup_rule - vrátí se k lepšímu předchozímu pravidlu, pokud je to potřeba
+        Důležité: Algoritmus aplikuje heuristiky v pořadí priorit, ale vždy jen jednu.
+        Jakmile jedna heuristika vede ke změně, algoritmus se ukončí.
         
         Args:
-            model: Aktuálny model znalostí
-            good: Pozitívny príklad
-            near_miss: Near-miss príklad
+            model: Aktuální model (hypotéza)
+            good: Pozitivní příklad
+            near_miss: Negativní příklad (near-miss)
             
         Returns:
             Aktualizovaný model
         """
-        # Reset zoznamu aplikovaných heuristík
-        self.applied_heuristics = []
-        
-        # Hlboká kópia modelu
+        self._debug_log(f"Updating model with positive example {good} and negative example {near_miss}")
         updated_model = model.copy()
-        
-        # Uložení aktuálního modelu do historie před změnami
-        if len(model.objects) > 0:  # Ukládáme pouze neprázdné modely
-            self._add_to_history(model)
-        
-        # Debugovanie
-        self._debug_log("Začínam aktualizáciu modelu")
-        self._debug_log(f"Pozitívny príklad: {good}")
-        if near_miss:
-            self._debug_log(f"Near-miss príklad: {near_miss}")
-        else:
-            self._debug_log("Near-miss príklad: None")
+        self.applied_heuristics = []
         
         # 1. Nejprve přidáme objekty z prvního příkladu, pokud je model prázdný
         if len(model.objects) == 0:
@@ -95,15 +72,18 @@ class WinstonLearner:
         updated_model = self._apply_require_link(updated_model, good, near_miss)
         
         # 5. Close-interval - zúžení intervalu numerických atributů
-        self._debug_log("Skúšam close-interval heuristiku...")
-        updated_model = self._apply_close_interval(updated_model, good, near_miss)
+        # COMMENTED OUT: Not a core Winston heuristic
+        # self._debug_log("Skúšam close-interval heuristiku...")
+        # updated_model = self._apply_close_interval(updated_model, good, near_miss)
         
         # 6. Enlarge-set - rozšíření množiny přijatelných hodnot atributů
+        # COMMENTED OUT: Not a core Winston heuristic
         self._debug_log("Skúšam enlarge-set heuristiku...")
         updated_model = self._apply_enlarge_set(updated_model, good)
         
         # 7. Propagace vlastností na nejvyšší úroveň hierarchie
-        updated_model = self._propagate_to_common_ancestor(updated_model)
+        # COMMENTED OUT: Not a core Winston heuristic
+        # updated_model = self._propagate_to_common_ancestor(updated_model)
             
         # 8. Forbid-link - identifikuje, co by objekt neměl mít
         if near_miss:
@@ -116,7 +96,8 @@ class WinstonLearner:
             updated_model = self._apply_drop_link(updated_model, good, near_miss)
         
         # 10. BackUp Rule - kontrola, zda nové změny nezhoršily přesnost modelu
-        updated_model = self._apply_backup_rule(updated_model, good, near_miss)
+        # COMMENTED OUT: Not a core Winston heuristic
+        # updated_model = self._apply_backup_rule(updated_model, good, near_miss)
         
         # Výpis aplikovaných heuristík
         if self.applied_heuristics:
@@ -299,7 +280,7 @@ class WinstonLearner:
         
         # 4. Osobitné spracovanie pre možnosti ekvivalentných komponentov (napr. rôzne typy motorov)
         # Zbierame komponenty podľa nadradených tried
-        component_classes = {}
+        component_classes = set()
         
         # Nájdeme všetky komponenty v modeli a príklade
         for obj in updated_model.objects + good.objects:
@@ -312,15 +293,13 @@ class WinstonLearner:
                 
             # Pridáme triedu komponenty pod jej rodiča
             if parent_class not in component_classes:
-                component_classes[parent_class] = set()
-                
-            component_classes[parent_class].add(obj.class_name)
+                component_classes.add(parent_class)
         
         # Ak máme viac ako jeden typ komponentu pre rodičovskú triedu, vytvoríme pravidlo
-        for parent_class, subclasses in component_classes.items():
-            if len(subclasses) > 1:
-                print(f"  Found equivalent components for {parent_class}: {subclasses}")
-                self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {subclasses}")
+        for parent_class in component_classes:
+            if len(component_classes) > 1:
+                print(f"  Found equivalent components for {parent_class}: {component_classes}")
+                self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {component_classes}")
                 
                 # Pre každý objekt v modeli, ktorý má MUST spojenie s touto komponentou
                 for link in updated_model.links:
@@ -337,12 +316,12 @@ class WinstonLearner:
                                 attr_name = f"allowed_{parent_class.lower()}_types"
                                 
                                 if attr_name not in obj.attributes or not isinstance(obj.attributes[attr_name], set):
-                                    obj.attributes[attr_name] = subclasses
+                                    obj.attributes[attr_name] = component_classes
                                     heuristic_applied = True
-                                    print(f"    Created set of allowed components {attr_name} = {subclasses}")
-                                    self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {subclasses}")
-                                elif subclasses - obj.attributes[attr_name]:
-                                    obj.attributes[attr_name].update(subclasses)
+                                    print(f"    Created set of allowed components {attr_name} = {component_classes}")
+                                    self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {component_classes}")
+                                elif component_classes - obj.attributes[attr_name]:
+                                    obj.attributes[attr_name].update(component_classes)
                                     heuristic_applied = True
                                     print(f"    Extended set of allowed components {attr_name}")
                                     self._debug_log(f"Rozšírená množina povolených komponentov {attr_name} pre triedu {source_class}")
@@ -358,7 +337,7 @@ class WinstonLearner:
         ktorá efektívnejšie spracováva numerické hodnoty pre atribúty ako power a cylinders.
         
         Args:
-            model: Aktuálny model
+            model: Aktuálný model
             good: Pozitívny príklad
             near_miss: Negativní příklad (volitelný)
             
@@ -745,17 +724,106 @@ class WinstonLearner:
         
         return updated_model
 
-    def _apply_forbid_link(self, model: Model, good: Model, near_miss: Model):
+    def _is_rule_consistent(self, updated_model, source_class, target_class, link_type):
         """
-        Vylepšená implementace forbid-link heuristiky.
-        
-        Identifikuje klíčové rozdíly mezi pozitivním a near-miss příkladem
-        a vytváří MUST_NOT pravidla, ale s lepší kontrolou konfliktu.
+        Zkontroluje, zda je pravidlo konzistentní s existujícím modelem.
         
         Args:
-            model: Aktuální model
+            updated_model: Aktuální model
+            source_class: Zdrojová třída
+            target_class: Cílová třída
+            link_type: Typ vazby (MUST_NOT)
+            
+        Returns:
+            True, pokud pravidlo je konzistentní, jinak False
+        """
+        # Zkontrolujeme, zda toto pravidlo není v konfliktu s jinými pravidly
+        
+        # 1. Kontrola konfliktu s existujícími MUST pravidly
+        if link_type == LinkType.MUST_NOT:
+            for link in updated_model.links:
+                if link.link_type == LinkType.MUST and link.source == source_class and link.target == target_class:
+                    self._debug_log(f"KONFLIKT: {source_class} nemůže mít MUST_NOT pro {target_class}, protože již má MUST")
+                    return False
+        
+        # 2. Kontrola konfliktu s pozitivními příklady v aktuálním modelu
+        # Zkontrolujeme, zda v aktuálním modelu existují objekty, které by porušily toto pravidlo
+        for obj in updated_model.objects:
+            if obj.class_name == source_class:
+                # Najdeme všechny vazby z tohoto objektu
+                for link in updated_model.links:
+                    if link.source == obj.name:
+                        # Najdeme cílový objekt
+                        target_obj = next((o for o in updated_model.objects if o.name == link.target), None)
+                        if target_obj and target_obj.class_name == target_class and link_type == LinkType.MUST_NOT:
+                            self._debug_log(f"KONFLIKT: {source_class} nemůže mít MUST_NOT pro {target_class}, protože objekt {obj.name} již má vazbu na {target_obj.name}")
+                            return False
+        
+        return True
+
+    def _find_specific_difference(self, updated_model, car_class, good, near_miss):
+        """
+        Hledá konkrétnější rozdíl mezi pozitivním a negativním příkladem.
+        
+        Args:
+            updated_model: Aktuální model
+            car_class: Třída auta
             good: Pozitivní příklad
             near_miss: Near-miss příklad
+            
+        Returns:
+            Dvojice (source_class, target_class) pro vytvoření MUST_NOT vazby, nebo None
+        """
+        # Najdeme objekty daného modelu auta v pozitivním a negativním příkladu
+        good_cars = [obj for obj in good.objects if obj.class_name == car_class]
+        near_miss_cars = [obj for obj in near_miss.objects if obj.class_name == car_class]
+        
+        if not good_cars or not near_miss_cars:
+            return None
+        
+        # Najdeme komponenty připojené k pozitivnímu příkladu
+        good_car = good_cars[0]
+        good_components = {}
+        for link in good.links:
+            if link.source == good_car.name:
+                target_obj = next((o for o in good.objects if o.name == link.target), None)
+                if target_obj and target_obj.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
+                    good_components[target_obj.class_name] = target_obj
+        
+        # Najdeme komponenty připojené k negativnímu příkladu
+        near_miss_car = near_miss_cars[0]
+        near_miss_components = {}
+        for link in near_miss.links:
+            if link.source == near_miss_car.name:
+                target_obj = next((o for o in near_miss.objects if o.name == link.target), None)
+                if target_obj and target_obj.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
+                    near_miss_components[target_obj.class_name] = target_obj
+        
+        # Nejprve kontrolujeme rozdíly v typech komponent (například ManualTransmission vs AutomaticTransmission)
+        for component_class, nm_component in near_miss_components.items():
+            # Zkontrolujeme, zda tato třída komponent existuje i v pozitivním příkladu
+            if any(comp_class for comp_class, _ in good_components.items() if 
+                  self.classification_tree.are_related(comp_class, component_class)):
+                # Našli jsme komponentu stejného typu, ale jiné třídy - to je konkrétnější rozdíl
+                # Například negativní příklad má ManualTransmission, zatímco pozitivní má AutomaticTransmission
+                # Vrátíme vazbu (car_class, component_class) pro vytvoření MUST_NOT
+                self._debug_log(f"Nalezen konkrétnější rozdíl: {car_class} -> {component_class}")
+                return (car_class, component_class)
+        
+        # Pokud nenajdeme konkrétnější rozdíl, vrátíme None
+        return None
+
+    def _apply_forbid_link(self, model: Model, good: Model, near_miss: Model):
+        """
+        Aplikuje forbid-link heuristiku.
+        
+        Vytváří MUST_NOT vazby mezi třídami objektů v modelu na základě
+        porovnání pozitivního a near-miss příkladu.
+        
+        Args:
+            model: Aktuálný model
+            good: Pozitívny príklad
+            near_miss: Near-miss príklad
             
         Returns:
             Aktualizovaný model
@@ -791,6 +859,32 @@ class WinstonLearner:
         
         # 2. Pro každou třídu auta, která je společná pro oba příklady
         for car_class in common_car_classes:
+            # Zkusíme najít konkrétnější rozdíl
+            specific_difference = self._find_specific_difference(updated_model, car_class, good, near_miss)
+            
+            if specific_difference:
+                source_class, target_class = specific_difference
+                
+                # Zkontrolujeme, zda je pravidlo konzistentní
+                if self._is_rule_consistent(updated_model, source_class, target_class, LinkType.MUST_NOT):
+                    must_not_link = Link(
+                        source=source_class,
+                        target=target_class,
+                        link_type=LinkType.MUST_NOT
+                    )
+                    
+                    # Ověříme, že taková vazba ještě neexistuje
+                    if not any(link.source == must_not_link.source and 
+                            link.target == must_not_link.target and 
+                            link.link_type == must_not_link.link_type 
+                            for link in updated_model.links):
+                        updated_model.add_link(must_not_link)
+                        self.applied_heuristics.append("forbid_link")
+                        self._debug_log(f"Přidáno pravidlo MUST_NOT (konkrétní rozdíl): {source_class} -> {target_class}")
+                        
+                # Pokračujeme dalším modelem, už jsme přidali konkrétní pravidlo
+                continue
+            
             # Získáme komponenty z negativního příkladu, které se nevyskytují v pozitivním příkladu
             near_miss_components = {}
             good_components = {}
@@ -809,24 +903,27 @@ class WinstonLearner:
             
             self._debug_log(f"Unique components in near-miss: {unique_component_classes}")
             
-            # 3. Pro každou unikátní komponentu vytvoříme MUST_NOT vazbu
+            # 3. Kontrola konzistence s aktuálním modelem a přidání MUST_NOT vazeb
             for component_class in unique_component_classes:
-                must_not_link = Link(
-                    source=car_class,
-                    target=component_class,
-                    link_type=LinkType.MUST_NOT
-                )
-                
-                # Ověříme, že taková vazba ještě neexistuje
-                if not any(link.source == must_not_link.source and 
-                        link.target == must_not_link.target and 
-                        link.link_type == must_not_link.link_type 
-                        for link in updated_model.links):
-                    updated_model.add_link(must_not_link)
-                    self.applied_heuristics.append("forbid_link")
-                    self._debug_log(f"Přidáno pravidlo MUST_NOT: {car_class} -> {component_class}")
+                # Zkontrolujeme, zda neexistují jiné pozitivní příklady nebo pravidla v modelu,
+                # které by mohly být v konfliktu s tímto pravidlem
+                if self._is_rule_consistent(updated_model, car_class, component_class, LinkType.MUST_NOT):
+                    must_not_link = Link(
+                        source=car_class,
+                        target=component_class,
+                        link_type=LinkType.MUST_NOT
+                    )
+                    
+                    # Ověříme, že taková vazba ještě neexistuje
+                    if not any(link.source == must_not_link.source and 
+                            link.target == must_not_link.target and 
+                            link.link_type == must_not_link.link_type 
+                            for link in updated_model.links):
+                        updated_model.add_link(must_not_link)
+                        self.applied_heuristics.append("forbid_link")
+                        self._debug_log(f"Přidáno pravidlo MUST_NOT: {car_class} -> {component_class}")
         
-        # 4. Analyzujeme vazby mezi objekty a vytvoříme další MUST_NOT vazby
+        # 4. Analyzujeme vazby mezi objekty a vytvoříme další MUST_NOT vazby, ale s kontrolou konzistence
         for near_miss_link in near_miss.links:
             near_miss_source = next((obj for obj in near_miss.objects if obj.name == near_miss_link.source), None)
             near_miss_target = next((obj for obj in near_miss.objects if obj.name == near_miss_link.target), None)
@@ -850,8 +947,8 @@ class WinstonLearner:
                         has_similar_in_good = True
                         break
                 
-                # Pokud neexistuje podobná vazba v pozitivním příkladu, vytvoříme MUST_NOT vazbu
-                if not has_similar_in_good:
+                # Pokud neexistuje podobná vazba v pozitivním příkladu, vytvoříme MUST_NOT vazbu (s kontrolou konzistence)
+                if not has_similar_in_good and self._is_rule_consistent(updated_model, near_miss_source.class_name, near_miss_target.class_name, LinkType.MUST_NOT):
                     must_not_link = Link(
                         source=near_miss_source.class_name,
                         target=near_miss_target.class_name,
@@ -860,9 +957,9 @@ class WinstonLearner:
                     
                     # Ověříme, že taková vazba ještě neexistuje
                     if not any(link.source == must_not_link.source and 
-                            link.target == must_not_link.target and 
-                            link.link_type == must_not_link.link_type 
-                            for link in updated_model.links):
+                               link.target == must_not_link.target and 
+                               link.link_type == must_not_link.link_type 
+                               for link in updated_model.links):
                         updated_model.add_link(must_not_link)
                         self.applied_heuristics.append("forbid_link")
                         self._debug_log(f"Přidáno pravidlo MUST_NOT z vazeb: {near_miss_source.class_name} -> {near_miss_target.class_name}")
