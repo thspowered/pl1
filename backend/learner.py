@@ -280,7 +280,7 @@ class WinstonLearner:
         
         # 4. Osobitné spracovanie pre možnosti ekvivalentných komponentov (napr. rôzne typy motorov)
         # Zbierame komponenty podľa nadradených tried
-        component_classes = set()
+        component_classes_by_parent = {}
         
         # Nájdeme všetky komponenty v modeli a príklade
         for obj in updated_model.objects + good.objects:
@@ -292,14 +292,16 @@ class WinstonLearner:
                 continue
                 
             # Pridáme triedu komponenty pod jej rodiča
-            if parent_class not in component_classes:
-                component_classes.add(parent_class)
+            if parent_class not in component_classes_by_parent:
+                component_classes_by_parent[parent_class] = set()
+                
+            component_classes_by_parent[parent_class].add(obj.class_name)
         
         # Ak máme viac ako jeden typ komponentu pre rodičovskú triedu, vytvoríme pravidlo
-        for parent_class in component_classes:
-            if len(component_classes) > 1:
-                print(f"  Found equivalent components for {parent_class}: {component_classes}")
-                self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {component_classes}")
+        for parent_class, subclasses in component_classes_by_parent.items():
+            if len(subclasses) > 1:
+                print(f"  Found equivalent components for {parent_class}: {subclasses}")
+                self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {subclasses}")
                 
                 # Pre každý objekt v modeli, ktorý má MUST spojenie s touto komponentou
                 for link in updated_model.links:
@@ -316,12 +318,12 @@ class WinstonLearner:
                                 attr_name = f"allowed_{parent_class.lower()}_types"
                                 
                                 if attr_name not in obj.attributes or not isinstance(obj.attributes[attr_name], set):
-                                    obj.attributes[attr_name] = component_classes
+                                    obj.attributes[attr_name] = subclasses
                                     heuristic_applied = True
-                                    print(f"    Created set of allowed components {attr_name} = {component_classes}")
-                                    self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {component_classes}")
-                                elif component_classes - obj.attributes[attr_name]:
-                                    obj.attributes[attr_name].update(component_classes)
+                                    print(f"    Created set of allowed components {attr_name} = {subclasses}")
+                                    self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {subclasses}")
+                                elif subclasses - obj.attributes[attr_name]:
+                                    obj.attributes[attr_name].update(subclasses)
                                     heuristic_applied = True
                                     print(f"    Extended set of allowed components {attr_name}")
                                     self._debug_log(f"Rozšírená množina povolených komponentov {attr_name} pre triedu {source_class}")
