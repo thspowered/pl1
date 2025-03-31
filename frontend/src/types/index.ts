@@ -59,17 +59,24 @@ export interface NetworkNode {
   class: string;
   category: string;
   attributes?: Record<string, any>;
+  status?: 'common' | 'only_in_a' | 'only_in_b';  // Status pro vizualizaci rozdílů
+  value?: any;  // Hodnota atributu
+  value_display?: string;  // Textová reprezentace hodnoty pro zobrazení
 }
 
 export interface NetworkLink {
   source: string;
   target: string;
   type: string;
+  status?: 'common' | 'only_in_a' | 'only_in_b';  // Status pro vizualizaci rozdílů
 }
 
 export interface SigmaNetworkProps {
   nodes: NetworkNode[];
   links: NetworkLink[];
+  showDifferences?: boolean;  // Příznak pro zobrazení rozdílů
+  modelA?: string;  // Název prvního modelu
+  modelB?: string;  // Název druhého modelu
 }
 
 export interface InfoPanelProps {
@@ -88,4 +95,80 @@ export interface ComparisonResult {
   is_valid: boolean;
   explanation: string;
   symbolic_differences: string[];
+}
+
+// Typy pro uložené modely a porovnávání hypotéz
+export interface SavedModel {
+  id: number;
+  name: string;
+  timestamp: string;
+}
+
+export interface SavedModelDetail extends SavedModel {
+  pl1_representation: string;
+  model_state: any;
+}
+
+export interface ModelComparisonRequest {
+  model_a_type: 'current' | 'saved';
+  model_a_id?: number;
+  model_b_type: 'current' | 'saved';
+  model_b_id?: number;
+}
+
+export interface ModelComparisonResult {
+  success: boolean;
+  model_a: {
+    name: string;
+    type: string;
+    id?: number;
+    pl1_representation: string;
+  };
+  model_b: {
+    name: string;
+    type: string;
+    id?: number;
+    pl1_representation: string;
+  };
+  differences: {
+    objects: {
+      only_in_a: string[];
+      only_in_b: string[];
+      common: string[];
+    };
+    links: {
+      only_in_a: string[];
+      only_in_b: string[];
+      count_a: number;
+      count_b: number;
+      common_count: number;
+    };
+    model_types: {
+      [model_type: string]: {
+        only_in_a: {
+          must: string[];
+          must_not: string[];
+        };
+        only_in_b: {
+          must: string[];
+          must_not: string[];
+        };
+        different: Record<string, any>;
+      };
+    };
+  };
+  visualization?: {
+    nodes: NetworkNode[];
+    links: NetworkLink[];
+  };
+  visualization_stats?: {
+    node_count: number;
+    link_count: number;
+    nodes_only_in_a: number;
+    nodes_only_in_b: number;
+    nodes_common: number;
+    links_only_in_a: number;
+    links_only_in_b: number;
+    links_common: number;
+  };
 } 

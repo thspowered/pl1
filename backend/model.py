@@ -556,6 +556,31 @@ class Model:
         print(f"Extracted rules from model: {rules}")
         
         return rules
+        
+    def get_rules_for_model_type(self, model_type):
+        """
+        Získá strukturovaná pravidla pro konkrétní typ modelu.
+        
+        Args:
+            model_type: Typ modelu (např. 'Series7', 'X5')
+            
+        Returns:
+            Slovník s pravidly rozdělenými na 'must' a 'must_not'
+        """
+        rules = {
+            "must": [],
+            "must_not": []
+        }
+        
+        # Najít všechna MUST pravidla
+        for link in self.links:
+            if link.source == model_type:
+                if link.link_type == LinkType.MUST:
+                    rules["must"].append(link.target)
+                elif link.link_type == LinkType.MUST_NOT:
+                    rules["must_not"].append(link.target)
+        
+        return rules
 
     def to_semantic_network(self) -> Dict[str, Any]:
         """

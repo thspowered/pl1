@@ -212,16 +212,13 @@ def formula_to_model(formula: Formula) -> Model:
 
 def generate_model_visualization(model: Model):
     """
-    Generuje vizualizáciu modelu ako sémantickú sieť.
+    Generuje vizualizaci modelu pro frontend.
     
-    Táto funkcia konvertuje model na formát vhodný pre vizualizáciu
-    ako sémantická sieť (uzly a hrany).
-    
-    Parametre:
-        model: Model, ktorý sa má vizualizovať
+    Args:
+        model: Model k vizualizaci
         
-    Návratová hodnota:
-        Dictionary obsahujúci uzly a hrany pre vizualizáciu
+    Returns:
+        Slovník obsahující vizualizaci modelu
     """
     if not model:
         return {"nodes": [], "links": []}
@@ -233,9 +230,226 @@ def generate_model_visualization(model: Model):
         traceback.print_exc()
         return {"nodes": [], "links": [], "error": str(e)}
 
+def generate_difference_visualization(model_a, model_b, model_type_differences):
+    """
+    Generuje vizualizaci rozdílů mezi dvěma modely ve formátu sémantické sítě.
+    
+    Args:
+        model_a: První model
+        model_b: Druhý model
+        model_type_differences: Slovník s rozdíly v pravidlech pro každý typ modelu
+        
+    Returns:
+        Slovník s uzly a spojeními pro vizualizaci rozdílů
+    """
+    if not model_a or not model_b:
+        return None
+        
+    nodes = []
+    links = []
+    
+    # Kategórie pre uzly (stejné jako v Model.to_semantic_network)
+    bmw_categories = ["BMW", "Series3", "Series5", "Series7", "X5", "X7"]
+    engine_categories = ["Engine", "DieselEngine", "PetrolEngine", "HybridEngine"]
+    transmission_categories = ["Transmission", "AutomaticTransmission", "ManualTransmission"]
+    drive_categories = ["DriveSystem", "RWD", "AWD", "XDrive"]
+    
+    # Pomocná funkce na určenie kategórie uzla
+    def get_node_category(obj_name, class_name):
+        if any(category in class_name for category in bmw_categories):
+            return "BMW"
+        elif any(category in class_name for category in engine_categories) or "engine" in obj_name.lower():
+            return "Engine"
+        elif any(category in class_name for category in transmission_categories) or "transmission" in obj_name.lower():
+            return "Transmission"
+        elif any(category in class_name for category in drive_categories) or "drive" in obj_name.lower():
+            return "Drive"
+        else:
+            return "Other"
+    
+    # Vytvoříme slovníky objektů podle jména pro rychlejší přístup
+    objects_a = {obj.name: obj for obj in model_a.objects}
+    objects_b = {obj.name: obj for obj in model_b.objects}
+    
+    # Vytvoříme slovníky spojení podle zdroje a cíle pro rychlejší porovnání
+    links_a = {(link.source, link.target, link.link_type.value): link for link in model_a.links}
+    links_b = {(link.source, link.target, link.link_type.value): link for link in model_b.links}
+    
+    # Přidáme třídy, které jsou uvedeny v links, ale chybí v objects
+    for link_key in links_a.keys():
+        source, target, _ = link_key
+        # Přidáme chybějící třídy jako uzly
+        if source not in objects_a and source not in objects_b:
+            if any(cat in source for cat in bmw_categories + engine_categories + transmission_categories + drive_categories):
+                class_name = source
+                objects_a[source] = Object(name=source, class_name=class_name)
+        if target not in objects_a and target not in objects_b:
+            if any(cat in target for cat in bmw_categories + engine_categories + transmission_categories + drive_categories):
+                class_name = target
+                objects_a[source] = Object(name=target, class_name=class_name)
+    
+    for link_key in links_b.keys():
+        source, target, _ = link_key
+        # Přidáme chybějící třídy jako uzly
+        if source not in objects_a and source not in objects_b:
+            if any(cat in source for cat in bmw_categories + engine_categories + transmission_categories + drive_categories):
+                class_name = source
+                objects_b[source] = Object(name=source, class_name=class_name)
+        if target not in objects_a and target not in objects_b:
+            if any(cat in target for cat in bmw_categories + engine_categories + transmission_categories + drive_categories):
+                class_name = target
+                objects_b[source] = Object(name=target, class_name=class_name)
+    
+    # Zpracování objektů z obou modelů a přidání do vizualizace
+    all_object_names = set(objects_a.keys()) | set(objects_b.keys())
+    
+    print(f"Total objects for visualization: {len(all_object_names)}")
+    
+    # Sledujeme již přidané atributy, abychom zabránili duplikátům
+    added_attributes = set()
+    
+    for obj_name in all_object_names:
+        # Určíme, zda je objekt v modelu A, B nebo v obou
+        status = "common" if obj_name in objects_a and obj_name in objects_b else \
+                "only_in_a" if obj_name in objects_a else "only_in_b"
+        
+        # Vezmeme objekt z příslušného modelu pro získání informací
+        obj = objects_a.get(obj_name) if obj_name in objects_a else objects_b.get(obj_name)
+        
+        # Kontrola null hodnoty
+        if not obj:
+            print(f"Warning: NULL object found: {obj_name}")
+            continue
+        
+        # Určíme kategorii objektu
+        category = get_node_category(obj.name, obj.class_name)
+        
+        # Vytvoříme uzel
+        node = {
+            "id": obj.name,
+            "name": obj.name,
+            "class": obj.class_name,
+            "category": category,
+            "attributes": obj.attributes or {},
+            "status": status  # Přidáme status pro vizualizaci
+        }
+        
+        nodes.append(node)
+        
+        # Přidáme atributy objektu jako samostatné uzly a vytvoříme spojení na ně
+        if hasattr(obj, 'attributes') and obj.attributes:
+            for attr_name, attr_value in obj.attributes.items():
+                # Vytvoříme unikátní ID pro atribut
+                attr_node_id = f"{obj.name}_{attr_name}"
+                
+                if attr_node_id not in added_attributes:
+                    # Přidáme uzel pro atribut
+                    attr_node = {
+                        "id": attr_node_id,
+                        "name": attr_name,
+                        "class": "Attribute",
+                        "category": "Attribute",
+                        "value": attr_value,
+                        "status": status  # Atributy mají stejný status jako jejich objekt
+                    }
+                    nodes.append(attr_node)
+                    added_attributes.add(attr_node_id)
+                    
+                    # Vytvoříme spojení mezi objektem a atributem
+                    link_data = {
+                        "source": obj.name,
+                        "target": attr_node_id,
+                        "type": "HAS_ATTRIBUTE",
+                        "status": status
+                    }
+                    links.append(link_data)
+                    
+                    # Pokud hodnota atributu je seznam nebo množina, přidáme každou hodnotu jako samostatný uzel
+                    if isinstance(attr_value, (list, set)) or (isinstance(attr_value, dict) and attr_value.get('type') == 'set'):
+                        values = attr_value if isinstance(attr_value, (list, set)) else attr_value.get('values', [])
+                        for idx, val in enumerate(values):
+                            value_node_id = f"{attr_node_id}_value_{idx}"
+                            
+                            # Přidáme uzel pro hodnotu
+                            value_node = {
+                                "id": value_node_id,
+                                "name": str(val),
+                                "class": "Value",
+                                "category": "Value",
+                                "status": status
+                            }
+                            nodes.append(value_node)
+                            
+                            # Spojení od atributu k hodnotě
+                            value_link = {
+                                "source": attr_node_id,
+                                "target": value_node_id,
+                                "type": "VALUE",
+                                "status": status
+                            }
+                            links.append(value_link)
+                    else:
+                        # Pro jednoduché hodnoty přidáme hodnotu přímo do uzlu atributu
+                        attr_node["value_display"] = str(attr_value)
+    
+    # Přidáme všechny třídy jako uzly
+    for class_name in bmw_categories + engine_categories + transmission_categories + drive_categories:
+        # Pokud už třída existuje jako uzel, přeskočíme ji
+        if any(node["name"] == class_name for node in nodes):
+            continue
+        
+        # Určíme kategorii třídy
+        category = get_node_category(class_name, class_name)
+        
+        # Určíme status třídy (třídy existují v obou modelech)
+        status = "common"
+        
+        # Vytvoříme uzel pro třídu
+        node = {
+            "id": class_name,
+            "name": class_name,
+            "class": class_name,
+            "category": category,
+            "attributes": {},
+            "status": status
+        }
+        
+        nodes.append(node)
+    
+    # Zpracování spojení z obou modelů
+    all_link_keys = set(links_a.keys()) | set(links_b.keys())
+    
+    print(f"Total links for visualization: {len(all_link_keys)}")
+    
+    for link_key in all_link_keys:
+        source, target, link_type = link_key
+        
+        # Určíme, zda je spojení v modelu A, B nebo v obou
+        status = "common" if link_key in links_a and link_key in links_b else \
+                "only_in_a" if link_key in links_a else "only_in_b"
+        
+        # Vytvoříme spojení
+        link_data = {
+            "source": source,
+            "target": target,
+            "type": link_type,
+            "status": status  # Přidáme status pro vizualizaci
+        }
+        
+        links.append(link_data)
+    
+    print(f"Generated visualization with {len(nodes)} nodes and {len(links)} links")
+    
+    return {
+        "nodes": nodes,
+        "links": links
+    }
+
 def get_timestamp():
-    """Vráti aktuálny časový údaj vo formáte ISO 8601."""
-    return datetime.now().isoformat()
+    """
+    Vráti aktuálny časový údaj vo formáte vhodnom pre identifikáciu snímok histórie.
+    """
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # Inicializácia aplikácie
 @app.on_event("startup")
@@ -1119,10 +1333,10 @@ async def step_forward_in_history():
     global current_model, model_history, current_history_index, dataset_examples
     
     # Kontrola, zda můžeme jít vpřed
-    if current_history_index >= len(model_history) - 1 or len(model_history) == 0:
+    if current_history_index >= len(model_history) - 1:
         return {
             "success": False,
-            "message": "Nelze jít vpřed - jsme na konci historie nebo historie je prázdná.",
+            "message": "Nelze jít vpřed - jsme na konci historie.",
             "current_index": current_history_index
         }
     
@@ -1146,21 +1360,13 @@ async def step_forward_in_history():
     
     # Získaní trénovanej formuly
     model_hypothesis = current_model.to_formula() if current_model else None
-
-    # Extrahuj identifikačné pravidlá pre modely áut
-    model_rules = current_model.extract_model_rules() if current_model else {}
     
     return {
         "success": True,
-        "message": f"Model posunut na stav z historie (index {current_history_index}).",
-        "current_index": current_history_index,
-        "model_visualization": visualization,
-        "training_steps": history_entry.get("training_steps", []),
-        "used_examples_count": history_entry.get("used_examples_count", 0),
-        "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
-        "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
-        "model_rules": model_rules,  # Pridané extrahované pravidlá
-        "model_updated": True  # Signalizácia, že model bol aktualizovaný
+        "message": "Krok vpřed v historii úspěšný.",
+        "visualization": visualization,
+        "pl1_representation": model_hypothesis,
+        "current_index": current_history_index
     }
 
 @app.post("/api/model/history/step_forward")
@@ -1387,6 +1593,232 @@ async def model_info():
             "entries": history_entries
         }
     }
+
+# Seznam uložených modelů/hypotéz
+saved_models = []
+
+@app.post("/api/save-model")
+async def save_current_model(model_data: dict):
+    """Uloží aktuální model pod zadaným názvem."""
+    global current_model, saved_models
+    
+    if not current_model or not current_model.objects:
+        raise HTTPException(status_code=400, detail="Model není natrénován")
+    
+    name = model_data.get("name", f"Model {len(saved_models) + 1}")
+    
+    # Uložení modelu
+    saved_model = {
+        "id": len(saved_models) + 1,
+        "name": name,
+        "timestamp": datetime.now().isoformat(),
+        "model_state": current_model.to_dict(),
+        "pl1_representation": current_model.to_formula()
+    }
+    
+    saved_models.append(saved_model)
+    
+    return {
+        "success": True,
+        "message": f"Model byl úspěšně uložen jako '{name}'",
+        "model_id": saved_model["id"]
+    }
+
+@app.get("/api/saved-models")
+async def get_saved_models():
+    """Vrátí seznam uložených modelů."""
+    global saved_models
+    
+    # Vrátíme zjednodušenou verzi bez velkých dat
+    models_info = [
+        {
+            "id": model["id"],
+            "name": model["name"],
+            "timestamp": model["timestamp"]
+        }
+        for model in saved_models
+    ]
+    
+    return {
+        "success": True,
+        "models": models_info
+    }
+
+@app.get("/api/saved-model/{model_id}")
+async def get_saved_model(model_id: int):
+    """Vrátí konkrétní uložený model."""
+    global saved_models
+    
+    model = next((m for m in saved_models if m["id"] == model_id), None)
+    
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Model s ID {model_id} nebyl nalezen")
+    
+    return {
+        "success": True,
+        "model": model
+    }
+
+class CompareModelsRequest(BaseModel):
+    model_a_type: str  # "current" nebo "saved"
+    model_a_id: Optional[int] = None  # ID uloženého modelu, pokud model_a_type == "saved"
+    model_b_type: str  # "current" nebo "saved"
+    model_b_id: Optional[int] = None  # ID uloženého modelu, pokud model_b_type == "saved"
+
+def is_model_trained():
+    """Zkontroluje, zda je aktuální model natrénován."""
+    global current_model
+    return current_model is not None and len(current_model.objects) > 0 and len(current_model.links) > 0
+
+@app.post("/api/compare-models")
+async def compare_models(request: CompareModelsRequest):
+    """Porovná dva modely na základě požadavku."""
+    try:
+        # Získání prvního modelu (model_a)
+        model_a = None
+        model_a_name = None
+        if request.model_a_type == "current":
+            if not is_model_trained():
+                raise HTTPException(status_code=400, detail="Aktuální model není natrénován")
+            model_a = current_model
+            model_a_name = "Aktuální model"
+        elif request.model_a_type == "saved":
+            if not request.model_a_id:
+                raise HTTPException(status_code=400, detail="Model ID je povinný pro uložený model")
+            
+            # Use the saved_models list instead of database
+            saved_model = next((m for m in saved_models if m["id"] == request.model_a_id), None)
+            if not saved_model:
+                raise HTTPException(status_code=404, detail="Uložený model nebyl nalezen")
+            
+            model_a_name = saved_model["name"]
+            model_a = Model.from_dict(saved_model["model_state"])
+        else:
+            raise HTTPException(status_code=400, detail="Neplatný typ modelu A")
+        
+        # Získání druhého modelu (model_b)
+        model_b = None
+        model_b_name = None
+        if request.model_b_type == "current":
+            if not is_model_trained():
+                raise HTTPException(status_code=400, detail="Aktuální model není natrénován")
+            model_b = current_model
+            model_b_name = "Aktuální model"
+        elif request.model_b_type == "saved":
+            if not request.model_b_id:
+                raise HTTPException(status_code=400, detail="Model ID je povinný pro uložený model")
+            
+            # Use the saved_models list instead of database
+            saved_model = next((m for m in saved_models if m["id"] == request.model_b_id), None)
+            if not saved_model:
+                raise HTTPException(status_code=404, detail="Uložený model nebyl nalezen")
+            
+            model_b_name = saved_model["name"]
+            model_b = Model.from_dict(saved_model["model_state"])
+        else:
+            raise HTTPException(status_code=400, detail="Neplatný typ modelu B")
+        
+        # Porovnání modelů
+        # Získáme rozdíly objektů
+        a_objects = set(obj.name for obj in model_a.objects)
+        b_objects = set(obj.name for obj in model_b.objects)
+        
+        # Porovnání spojení (links)
+        a_links = set((link.source, link.link_type, link.target) for link in model_a.links)
+        b_links = set((link.source, link.link_type, link.target) for link in model_b.links)
+        
+        # Formátování výsledků
+        result = {
+            "success": True,
+            "model_a": {
+                "name": model_a_name,
+                "type": request.model_a_type,
+                "id": request.model_a_id if request.model_a_type == "saved" else None,
+                "pl1_representation": model_a.to_formula() if model_a else ""
+            },
+            "model_b": {
+                "name": model_b_name,
+                "type": request.model_b_type,
+                "id": request.model_b_id if request.model_b_type == "saved" else None,
+                "pl1_representation": model_b.to_formula() if model_b else ""
+            },
+            "differences": {
+                "objects": {
+                    "only_in_a": list(a_objects - b_objects),
+                    "only_in_b": list(b_objects - a_objects),
+                    "common": list(a_objects & b_objects)
+                },
+                "links": {
+                    "only_in_a": [f"{source} -{link_type}-> {target}" for source, link_type, target in (a_links - b_links)],
+                    "only_in_b": [f"{source} -{link_type}-> {target}" for source, link_type, target in (b_links - a_links)],
+                    "count_a": len(a_links),
+                    "count_b": len(b_links),
+                    "common_count": len(a_links & b_links)
+                },
+                "model_types": {}
+            }
+        }
+        
+        # Získáme typy modelů aut z obou modelů
+        car_models = set()
+        known_car_models = {"BMW", "Series3", "Series5", "Series7", "X5", "X7"}
+        
+        # Hledáme typy modelů aut v objektech obou modelů
+        for obj in model_a.objects:
+            if obj.class_name in known_car_models:
+                car_models.add(obj.class_name)
+                
+        for obj in model_b.objects:
+            if obj.class_name in known_car_models:
+                car_models.add(obj.class_name)
+        
+        # Pravidla pro jednotlivé typy modelů
+        model_type_differences = {}
+        
+        for car_model in car_models:
+            # Získáme pravidla pro daný model
+            rules_a = model_a.get_rules_for_model_type(car_model)
+            rules_b = model_b.get_rules_for_model_type(car_model)
+            
+            # Rozdíly mezi pravidly
+            model_type_differences[car_model] = {
+                "only_in_a": {
+                    "must": list(set(rules_a.get("must", [])) - set(rules_b.get("must", []))),
+                    "must_not": list(set(rules_a.get("must_not", [])) - set(rules_b.get("must_not", [])))
+                },
+                "only_in_b": {
+                    "must": list(set(rules_b.get("must", [])) - set(rules_a.get("must", []))),
+                    "must_not": list(set(rules_b.get("must_not", [])) - set(rules_a.get("must_not", [])))
+                },
+                "different": {}
+            }
+        
+        result["differences"]["model_types"] = model_type_differences
+        
+        # Vytvoříme vizualizaci rozdílů
+        visualization = generate_difference_visualization(model_a, model_b, model_type_differences)
+        result["visualization"] = visualization
+        
+        # Přidáme statistiky o vizualizaci
+        if visualization and "nodes" in visualization and "links" in visualization:
+            result["visualization_stats"] = {
+                "node_count": len(visualization["nodes"]),
+                "link_count": len(visualization["links"]),
+                "nodes_only_in_a": len([n for n in visualization["nodes"] if n.get("status") == "only_in_a"]),
+                "nodes_only_in_b": len([n for n in visualization["nodes"] if n.get("status") == "only_in_b"]),
+                "nodes_common": len([n for n in visualization["nodes"] if n.get("status") == "common"]),
+                "links_only_in_a": len([l for l in visualization["links"] if l.get("status") == "only_in_a"]),
+                "links_only_in_b": len([l for l in visualization["links"] if l.get("status") == "only_in_b"]),
+                "links_common": len([l for l in visualization["links"] if l.get("status") == "common"])
+            }
+        
+        return result
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error in compare_models: {str(e)}")
+        traceback.print_exc()  # Výpis traceback pro podrobnější informace
+        raise HTTPException(status_code=500, detail=f"Chyba při porovnávání modelů: {str(e)}")
 
 # Spustenie aplikácie (pre lokálny vývoj)
 if __name__ == "__main__":

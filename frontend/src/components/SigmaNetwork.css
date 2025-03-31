@@ -1,0 +1,205 @@
+.semantic-network-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.network-legend {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  padding: 12px;
+  z-index: 1000;
+  font-size: 14px;
+  min-width: 180px;
+  border: 1px solid #ccc;
+  max-height: 80%;
+  overflow-y: auto;
+}
+
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 5px;
+  color: #333;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  margin-right: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.sigma-error {
+  padding: 20px;
+  background-color: #fee;
+  color: #c00;
+  border-radius: 4px;
+  margin: 10px 0;
+  font-weight: bold;
+}
+
+/* Styly pro Sigma rendering */
+.sigma-labels text {
+  font-weight: bold !important;
+  font-size: 14px !important;
+  text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white !important;
+  fill: #000 !important;
+}
+
+/* Styling for different node shapes */
+.sigma-node-diamond {
+  stroke: #333;
+  stroke-width: 1px;
+}
+
+.sigma-node-square {
+  stroke: #444;
+  stroke-width: 0.5px;
+}
+
+/* Hover effects */
+.sigma-hover-node {
+  stroke: #ff0 !important;
+  stroke-width: 3px !important;
+}
+
+.sigma-mouse path {
+  stroke-width: 3px !important;
+}
+
+.sigma-container {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #f5f5f5;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.info-panel {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  max-width: 400px;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  font-size: 0.85rem;
+  transition: opacity 0.2s ease;
+  max-height: 80%;
+  overflow-y: auto;
+}
+
+.info-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.info-panel th {
+  text-align: left;
+  padding: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: #9ec9ff;
+}
+
+.info-panel td {
+  padding: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.legend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  font-size: 0.85rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.legend-color {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  border-radius: 3px;
+}
+
+.legend-title {
+  margin-bottom: 10px;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 5px;
+}
+
+/* Status colors for differences */
+.color-only-in-a {
+  background-color: #4a90e2;
+}
+
+.color-only-in-b {
+  background-color: #9c27b0;
+}
+
+.color-common {
+  background-color: #aaaaaa;
+}
+
+/* Category colors */
+.color-BMW {
+  background-color: #5D8AA8;
+}
+
+.color-Engine {
+  background-color: #DC143C;
+}
+
+.color-Transmission {
+  background-color: #B22222;
+}
+
+.color-Drive {
+  background-color: #FF6347;
+}
+
+.color-Attribute {
+  background-color: #9370DB;
+}
+
+.color-Value {
+  background-color: #FFD700;
+}
+
+.color-Other {
+  background-color: #DDA0DD;
+} 

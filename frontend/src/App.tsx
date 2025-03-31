@@ -35,6 +35,7 @@ import LandingPage from './components/LandingPage';
 import ExamplesTrainingView from './components/ExamplesTrainingView';
 import TrainingResult from './components/TrainingResult';
 import CompareExample from './components/CompareExample';
+import CompareModels from './components/CompareModels';
 import { NetworkNode, NetworkLink, ApiExample, Example, ModelHistory, TrainingResult as TrainingResultType } from './types';
 import axios from "axios";
 
@@ -704,6 +705,7 @@ function App() {
               >
                 <Tab label="Trénovanie modelu" value="training" />
                 <Tab label="Porovnanie príkladu" value="compare" />
+                <Tab label="Porovnanie hypotéz" value="compare-models" />
               </Tabs>
             </Paper>
             
@@ -727,10 +729,15 @@ function App() {
                 onReset={handleReset}
                 onFileUpload={goToUploadScreen}
               />
-            ) : (
+            ) : activeView === "compare" ? (
               // Zobrazenie stránky pre porovnanie príkladu
               <CompareExample 
                 onCompare={compareExample}
+                isLoading={apiLoading}
+              />
+            ) : (
+              // Zobrazenie stránky pre porovnanie modelov
+              <CompareModels
                 isLoading={apiLoading}
               />
             )}
