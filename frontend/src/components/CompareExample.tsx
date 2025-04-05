@@ -15,97 +15,162 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  Container
+  Container,
+  FormControlLabel,
+  Switch,
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import InfoIcon from '@mui/icons-material/Info';
 import { ComparisonResult } from '../types';
+import { useApi } from '../hooks/useApi';
 
 interface CompareExampleProps {
-  onCompare: (formula: string) => Promise<{
-    success: boolean;
-    data?: any;
-    error?: string;
-  }>;
-  isLoading: boolean;
+  exampleFormula: string;
+  validateAttributes?: boolean;
 }
 
-const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading }) => {
-  const [formula, setFormula] = useState<string>('');
+const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validateAttributes = true }) => {
+  const [formula, setFormula] = useState(exampleFormula || '');
   const [result, setResult] = useState<ComparisonResult | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validateAttrs, setValidateAttrs] = useState(validateAttributes);
+  
+  const { compareExample } = useApi();
+  
+  const adaptBackendResponse = (result: ComparisonResult | null) => {
+    if (!result) {
+      return { title: 'Žiadny výsledok', description: '', details: [] };
+    }
 
-  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    let title = '';
+    let description = '';
+    let details: { text: string; color: string; symbol?: string }[] = [];
+
+    if (!result.model_type || !result.violations || !result.satisfied_rules) {
+      return { title: 'Neplatná odpoveď', description: 'Odpoveď neobsahuje platné dáta', details: [] };
+    }
+
+    if (result.is_valid) {
+      title = `✅ Príklad je platný pre model ${result.model_type}`;
+      description = `Príklad spĺňa všetkých ${result.satisfied_rules.length} pravidiel pre model ${result.model_type}.`;
+    }
+    else {
+      title = `❌ Príklad nie je platný pre model ${result.model_type}`;
+      description = `Príklad porušuje ${result.violations.length} z ${result.violations.length + result.satisfied_rules.length} pravidiel.`;
+      
+      if (result.allowed_alternatives && Object.keys(result.allowed_alternatives).length > 0) {
+        description += ' Povolené alternatívy komponentov:';
+      }
+    }
+
+    if (result.violations && result.violations.length > 0) {
+      details.push({ text: 'Porušené pravidlá:', color: '#f44336', symbol: '' });
+      
+      if (result.categorized_violations) {
+        if (result.categorized_violations.component_violations && result.categorized_violations.component_violations.length > 0) {
+          result.categorized_violations.component_violations.forEach(violation => {
+            details.push({ text: violation, color: '#f44336', symbol: '❌' });
+          });
+        }
+        
+        if (result.categorized_violations.must_violations && result.categorized_violations.must_violations.length > 0) {
+          result.categorized_violations.must_violations.forEach(violation => {
+            details.push({ text: violation, color: '#f44336', symbol: '❌' });
+          });
+        }
+        
+        if (result.categorized_violations.must_not_violations && result.categorized_violations.must_not_violations.length > 0) {
+          result.categorized_violations.must_not_violations.forEach(violation => {
+            details.push({ text: violation, color: '#f44336', symbol: '❌' });
+          });
+        }
+        
+        if (result.categorized_violations.attribute_violations && result.categorized_violations.attribute_violations.length > 0) {
+          result.categorized_violations.attribute_violations.forEach(violation => {
+            details.push({ text: violation, color: '#f44336', symbol: '❌' });
+          });
+        }
+      } else {
+        result.violations.forEach(violation => {
+          details.push({ text: violation, color: '#f44336', symbol: '❌' });
+        });
+      }
+      
+      if (result.satisfied_rules && result.satisfied_rules.length > 0) {
+        details.push({ text: '', color: '', symbol: '' });
+      }
+    }
+
+    if (result.satisfied_rules && result.satisfied_rules.length > 0) {
+      details.push({ text: 'Splnené pravidlá:', color: '#4caf50', symbol: '' });
+      result.satisfied_rules.forEach(rule => {
+        details.push({ text: rule, color: '#4caf50', symbol: '✅' });
+      });
+    }
+
+    if (!result.is_valid && result.allowed_alternatives) {
+      if (result.allowed_alternatives.engines && result.allowed_alternatives.engines.length > 0 || 
+          result.allowed_alternatives.transmissions && result.allowed_alternatives.transmissions.length > 0 ||
+          result.allowed_alternatives.drives && result.allowed_alternatives.drives.length > 0) {
+        details.push({ text: '', color: '', symbol: '' });
+        details.push({ text: 'Povolené alternatívy:', color: '#2196f3', symbol: '' });
+        
+        if (result.allowed_alternatives.engines && result.allowed_alternatives.engines.length > 0) {
+          details.push({ 
+            text: `Motory: ${result.allowed_alternatives.engines.join(', ')}`, 
+            color: '#2196f3', 
+            symbol: 'ℹ️' 
+          });
+        }
+        
+        if (result.allowed_alternatives.transmissions && result.allowed_alternatives.transmissions.length > 0) {
+          details.push({ 
+            text: `Prevodovky: ${result.allowed_alternatives.transmissions.join(', ')}`, 
+            color: '#2196f3', 
+            symbol: 'ℹ️' 
+          });
+        }
+        
+        if (result.allowed_alternatives.drives && result.allowed_alternatives.drives.length > 0) {
+          details.push({ 
+            text: `Pohony: ${result.allowed_alternatives.drives.join(', ')}`, 
+            color: '#2196f3', 
+            symbol: 'ℹ️' 
+          });
+        }
+      }
+    }
+
+    return { title, description, details };
+  };
+  
+  const handleCompare = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const comparisonResult = await compareExample(formula, validateAttrs);
+      setResult(comparisonResult);
+    } catch (err) {
+      console.error('Error comparing example:', err);
+      setError('Nastala chyba pri porovnávaní príkladu');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const adaptedResult = adaptBackendResponse(result);
+  
+  const handleEditorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormula(event.target.value);
   };
-
-  // Adaptér pro převod odpovědi z backendu na formát očekávaný frontendem
-  const adaptBackendResponse = (response: any): ComparisonResult => {
-    // Zkontrolujeme, zda response obsahuje klíčové vlastnosti
-    if (response && typeof response.is_valid === 'boolean') {
-      // Vytvoříme symbolické rozdíly z violations a satisfied_rules
-      const violations = Array.isArray(response.violations) ? response.violations : [];
-      const satisfiedRules = Array.isArray(response.satisfied_rules) ? response.satisfied_rules : [];
-      
-      // Vytvoříme vysvětlení na základě porušení pravidel
-      let explanation = '';
-      if (response.is_valid) {
-        explanation = `Příklad je platný pro model ${response.model_type || 'auta'}.`;
-        if (satisfiedRules.length > 0) {
-          explanation += ` Splňuje ${satisfiedRules.length} pravidel.`;
-        }
-      } else {
-        explanation = `Příklad není platný pro model ${response.model_type || 'auta'}.`;
-        if (violations.length > 0) {
-          explanation += ` Porušuje ${violations.length} pravidel.`;
-        }
-      }
-      
-      // Zkombinujeme porušení a splněná pravidla do symbolických rozdílů
-      const symbolicDifferences = [
-        ...violations,
-        ...satisfiedRules.map((rule: string) => `✓ ${rule}`)
-      ];
-      
-      // Vrátíme objekt ve formátu ComparisonResult
-      return {
-        is_valid: response.is_valid,
-        explanation,
-        symbolic_differences: symbolicDifferences
-      };
-    }
-    
-    // Pokud odpověď nemá očekávanou strukturu, vrátíme výchozí objekt
-    return {
-      is_valid: false,
-      explanation: 'Neplatná odpověď ze serveru',
-      symbolic_differences: ['Chyba při zpracování odpovědi']
-    };
-  };
-
-  const handleCompare = async () => {
-    if (!formula.trim()) {
-      setError('Prosím, zadajte formulu v predikátovej logike prvého rádu.');
-      return;
-    }
-
-    try {
-      const response = await onCompare(formula);
-      
-      if (response.success && response.data) {
-        // Použijeme adaptér k převodu odpovědi do očekávaného formátu
-        const adaptedResult = adaptBackendResponse(response.data);
-        setResult(adaptedResult);
-        setError(null);
-      } else {
-        setError(response.error || 'Nastala chyba pri porovnávaní príkladu.');
-        setResult(null);
-      }
-    } catch (err) {
-      setError('Nastala neočakávaná chyba pri porovnávaní príkladu.');
-      setResult(null);
-    }
+  
+  const handleValidateAttributesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setValidateAttrs(event.target.checked);
   };
 
   return (
@@ -179,29 +244,47 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
             </Typography>
 
             <TextField
-              label="Formalizovaný príklad v PL1"
+              label="Zadajte PL1 formulu príkladu"
               multiline
               fullWidth
-              rows={14}
+              rows={6}
               value={formula}
-              onChange={handleChange}
+              onChange={handleEditorChange}
+              placeholder="Zadajte PL1 formulu príkladu..."
               variant="outlined"
-              placeholder="Napríklad: Ι(c₁, X5) ∧ Π(c₁, e₁) ∧ Ι(e₁, PetrolEngine) ∧ Π(c₁, t₁) ∧ Ι(t₁, ManualTransmission) ∧ Π(c₁, d₁) ∧ Ι(d₁, XDrive)"
-              sx={{
-                mb: 3,
+              sx={{ 
+                mb: 2,
                 '& .MuiOutlinedInput-root': {
-                  fontFamily: 'monospace',
-                  fontSize: '0.9rem'
+                  fontFamily: 'monospace'
                 }
               }}
             />
+
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+              <Tooltip title="Kontrolovať aj číselné hodnoty atribútov ako výkon, krútiaci moment, počet valcov...">
+                <FormControlLabel 
+                  control={
+                    <Switch 
+                      checked={validateAttrs} 
+                      onChange={handleValidateAttributesChange}
+                      color="primary" 
+                    />
+                  } 
+                  label="Validovať hodnoty atribútov" 
+                  sx={{ 
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    mr: 0
+                  }}
+                />
+              </Tooltip>
+            </Box>
 
             <Button
               variant="contained"
               color="primary"
               fullWidth
               onClick={handleCompare}
-              disabled={isLoading || !formula.trim()}
+              disabled={loading || !formula.trim()}
               sx={{
                 py: 1.5,
                 boxShadow: '0 4px 10px rgba(25, 118, 210, 0.3)',
@@ -213,7 +296,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
                 }
               }}
             >
-              {isLoading ? (
+              {loading ? (
                 <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
               ) : null}
               Porovnať s modelom
@@ -256,118 +339,153 @@ const CompareExample: React.FC<CompareExampleProps> = ({ onCompare, isLoading })
                 }
               }}
             >
-              <InfoIcon sx={{ mr: 1, color: '#90caf9' }} />
+              {result ? (
+                result.is_valid ? (
+                  <CheckCircleOutlineIcon sx={{ mr: 1, color: '#66bb6a' }} />
+                ) : (
+                  <ErrorOutlineIcon sx={{ mr: 1, color: '#f44336' }} />
+                )
+              ) : (
+                <InfoIcon sx={{ mr: 1, color: '#90caf9' }} />
+              )}
               Výsledok porovnania
             </Typography>
 
-            {isLoading ? (
+            {!result && !loading && (
+              <Card sx={{ 
+                mb: 3, 
+                background: 'rgba(0, 0, 0, 0.2)',
+                boxShadow: 'none',
+                border: '1px dashed rgba(255, 255, 255, 0.1)',
+                borderRadius: 2,
+                height: 'calc(100% - 30px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <CardContent sx={{ textAlign: 'center', py: 8 }}>
+                  <InfoIcon sx={{ fontSize: 48, color: 'rgba(255, 255, 255, 0.2)', mb: 2 }} />
+                  <Typography sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                    Tu sa zobrazia výsledky porovnania príkladu s modelom.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+
+            {loading && (
               <Box sx={{ 
                 display: 'flex', 
-                flexDirection: 'column', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                height: '300px'
+                height: 'calc(100% - 30px)',
+                border: '1px dashed rgba(25, 118, 210, 0.2)',
+                borderRadius: 2,
+                background: 'rgba(25, 118, 210, 0.05)',
+                p: 4
               }}>
                 <CircularProgress size={40} />
-                <Typography sx={{ mt: 2, color: 'text.secondary' }}>
-                  Prebieha porovnávanie príkladu s modelom...
+                <Typography sx={{ ml: 2, color: 'rgba(255, 255, 255, 0.7)' }}>
+                  Porovnávam príklad s modelom...
                 </Typography>
               </Box>
-            ) : result ? (
+            )}
+
+            {result && (
               <Box>
-                <Card 
+                <Alert 
+                  severity={result.is_valid ? "success" : "error"}
                   sx={{ 
-                    mb: 3, 
-                    backgroundColor: result.is_valid ? 'rgba(102, 187, 106, 0.1)' : 'rgba(244, 67, 54, 0.1)',
-                    border: result.is_valid ? '1px solid rgba(102, 187, 106, 0.3)' : '1px solid rgba(244, 67, 54, 0.3)',
-                    borderRadius: 2
+                    mb: 3,
+                    borderRadius: 2,
+                    background: result.is_valid 
+                      ? 'rgba(102, 187, 106, 0.15)'
+                      : 'rgba(244, 67, 54, 0.15)',
+                    border: result.is_valid
+                      ? '1px solid rgba(102, 187, 106, 0.3)'
+                      : '1px solid rgba(244, 67, 54, 0.3)',
+                    color: 'white'
                   }}
                 >
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      {result.is_valid ? (
-                        <CheckCircleOutlineIcon sx={{ color: '#66bb6a', mr: 1 }} />
-                      ) : (
-                        <ErrorOutlineIcon sx={{ color: '#f44336', mr: 1 }} />
-                      )}
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        {result.is_valid ? 'Príklad je platný' : 'Príklad nie je platný'}
-                      </Typography>
-                    </Box>
-                    <Typography variant="body1">
-                      {result.explanation}
-                    </Typography>
-                  </CardContent>
-                </Card>
+                  <Typography fontWeight={500}>
+                    {adaptedResult.title}
+                  </Typography>
+                </Alert>
 
-                {result.symbolic_differences.length > 0 && (
-                  <Paper sx={{ 
-                    p: 2,
-                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                    border: '1px solid rgba(255, 255, 255, 0.05)',
-                    borderRadius: 2
-                  }}>
+                <Typography 
+                  variant="subtitle1" 
+                  sx={{ 
+                    fontWeight: 600, 
+                    mb: 1.5, 
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    pb: 1
+                  }}
+                >
+                  Detaily porovnania:
+                </Typography>
+                
+                {adaptedResult.details.map((detail, index) => (
+                  detail.text ? (
                     <Typography 
-                      variant="subtitle1" 
+                      key={index} 
+                      variant={detail.symbol === '' ? 'subtitle1' : 'body1'} 
                       sx={{ 
-                        mb: 2, 
-                        fontWeight: 600,
-                        color: result.is_valid ? '#66bb6a' : '#f8bb86'
+                        color: detail.color, 
+                        my: detail.symbol === '' ? 1 : 0.5,
+                        fontWeight: detail.symbol === '' ? 'bold' : 'normal',
+                        display: 'flex',
+                        alignItems: 'center'
                       }}
                     >
-                      {result.is_valid ? 'Splněná pravidla:' : 'Zistené problémy:'}
+                      {detail.symbol && <span style={{ marginRight: '8px' }}>{detail.symbol}</span>}
+                      {detail.text}
                     </Typography>
-                    <List sx={{ 
-                      p: 0,
-                      '& .MuiListItem-root': {
-                        px: 2,
-                        py: 1,
-                        borderRadius: 1,
-                        mb: 1,
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)'
-                      }
-                    }}>
-                      {result.symbolic_differences.map((diff, index) => (
-                        <ListItem key={index}>
-                          <ListItemIcon sx={{ minWidth: 36 }}>
-                            {diff.startsWith('✓') ? (
-                              <CheckCircleOutlineIcon sx={{ color: '#66bb6a' }} />
-                            ) : (
-                              <ErrorOutlineIcon sx={{ color: '#f44336' }} />
-                            )}
-                          </ListItemIcon>
-                          <ListItemText 
-                            primary={diff.startsWith('✓') ? diff.substring(2) : diff} 
-                            primaryTypographyProps={{
-                              variant: 'body2',
-                              sx: { 
-                                color: 'rgba(255, 255, 255, 0.8)',
-                                fontFamily: 'monospace',
-                                whiteSpace: 'pre-wrap'
-                              }
-                            }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Paper>
+                  ) : (
+                    <Divider key={index} sx={{ my: 1 }} />
+                  )
+                ))}
+
+                {result && !result.is_valid && result.allowed_alternatives && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" color="warning.main" sx={{ fontWeight: 600 }}>
+                      Povolené alternatívy pre komponenty:
+                    </Typography>
+                    <Card variant="outlined" sx={{ mt: 1, bgcolor: 'rgba(255, 255, 255, 0.03)' }}>
+                      <CardContent>
+                        {result.allowed_alternatives.engines && result.allowed_alternatives.engines.length > 0 && (
+                          <Box sx={{ mb: 1 }}>
+                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 600 }}>
+                              Motory:
+                            </Typography>
+                            <Typography variant="body2">
+                              {result.allowed_alternatives.engines.join(', ')}
+                            </Typography>
+                          </Box>
+                        )}
+                        {result.allowed_alternatives.transmissions && result.allowed_alternatives.transmissions.length > 0 && (
+                          <Box sx={{ mb: 1 }}>
+                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 600 }}>
+                              Prevodovky:
+                            </Typography>
+                            <Typography variant="body2">
+                              {result.allowed_alternatives.transmissions.join(', ')}
+                            </Typography>
+                          </Box>
+                        )}
+                        {result.allowed_alternatives.drives && result.allowed_alternatives.drives.length > 0 && (
+                          <Box>
+                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 600 }}>
+                              Pohony:
+                            </Typography>
+                            <Typography variant="body2">
+                              {result.allowed_alternatives.drives.join(', ')}
+                            </Typography>
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Box>
                 )}
-              </Box>
-            ) : (
-              <Box sx={{ 
-                height: '300px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                flexDirection: 'column',
-                backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                borderRadius: 2,
-                border: '1px dashed rgba(255, 255, 255, 0.1)'
-              }}>
-                <InfoIcon sx={{ color: 'text.secondary', fontSize: 40, mb: 2 }} />
-                <Typography variant="body1" color="text.secondary" align="center">
-                  Zadajte príklad do editora a kliknite na tlačidlo "Porovnať s modelom"
-                </Typography>
               </Box>
             )}
           </Grid>

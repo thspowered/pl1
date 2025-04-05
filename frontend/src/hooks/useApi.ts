@@ -233,7 +233,7 @@ export const useApi = () => {
   };
 
   // Porovná príklad s natrénovaným modelom
-  const compareExample = async (formula: string) => {
+  const compareExample = async (formula: string, validateAttributes: boolean = true) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -241,14 +241,15 @@ export const useApi = () => {
       const response = await axios.post(`${API_BASE_URL}/api/compare`, {
         formula: formula,
         is_positive: true, // pre porovnanie nie je dôležité, či je príklad pozitívny alebo negatívny
-        name: "Porovnávaný príklad"
+        name: "Porovnávaný príklad",
+        validate_attributes: validateAttributes
       });
       
-      return { success: true, data: response.data };
+      return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Neznáma chyba';
       setError(`Chyba pri porovnávaní príkladu: ${errorMessage}`);
-      return { success: false, error: errorMessage };
+      throw error;
     } finally {
       setIsLoading(false);
     }

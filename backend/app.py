@@ -41,6 +41,7 @@ class PL1Example(BaseModel):
     formula: str
     is_positive: Optional[bool] = True
     name: Optional[str] = None
+    validate_attributes: Optional[bool] = True
 
 class TrainingRequest(BaseModel):
     example_ids: List[int]
@@ -1128,15 +1129,19 @@ async def compare_example_endpoint(example: PL1Example):
         raise HTTPException(status_code=400, detail="Model není natrénován")
     
     try:
-        # Validace příkladu
-        result = compare_example(current_model, example.formula)
+        # Validace příkladu s parametrom validate_attributes
+        validate_attrs = example.validate_attributes if example.validate_attributes is not None else True
+        result = compare_example(current_model, example.formula, validate_attrs)
         
         return {
             "is_valid": result["is_valid"],
             "model_type": result["model_type"],
             "violations": result["violations"],
             "satisfied_rules": result["satisfied_rules"],
-            "formula": result["formula"]
+            "formula": result["formula"],
+            "validate_attributes": result.get("validate_attributes", validate_attrs),
+            "allowed_alternatives": result.get("allowed_alternatives", {}),
+            "categorized_violations": result.get("categorized_violations", {})
         }
     except Exception as e:
         traceback.print_exc()

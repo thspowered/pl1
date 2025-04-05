@@ -1,0 +1,160 @@
+# BMW X5 - Initial basic example
+# This is our starting point - a simple X5 model with minimum attributes
+Ι(c₁, X5) ∧ 
+Π(c₁, e₁) ∧ Ι(e₁, Engine) ∧ 
+Α(c₁, color, "black") ∧
+Α(c₁, weight, 2200)
+
+# BMW X5 with more details - Expanding our knowledge
+# Introduces engine type and transmission
+Ι(c₂, X5) ∧ 
+Π(c₂, e₂) ∧ Ι(e₂, PetrolEngine) ∧
+Π(c₂, t₁) ∧ Ι(t₁, AutomaticTransmission) ∧ 
+Α(c₂, color, "silver") ∧
+Α(c₂, weight, 2250) ∧
+Α(e₂, cylinders, 6) ∧
+Α(e₂, power, 300)
+
+# BMW X5 - Refined example with drive system
+# Introduces the concept of a drive system
+Ι(c₃, X5) ∧ 
+Π(c₃, e₃) ∧ Ι(e₃, PetrolEngine) ∧ 
+Π(c₃, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧ 
+Π(c₃, d₁) ∧ Ι(d₁, XDrive) ∧
+Α(c₃, color, "blue") ∧
+Α(c₃, weight, 2200) ∧
+Α(e₃, cylinders, 6) ∧
+Α(e₃, power, 300) ∧
+Α(t₂, gears, 8)
+
+# BMW X5 with Diesel Engine
+# Introduces alternative engine type, establishes that X5 can have different engines
+Ι(c₄, X5) ∧ 
+Π(c₄, e₄) ∧ Ι(e₄, DieselEngine) ∧ 
+Π(c₄, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧ 
+Π(c₄, d₂) ∧ Ι(d₂, XDrive) ∧ 
+Α(c₄, color, "grey") ∧
+Α(c₄, weight, 2250) ∧
+Α(e₄, cylinders, 6) ∧
+Α(e₄, power, 280) ∧
+Α(e₄, torque, 580) ∧
+Α(t₃, gears, 8)
+
+# BMW X7 - Different model
+# Introduces a different model with its own characteristics
+Ι(c₅, X7) ∧ 
+Π(c₅, e₅) ∧ Ι(e₅, PetrolEngine) ∧ 
+Π(c₅, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧ 
+Π(c₅, d₃) ∧ Ι(d₃, XDrive) ∧ 
+Α(c₅, color, "black") ∧
+Α(c₅, weight, 2400) ∧
+Α(c₅, seats, 7) ∧ 
+Α(e₅, cylinders, 8) ∧
+Α(e₅, power, 400) ∧
+Α(t₄, gears, 8)
+
+# BMW Series3 - Compact model with different drive system
+# Introduces a smaller model with RWD, teaching system about model variants
+Ι(c₆, Series3) ∧ 
+Π(c₆, e₆) ∧ Ι(e₆, PetrolEngine) ∧ 
+Π(c₆, t₅) ∧ Ι(t₅, ManualTransmission) ∧ 
+Π(c₆, d₄) ∧ Ι(d₄, RWD) ∧ 
+Α(c₆, color, "blue") ∧
+Α(c₆, weight, 1600) ∧
+Α(c₆, seats, 5) ∧ 
+Α(e₆, cylinders, 4) ∧
+Α(e₆, power, 190) ∧
+Α(t₅, gears, 6)
+
+# Negatívny príklad 1: X5 s manuálnou prevodovkou (X5 má vždy automatickú)
+Ι(n₁, X5) ∧ 
+Π(n₁, ne₁) ∧ Ι(ne₁, PetrolEngine) ∧ 
+Π(n₁, nt₁) ∧ Ι(nt₁, ManualTransmission) ∧ 
+Π(n₁, nd₁) ∧ Ι(nd₁, XDrive) ∧ 
+Α(n₁, color, "red") ∧
+Α(n₁, weight, 2200) ∧
+Α(ne₁, cylinders, 6)
+
+# Negatívny príklad 2: X7 so 4-valcovým motorom (X7 má vždy 6+ valcov)
+Ι(n₂, X7) ∧ 
+Π(n₂, ne₂) ∧ Ι(ne₂, PetrolEngine) ∧ 
+Π(n₂, nt₂) ∧ Ι(nt₂, AutomaticTransmission) ∧ 
+Π(n₂, nd₂) ∧ Ι(nd₂, XDrive) ∧ 
+Α(n₂, color, "black") ∧
+Α(n₂, weight, 2400) ∧
+Α(ne₂, cylinders, 4)
+
+# BMW X5 with Hybrid Engine
+# Teaches about a new engine type and expands understanding
+Ι(c₇, X5) ∧ 
+Π(c₇, e₇) ∧ Ι(e₇, HybridEngine) ∧ 
+Π(c₇, t₆) ∧ Ι(t₆, AutomaticTransmission) ∧ 
+Π(c₇, d₅) ∧ Ι(d₅, XDrive) ∧ 
+Α(c₇, color, "white") ∧
+Α(c₇, weight, 2300) ∧
+Α(e₇, cylinders, 6) ∧
+Α(e₇, power, 380) ∧
+Α(e₇, electric_range, 50) ∧
+Α(t₆, gears, 8)
+
+# BMW Series5 - Mid-size model
+# Further expands model range knowledge
+Ι(c₈, Series5) ∧ 
+Π(c₈, e₈) ∧ Ι(e₈, PetrolEngine) ∧ 
+Π(c₈, t₇) ∧ Ι(t₇, AutomaticTransmission) ∧ 
+Π(c₈, d₆) ∧ Ι(d₆, RWD) ∧ 
+Α(c₈, color, "silver") ∧
+Α(c₈, weight, 1800) ∧
+Α(c₈, seats, 5) ∧ 
+Α(e₈, cylinders, 6) ∧
+Α(e₈, power, 245) ∧
+Α(t₇, gears, 8)
+
+# BMW Series7 - Luxury model with advanced features
+Ι(c₉, Series7) ∧ 
+Π(c₉, e₉) ∧ Ι(e₉, PetrolEngine) ∧ 
+Π(c₉, t₈) ∧ Ι(t₈, AutomaticTransmission) ∧ 
+Π(c₉, d₇) ∧ Ι(d₇, AWD) ∧ 
+Α(c₉, color, "black") ∧
+Α(c₉, weight, 2000) ∧
+Α(c₉, seats, 5) ∧ 
+Α(e₉, cylinders, 8) ∧
+Α(e₉, power, 450) ∧
+Α(t₈, gears, 8) ∧
+Α(c₉, has_premium_audio, true) ∧
+Α(c₉, has_night_vision, true)
+
+# Negatívny príklad 3: Series7 s manuálnou prevodovkou (Series7 má vždy automatickú)
+Ι(n₃, Series7) ∧ 
+Π(n₃, ne₃) ∧ Ι(ne₃, PetrolEngine) ∧ 
+Π(n₃, nt₃) ∧ Ι(nt₃, ManualTransmission) ∧ 
+Π(n₃, nd₃) ∧ Ι(nd₃, AWD) ∧ 
+Α(n₃, color, "black") ∧
+Α(n₃, weight, 2000) ∧
+Α(ne₃, cylinders, 8)
+
+# BMW X3 - Compact SUV
+# Introduces smaller SUV model to complete range understanding
+Ι(c₁₀, X3) ∧ 
+Π(c₁₀, e₁₀) ∧ Ι(e₁₀, PetrolEngine) ∧ 
+Π(c₁₀, t₉) ∧ Ι(t₉, AutomaticTransmission) ∧ 
+Π(c₁₀, d₈) ∧ Ι(d₈, XDrive) ∧ 
+Α(c₁₀, color, "blue") ∧
+Α(c₁₀, weight, 1900) ∧
+Α(c₁₀, seats, 5) ∧ 
+Α(e₁₀, cylinders, 4) ∧
+Α(e₁₀, power, 240) ∧
+Α(t₉, gears, 8)
+
+# BMW Series5 with Diesel Engine and AWD
+# Completes understanding of Series5 variations
+Ι(c₁₁, Series5) ∧ 
+Π(c₁₁, e₁₁) ∧ Ι(e₁₁, DieselEngine) ∧ 
+Π(c₁₁, t₁₀) ∧ Ι(t₁₀, AutomaticTransmission) ∧ 
+Π(c₁₁, d₉) ∧ Ι(d₉, AWD) ∧ 
+Α(c₁₁, color, "grey") ∧
+Α(c₁₁, weight, 1850) ∧
+Α(c₁₁, seats, 5) ∧ 
+Α(e₁₁, cylinders, 6) ∧
+Α(e₁₁, power, 265) ∧
+Α(t₁₀, gears, 8) 

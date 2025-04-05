@@ -19,7 +19,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TrainingResult as TrainingResultType } from '../types';
 import SigmaNetwork from './SigmaNetwork';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, ReactNode } from 'react';
 
 interface TrainingResultProps {
   result: TrainingResultType | null;
@@ -139,6 +139,91 @@ const extractModelRulesAlternative = (hypothesis: string | null): Record<string,
   }
   
   return results;
+};
+
+// Nová funkcia pre formátovanie pravidla ako React element
+// Nahrádza množinový zápis disjunkciou a zvýrazňuje všetky logické operátory
+const formatRuleWithColorsAsReact = (rule: string): ReactNode => {
+  if (!rule) return null;
+  
+  // Najprv nahradíme množiny disjunkciami v reťazci
+  let processedRule = rule;
+  // Regulárny výraz na detekciu množiny {a, b, c}
+  const setRegex = /∈\s*\{([^}]+)\}/g;
+  
+  // Nahradíme množiny disjunkciou hodnôt
+  processedRule = processedRule.replace(setRegex, (match, valuesStr) => {
+    // Rozdelíme hodnoty podľa čiarky
+    const values = valuesStr.split(',').map((v: string) => v.trim());
+    
+    // Ak je len jedna hodnota, vrátime ju
+    if (values.length === 1) {
+      return `= ${values[0]}`;
+    }
+    
+    // Inak vytvoríme disjunkciu
+    return `= ${values.join(' ∨ ')}`;
+  });
+  
+  // Ďalšie nahradenie pre formát {250, 340}
+  const numericSetRegex = /\{(\d+),\s*(\d+)\}/g;
+  processedRule = processedRule.replace(numericSetRegex, (match, val1, val2) => {
+    return `${val1} ∨ ${val2}`;
+  });
+  
+  // Teraz pokračujeme so štandardným formátovaním
+  const parts: ReactNode[] = [];
+  let currentText = '';
+  let index = 0;
+  
+  // Funkcia na pridanie aktuálneho textu do zoznamu častí
+  const addCurrentText = () => {
+    if (currentText) {
+      parts.push(<span key={`text-${index}`}>{currentText}</span>);
+      currentText = '';
+      index++;
+    }
+  };
+
+  // Funkcia na spracovanie pravidla znak po znaku
+  const processRule = () => {
+    for (let i = 0; i < processedRule.length; i++) {
+      const char = processedRule[i];
+      
+      // Zvýrazňujeme všetky logické operátory
+      if (char === '∧') {
+        addCurrentText();
+        parts.push(<span key={`and-${index}`} style={{ color: '#64b5f6', fontWeight: 'bold' }}>∧</span>);
+        index++;
+      }
+      else if (char === '∨') {
+        addCurrentText();
+        parts.push(<span key={`or-${index}`} style={{ color: '#ffb74d', fontWeight: 'bold' }}>∨</span>);
+        index++;
+      }
+      else if (char === '¬') {
+        addCurrentText();
+        parts.push(<span key={`not-${index}`} style={{ color: '#ef5350', fontWeight: 'bold' }}>¬</span>);
+        index++;
+      }
+      else if (char === '→') {
+        addCurrentText();
+        parts.push(<span key={`impl-${index}`} style={{ color: '#ba68c8', fontWeight: 'bold' }}>→</span>);
+        index++;
+      }
+      // Všetok ostatný text sa pridáva do currentText
+      else {
+        currentText += char;
+      }
+    }
+    
+    // Pridáme zvyšok textu
+    addCurrentText();
+  };
+  
+  processRule();
+  
+  return <>{parts}</>;
 };
 
 const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) => {
@@ -312,15 +397,17 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                               <Typography variant="h6" sx={{ fontSize: '1rem', mb: 1, color: '#f8bb86' }}>
                                 {modelName}
                               </Typography>
-                              <Box sx={{ 
-                                p: 1.5, 
-                                borderRadius: 1, 
-                                bgcolor: 'rgba(0,0,0,0.15)',
-                                color: 'rgba(255,255,255,0.85)',
-                                fontFamily: 'monospace',
-                                lineHeight: 1.5
-                              }}>
-                                {rule}
+                              <Box 
+                                sx={{ 
+                                  p: 1.5, 
+                                  borderRadius: 1, 
+                                  bgcolor: 'rgba(0,0,0,0.15)',
+                                  color: 'rgba(255,255,255,0.85)',
+                                  fontFamily: 'monospace',
+                                  lineHeight: 1.5
+                                }}
+                              >
+                                {formatRuleWithColorsAsReact(rule as string)}
                               </Box>
                             </Box>
                           </Grid>
@@ -366,7 +453,7 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                                 color: 'rgba(255,255,255,0.7)'
                               }}
                             >
-                              {result.model_hypothesis}
+                              {formatRuleWithColorsAsReact(result.model_hypothesis)}
                             </Box>
                           </AccordionDetails>
                         </Accordion>

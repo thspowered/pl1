@@ -93,8 +93,22 @@ export interface ModelHistory {
 // Výsledok porovnania príkladu s natrénovaným modelom
 export interface ComparisonResult {
   is_valid: boolean;
-  explanation: string;
-  symbolic_differences: string[];
+  model_type: string;
+  violations: string[];
+  satisfied_rules: string[];
+  formula: string;
+  validate_attributes?: boolean;
+  allowed_alternatives?: {
+    engines?: string[];
+    transmissions?: string[];
+    drives?: string[];
+  };
+  categorized_violations?: {
+    must_violations?: string[];
+    must_not_violations?: string[];
+    component_violations?: string[];
+    attribute_violations?: string[];
+  };
 }
 
 // Typy pro uložené modely a porovnávání hypotéz

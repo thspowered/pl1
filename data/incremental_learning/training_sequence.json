@@ -1,0 +1,152 @@
+[
+  {
+    "step": 1,
+    "description": "Initial model learning",
+    "examples": [
+      {
+        "id": 1,
+        "formula": "Ι(c₁, X5) ∧ Π(c₁, e₁) ∧ Ι(e₁, Engine) ∧ Α(c₁, color, \"black\") ∧ Α(c₁, weight, 2200)",
+        "is_positive": true,
+        "name": "Basic X5 model"
+      }
+    ]
+  },
+  {
+    "step": 2,
+    "description": "Introduce engine types and transmission",
+    "examples": [
+      {
+        "id": 2,
+        "formula": "Ι(c₂, X5) ∧ Π(c₂, e₂) ∧ Ι(e₂, PetrolEngine) ∧ Π(c₂, t₁) ∧ Ι(t₁, AutomaticTransmission) ∧ Α(c₂, color, \"silver\") ∧ Α(c₂, weight, 2250) ∧ Α(e₂, cylinders, 6) ∧ Α(e₂, power, 300)",
+        "is_positive": true,
+        "name": "X5 with petrol engine and auto transmission"
+      }
+    ]
+  },
+  {
+    "step": 3,
+    "description": "Add drive system concept",
+    "examples": [
+      {
+        "id": 3,
+        "formula": "Ι(c₃, X5) ∧ Π(c₃, e₃) ∧ Ι(e₃, PetrolEngine) ∧ Π(c₃, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧ Π(c₃, d₁) ∧ Ι(d₁, XDrive) ∧ Α(c₃, color, \"blue\") ∧ Α(c₃, weight, 2200) ∧ Α(e₃, cylinders, 6) ∧ Α(e₃, power, 300) ∧ Α(t₂, gears, 8)",
+        "is_positive": true,
+        "name": "X5 with XDrive system"
+      }
+    ]
+  },
+  {
+    "step": 4,
+    "description": "Introduce alternative engine",
+    "examples": [
+      {
+        "id": 4,
+        "formula": "Ι(c₄, X5) ∧ Π(c₄, e₄) ∧ Ι(e₄, DieselEngine) ∧ Π(c₄, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧ Π(c₄, d₂) ∧ Ι(d₂, XDrive) ∧ Α(c₄, color, \"grey\") ∧ Α(c₄, weight, 2250) ∧ Α(e₄, cylinders, 6) ∧ Α(e₄, power, 280) ∧ Α(e₄, torque, 580) ∧ Α(t₃, gears, 8)",
+        "is_positive": true,
+        "name": "X5 with diesel engine"
+      }
+    ]
+  },
+  {
+    "step": 5,
+    "description": "Learning first negative example",
+    "examples": [
+      {
+        "id": 7,
+        "formula": "Ι(n₁, X5) ∧ Π(n₁, ne₁) ∧ Ι(ne₁, PetrolEngine) ∧ Π(n₁, nt₁) ∧ Ι(nt₁, ManualTransmission) ∧ Π(n₁, nd₁) ∧ Ι(nd₁, XDrive) ∧ Α(n₁, color, \"red\") ∧ Α(n₁, weight, 2200) ∧ Α(ne₁, cylinders, 6)",
+        "is_positive": false,
+        "name": "Invalid X5 with manual transmission"
+      }
+    ]
+  },
+  {
+    "step": 6,
+    "description": "Introduce different model - X7",
+    "examples": [
+      {
+        "id": 5,
+        "formula": "Ι(c₅, X7) ∧ Π(c₅, e₅) ∧ Ι(e₅, PetrolEngine) ∧ Π(c₅, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧ Π(c₅, d₃) ∧ Ι(d₃, XDrive) ∧ Α(c₅, color, \"black\") ∧ Α(c₅, weight, 2400) ∧ Α(c₅, seats, 7) ∧ Α(e₅, cylinders, 8) ∧ Α(e₅, power, 400) ∧ Α(t₄, gears, 8)",
+        "is_positive": true,
+        "name": "X7 model with V8 engine"
+      }
+    ]
+  },
+  {
+    "step": 7,
+    "description": "Introduce smaller model with different configuration",
+    "examples": [
+      {
+        "id": 6,
+        "formula": "Ι(c₆, Series3) ∧ Π(c₆, e₆) ∧ Ι(e₆, PetrolEngine) ∧ Π(c₆, t₅) ∧ Ι(t₅, ManualTransmission) ∧ Π(c₆, d₄) ∧ Ι(d₄, RWD) ∧ Α(c₆, color, \"blue\") ∧ Α(c₆, weight, 1600) ∧ Α(c₆, seats, 5) ∧ Α(e₆, cylinders, 4) ∧ Α(e₆, power, 190) ∧ Α(t₅, gears, 6)",
+        "is_positive": true,
+        "name": "Series3 compact model"
+      }
+    ]
+  },
+  {
+    "step": 8,
+    "description": "Learning more model constraints",
+    "examples": [
+      {
+        "id": 8,
+        "formula": "Ι(n₂, X7) ∧ Π(n₂, ne₂) ∧ Ι(ne₂, PetrolEngine) ∧ Π(n₂, nt₂) ∧ Ι(nt₂, AutomaticTransmission) ∧ Π(n₂, nd₂) ∧ Ι(nd₂, XDrive) ∧ Α(n₂, color, \"black\") ∧ Α(n₂, weight, 2400) ∧ Α(ne₂, cylinders, 4)",
+        "is_positive": false,
+        "name": "Invalid X7 with small engine"
+      }
+    ]
+  },
+  {
+    "step": 9,
+    "description": "Introduce hybrid engines",
+    "examples": [
+      {
+        "id": 9,
+        "formula": "Ι(c₇, X5) ∧ Π(c₇, e₇) ∧ Ι(e₇, HybridEngine) ∧ Π(c₇, t₆) ∧ Ι(t₆, AutomaticTransmission) ∧ Π(c₇, d₅) ∧ Ι(d₅, XDrive) ∧ Α(c₇, color, \"white\") ∧ Α(c₇, weight, 2300) ∧ Α(e₇, cylinders, 6) ∧ Α(e₇, power, 380) ∧ Α(e₇, electric_range, 50) ∧ Α(t₆, gears, 8)",
+        "is_positive": true,
+        "name": "X5 with hybrid engine"
+      }
+    ]
+  },
+  {
+    "step": 10,
+    "description": "Complete model range with Series5 and Series7",
+    "examples": [
+      {
+        "id": 10,
+        "formula": "Ι(c₈, Series5) ∧ Π(c₈, e₈) ∧ Ι(e₈, PetrolEngine) ∧ Π(c₈, t₇) ∧ Ι(t₇, AutomaticTransmission) ∧ Π(c₈, d₆) ∧ Ι(d₆, RWD) ∧ Α(c₈, color, \"silver\") ∧ Α(c₈, weight, 1800) ∧ Α(c₈, seats, 5) ∧ Α(e₈, cylinders, 6) ∧ Α(e₈, power, 245) ∧ Α(t₇, gears, 8)",
+        "is_positive": true,
+        "name": "Series5 mid-size model"
+      },
+      {
+        "id": 11,
+        "formula": "Ι(c₉, Series7) ∧ Π(c₉, e₉) ∧ Ι(e₉, PetrolEngine) ∧ Π(c₉, t₈) ∧ Ι(t₈, AutomaticTransmission) ∧ Π(c₉, d₇) ∧ Ι(d₇, AWD) ∧ Α(c₉, color, \"black\") ∧ Α(c₉, weight, 2000) ∧ Α(c₉, seats, 5) ∧ Α(e₉, cylinders, 8) ∧ Α(e₉, power, 450) ∧ Α(t₈, gears, 8) ∧ Α(c₉, has_premium_audio, true) ∧ Α(c₉, has_night_vision, true)",
+        "is_positive": true,
+        "name": "Series7 luxury model"
+      }
+    ]
+  },
+  {
+    "step": 11,
+    "description": "Final learning with negative example and model variants",
+    "examples": [
+      {
+        "id": 12,
+        "formula": "Ι(n₃, Series7) ∧ Π(n₃, ne₃) ∧ Ι(ne₃, PetrolEngine) ∧ Π(n₃, nt₃) ∧ Ι(nt₃, ManualTransmission) ∧ Π(n₃, nd₃) ∧ Ι(nd₃, AWD) ∧ Α(n₃, color, \"black\") ∧ Α(n₃, weight, 2000) ∧ Α(ne₃, cylinders, 8)",
+        "is_positive": false,
+        "name": "Invalid Series7 with manual transmission"
+      },
+      {
+        "id": 13,
+        "formula": "Ι(c₁₀, X3) ∧ Π(c₁₀, e₁₀) ∧ Ι(e₁₀, PetrolEngine) ∧ Π(c₁₀, t₉) ∧ Ι(t₉, AutomaticTransmission) ∧ Π(c₁₀, d₈) ∧ Ι(d₈, XDrive) ∧ Α(c₁₀, color, \"blue\") ∧ Α(c₁₀, weight, 1900) ∧ Α(c₁₀, seats, 5) ∧ Α(e₁₀, cylinders, 4) ∧ Α(e₁₀, power, 240) ∧ Α(t₉, gears, 8)",
+        "is_positive": true,
+        "name": "X3 compact SUV"
+      },
+      {
+        "id": 14,
+        "formula": "Ι(c₁₁, Series5) ∧ Π(c₁₁, e₁₁) ∧ Ι(e₁₁, DieselEngine) ∧ Π(c₁₁, t₁₀) ∧ Ι(t₁₀, AutomaticTransmission) ∧ Π(c₁₁, d₉) ∧ Ι(d₉, AWD) ∧ Α(c₁₁, color, \"grey\") ∧ Α(c₁₁, weight, 1850) ∧ Α(c₁₁, seats, 5) ∧ Α(e₁₁, cylinders, 6) ∧ Α(e₁₁, power, 265) ∧ Α(t₁₀, gears, 8)",
+        "is_positive": true,
+        "name": "Series5 with diesel and AWD"
+      }
+    ]
+  }
+] 

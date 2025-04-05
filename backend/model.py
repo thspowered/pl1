@@ -332,13 +332,33 @@ class Model:
         Vráti slovník, kde kľúče sú názvy modelov a hodnoty sú
         textové reprezentácie pravidiel v logike prvého rádu.
         
-        Táto metóda extrahuje pravidlá pre všetky modely z formuly vygenerovanej
-        metódou to_formula().
+        Táto metóda extrahuje pravidlá len pre modely, ktoré sú naozaj prítomné v modeli.
         """
         rules = {}
         
-        # Najprv získame známe modely, ktoré chceme hľadať v pravidlách
-        known_models = {"BMW", "Series3", "Series5", "Series7", "X5", "X7"}
+        # Najprv získame všetky možné špecifické modely áut (bez základnej triedy BMW)
+        specific_car_models = {"Series3", "Series5", "Series7", "X5", "X7"}
+        
+        # Nájdeme skutočné modely áut, ktoré sú prítomné v modeli
+        # a) buď priamo ako objekty
+        car_models_in_objects = {obj.class_name for obj in self.objects if obj.class_name in specific_car_models}
+        
+        # b) alebo ako triedy v spojeniach
+        car_models_in_links = set()
+        for link in self.links:
+            if link.source in specific_car_models:
+                car_models_in_links.add(link.source)
+            if link.target in specific_car_models:
+                car_models_in_links.add(link.target)
+        
+        # Spojenie oboch množín
+        car_models_present = car_models_in_objects.union(car_models_in_links)
+        
+        if not car_models_present:
+            print("Nenašli sa žiadne špecifické modely áut v aktuálnom modeli.")
+            return rules  # Prázdny slovník
+            
+        print(f"Špecifické modely áut prítomné v modeli: {car_models_present}")
         
         # Vygeneruj formulu z modelu
         formula_text = self.to_formula()
@@ -355,7 +375,7 @@ class Model:
         
         # Pre každý model nájdi všetky objekty, ktoré sú s ním spojené
         model_to_components = {}
-        for model_name in known_models:
+        for model_name in car_models_present:
             model_to_components[model_name] = {}
             model_objects = [obj for obj in self.objects if obj.class_name == model_name]
             
@@ -384,8 +404,8 @@ class Model:
         # Spracuj MUST (Μ) a MUST_NOT (Ν) vzťahy a atribúty (Α) pre jednotlivé modely
         import re
         
-        # Pre každý známy model vytvoríme pravidlo
-        for model_name in known_models:
+        # Pre každý nájdený model vytvoríme pravidlo
+        for model_name in car_models_present:
             # Hľadáme všetky MUST (Μ) spojenia pre tento model
             must_pattern = re.compile(r'Μ\s*\(\s*' + re.escape(model_name) + r'\s*,\s*(\w+)\s*\)')
             must_relations = must_pattern.findall(formula_text)
@@ -552,8 +572,7 @@ class Model:
                 basic_condition = " ∧ ".join([f"HAS(x, {comp})" for comp in basic_components])
                 rules[model_name] = f"∀x: [\n  {basic_condition} → IS(x, {model_name})\n]"
         
-        # Pre debugovanie vypíšeme extrahované pravidlá
-        print(f"Extracted rules from model: {rules}")
+        print(f"Extrahované pravidlá pre modely: {list(rules.keys())}")
         
         return rules
         
