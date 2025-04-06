@@ -33,7 +33,8 @@ interface CompareExampleProps {
 }
 
 const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validateAttributes = true }) => {
-  const [formula, setFormula] = useState(exampleFormula || '');
+  const defaultExample = "Ι(c1, X5) ∧ Π(c1, e1) ∧ Ι(e1, DieselEngine) ∧ Π(c1, t1) ∧ Ι(t1, AutomaticTransmission) ∧ Π(c1, d1) ∧ Ι(d1, XDrive) ∧ Α(e1, power, 400) ∧ Α(e1, torque, 450) ∧ Α(e1, cylinders, 6)";
+  const [formula, setFormula] = useState(exampleFormula || defaultExample);
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,26 +73,34 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
       
       if (result.categorized_violations) {
         if (result.categorized_violations.component_violations && result.categorized_violations.component_violations.length > 0) {
+          details.push({ text: 'Chýbajúce komponenty:', color: '#f44336', symbol: '' });
           result.categorized_violations.component_violations.forEach(violation => {
             details.push({ text: violation, color: '#f44336', symbol: '❌' });
           });
         }
         
         if (result.categorized_violations.must_violations && result.categorized_violations.must_violations.length > 0) {
+          details.push({ text: 'Chýbajúce povinné vzťahy:', color: '#f44336', symbol: '' });
           result.categorized_violations.must_violations.forEach(violation => {
             details.push({ text: violation, color: '#f44336', symbol: '❌' });
           });
         }
         
         if (result.categorized_violations.must_not_violations && result.categorized_violations.must_not_violations.length > 0) {
+          details.push({ text: 'Porušené zakázané vzťahy:', color: '#f44336', symbol: '' });
           result.categorized_violations.must_not_violations.forEach(violation => {
             details.push({ text: violation, color: '#f44336', symbol: '❌' });
           });
         }
         
-        if (result.categorized_violations.attribute_violations && result.categorized_violations.attribute_violations.length > 0) {
+        if (result.validate_attributes && result.categorized_violations.attribute_violations && result.categorized_violations.attribute_violations.length > 0) {
+          details.push({ text: 'Neplatné hodnoty atribútov (numerické a iné):', color: '#ff5722', symbol: '' });
           result.categorized_violations.attribute_violations.forEach(violation => {
-            details.push({ text: violation, color: '#f44336', symbol: '❌' });
+            if (violation.includes("číselnú hodnotu")) {
+              details.push({ text: violation, color: '#ff5722', symbol: '⚠️' });
+            } else {
+              details.push({ text: violation, color: '#ff9800', symbol: '⚠️' });
+            }
           });
         }
       } else {
@@ -244,13 +253,13 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
             </Typography>
 
             <TextField
-              label="Zadajte PL1 formulu príkladu"
+              label="Zadajte PL1 formulu príkladu (použite Unicode symboly: Ι, Π, Α, ...)"
               multiline
               fullWidth
               rows={6}
               value={formula}
               onChange={handleEditorChange}
-              placeholder="Zadajte PL1 formulu príkladu..."
+              placeholder="Zadajte PL1 formulu príkladu s Unicode symbolmi (Ι, Π, Α, ∧) namiesto ASCII (I, Pi, A, ^)..."
               variant="outlined"
               sx={{ 
                 mb: 2,
@@ -259,6 +268,25 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
                 }
               }}
             />
+            
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mb: 2,
+                borderRadius: 1,
+                background: 'rgba(33, 150, 243, 0.15)',
+                border: '1px solid rgba(33, 150, 243, 0.3)',
+                color: 'white'
+              }}
+            >
+              <Typography variant="body2">
+                Prosím, používajte správne Unicode symboly pre PL1 formulu: <br/>
+                • <b>Ι</b> (Unicode IOTA) pre predikat "is_a", nie ASCII "I" <br/>
+                • <b>Π</b> (Unicode PI) pre predikat "has_part", nie ASCII "Pi" <br/>
+                • <b>Α</b> (Unicode ALPHA) pre predikat "has_attribute", nie ASCII "A" <br/>
+                • <b>∧</b> (Unicode AND) pre konjunkciu, nie ASCII "^"
+              </Typography>
+            </Alert>
 
             <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
               <Tooltip title="Kontrolovať aj číselné hodnoty atribútov ako výkon, krútiaci moment, počet valcov...">

@@ -169,17 +169,34 @@ class ExampleValidator:
     def _extract_attribute_values(self) -> Dict[str, Dict[str, Any]]:
         """
         Extrahuje hodnoty atribútov z modelu pre každý typ komponentu.
+        Ak konkrétna trieda nemá definované hodnoty, budú prebrané z rodičovskej triedy.
         
         Returns:
             Slovník s hodnotami atribútov pre typy komponentov
         """
         attribute_values = {}
+        parent_map = {}
+        
+        # Najprv vytvoríme mapu tried a ich rodičov
+        for link in self.model.links:
+            if link.link_type == LinkType.MUST_BE_A:
+                parent_map[link.source] = link.target
+        
+        # Vytvoríme mapu tried
+        class_hierarchy = {}
+        for obj_name, parent_name in parent_map.items():
+            if obj_name not in class_hierarchy and obj_name[0].isupper():
+                class_hierarchy[obj_name] = parent_name
+        
+        print("\nExtrahujem hodnoty atribútov z modelu - vrátane hodnôt z rodičovských tried:")
         
         # Prejdeme všetky objekty v modeli
         for obj in self.model.objects:
             if obj.attributes is not None:
                 # Ak objekt je komponent, uložíme jeho atribúty
                 class_name = obj.class_name
+                print(f"  Našiel som objekt triedy {class_name} s atribútmi: {obj.attributes}")
+                
                 if class_name not in attribute_values:
                     attribute_values[class_name] = {}
                 
@@ -188,54 +205,132 @@ class ExampleValidator:
                     # Numerické atribúty alebo množiny hodnôt
                     if isinstance(attr_value, (int, float)) or isinstance(attr_value, set) or (isinstance(attr_value, tuple) and len(attr_value) == 2):
                         attribute_values[class_name][attr_name] = attr_value
+                        print(f"    Uložil som atribút {attr_name} = {attr_value}")
         
-        print("Extrahované hodnoty atribútov z modelu:")
+        # Teraz rozšírime hodnoty atribútov pre konkrétne triedy z ich rodičovských tried
+        # Vytvoríme list všetkých známych tried, ktoré môžu mať atribúty
+        all_classes = set()
+        for link in self.model.links:
+            if link.source[0].isupper() and link.target[0].isupper():  # Triedy začínajú veľkým písmenom
+                all_classes.add(link.source)
+                all_classes.add(link.target)
+        
+        print("\nRozširujem hodnoty atribútov z rodičovských tried:")
+        
+        # Pre každú triedu skúsime nájsť hodnoty atribútov z rodičovských tried
+        for class_name in all_classes:
+            # Ak trieda nemá definované atribúty, skúsime ich nájsť v rodičovskej triede
+            if class_name not in attribute_values:
+                attribute_values[class_name] = {}
+            
+            # Nájdeme rodičovskú triedu
+            current_class = class_name
+            while current_class in class_hierarchy:
+                parent_class = class_hierarchy[current_class]
+                print(f"  Kontrolujem rodičovskú triedu {parent_class} pre {class_name}")
+                
+                # Ak rodičovská trieda má definované atribúty, použijeme ich
+                if parent_class in attribute_values:
+                    for attr_name, attr_value in attribute_values[parent_class].items():
+                        # Pridáme len ak trieda ešte nemá definovaný tento atribút
+                        if attr_name not in attribute_values[class_name]:
+                            attribute_values[class_name][attr_name] = attr_value
+                            print(f"    Dedím atribút {attr_name} = {attr_value} z triedy {parent_class} pre triedu {class_name}")
+                
+                # Pokračujeme s rodičovskou triedou rodičovskej triedy
+                current_class = parent_class
+        
+        # Manuálna definícia vzťahov dedičnosti pre najčastejšie typy
+        engine_inheritance = {
+            "DieselEngine": "Engine",
+            "PetrolEngine": "Engine",
+            "HybridEngine": "Engine"
+        }
+        
+        transmission_inheritance = {
+            "AutomaticTransmission": "Transmission",
+            "ManualTransmission": "Transmission"
+        }
+        
+        drive_inheritance = {
+            "XDrive": "AWD",
+            "AWD": "DriveSystem",
+            "RWD": "DriveSystem"
+        }
+        
+        # Aplikujeme manuálne dedenie
+        for child, parent in engine_inheritance.items():
+            if parent in attribute_values:
+                if child not in attribute_values:
+                    attribute_values[child] = {}
+                for attr_name, attr_value in attribute_values[parent].items():
+                    if attr_name not in attribute_values[child]:
+                        attribute_values[child][attr_name] = attr_value
+                        print(f"    Manuálne dedím atribút {attr_name} = {attr_value} z triedy {parent} pre triedu {child}")
+        
+        for child, parent in transmission_inheritance.items():
+            if parent in attribute_values:
+                if child not in attribute_values:
+                    attribute_values[child] = {}
+                for attr_name, attr_value in attribute_values[parent].items():
+                    if attr_name not in attribute_values[child]:
+                        attribute_values[child][attr_name] = attr_value
+                        print(f"    Manuálne dedím atribút {attr_name} = {attr_value} z triedy {parent} pre triedu {child}")
+        
+        for child, parent in drive_inheritance.items():
+            if parent in attribute_values:
+                if child not in attribute_values:
+                    attribute_values[child] = {}
+                for attr_name, attr_value in attribute_values[parent].items():
+                    if attr_name not in attribute_values[child]:
+                        attribute_values[child][attr_name] = attr_value
+                        print(f"    Manuálne dedím atribút {attr_name} = {attr_value} z triedy {parent} pre triedu {child}")
+        
+        print("\nFinálne extrahované hodnoty atribútov z modelu (vrátane zdedených hodnôt):")
         for class_name, attrs in attribute_values.items():
-            print(f"  {class_name}:")
-            for attr_name, attr_value in attrs.items():
-                print(f"    {attr_name}: {attr_value}")
+            if attrs:  # Zobrazíme len triedy s neprázdnymi atribútmi
+                print(f"  {class_name}:")
+                for attr_name, attr_value in attrs.items():
+                    print(f"    {attr_name}: {attr_value}")
         
         return attribute_values
     
     def validate_example(self, example: Model, validate_attributes: bool = True) -> Dict[str, Any]:
         """
-        Validuje příklad proti pravidlům naučeného modelu pro konkrétní model auta.
+        Validuje príklad voči modelu, zisťuje, či je s modelom konzistentný.
         
         Args:
-            example: Příklad k validaci
-            validate_attributes: Zda se mají kontrolovat i hodnoty atributů
+            example: Príklad na validáciu
+            validate_attributes: Či sa majú overovať aj hodnoty atribútov
             
         Returns:
-            Slovník s výsledky validace, obsahující:
-            - is_valid: True pokud příklad splňuje všechna relevantní pravidla
-            - model_type: Detekovaný typ modelu auta (Series3, X5, apod.)
-            - violations: Seznam porušených pravidel, pokud is_valid je False
-            - satisfied_rules: Seznam splněných pravidel
-            - allowed_alternatives: Povolené alternativy komponentů pro daný model
+            Dict s výsledkami validácie
         """
-        # Zjistíme, o jaký model auta se jedná
+        print(f"\n===== Začínam validáciu príkladu, validate_attributes={validate_attributes} =====")
+        
+        # Najprv extrahujeme hodnoty atribútov z modelu, ktoré budeme používať na validáciu
+        self.attribute_values = self._extract_attribute_values()
+        
+        # Identifikujeme typ auta (napr. X5, Series5, ...)
         car_model = self._identify_car_model(example)
         
         if not car_model:
+            print("Nepodarilo sa identifikovať typ modelu auta v príklade")
             return {
                 "is_valid": False,
                 "model_type": None,
                 "violations": ["Nepodařilo se identifikovat typ modelu auta v příkladu"],
                 "satisfied_rules": [],
                 "allowed_alternatives": {},
-                "validate_attributes": validate_attributes
+                "categorized_violations": {}  # Prázdne kategorizované porušenia, keďže validácia nemohla byť vykonaná
             }
         
-        # Validujeme příklad proti pravidlům pro konkrétní model auta
-        validation_result = self._validate_against_model_rules(example, car_model, validate_attributes)
-        print(f"Validace příkladu pro model {car_model}:")
-        print(f"  Platný: {validation_result['is_valid']}")
-        print(f"  Porušená pravidla: {len(validation_result['violations'])}")
-        print(f"  Splněná pravidla: {len(validation_result['satisfied_rules'])}")
-        print(f"  Validace atributů: {validate_attributes}")
+        print(f"Identifikovaný model auta: {car_model}")
         
-        # Přidáme informaci o kontrole atributů
-        validation_result["validate_attributes"] = validate_attributes
+        # Validujeme príklad voči pravidlám
+        validation_result = self._validate_against_model_rules(example, car_model, validate_attributes)
+        
+        print(f"\n===== Validácia príkladu dokončená =====")
         
         return validation_result
     
@@ -262,16 +357,18 @@ class ExampleValidator:
     
     def _validate_against_model_rules(self, example: Model, model_type: str, validate_attributes: bool = True) -> Dict[str, Any]:
         """
-        Validuje příklad proti pravidlům pro konkrétní model auta.
+        Validuje príklad proti pravidlám pre konkrétny model auta.
         
         Args:
-            example: Příklad k validaci
+            example: Príklad na validáciu
             model_type: Typ modelu auta
-            validate_attributes: Zda se mají kontrolovat i hodnoty atributů
+            validate_attributes: Či sa majú kontrolovať aj hodnoty atribútov
             
         Returns:
-            Slovník s výsledky validace
+            Slovník s výsledkami validácie
         """
+        print(f"\nValidujem príklad proti pravidlám pre model {model_type}, validate_attributes={validate_attributes}")
+        
         if model_type not in self.rules:
             return {
                 "is_valid": False,
@@ -294,9 +391,13 @@ class ExampleValidator:
         attribute_violations = []
         attribute_satisfied = []
         if validate_attributes:
+            print(f"Vykonávam validáciu hodnôt atribútov...")
             attribute_results = self._check_attribute_values(example)
             attribute_violations = attribute_results["violations"]
             attribute_satisfied = attribute_results["satisfied"]
+            print(f"Výsledky validácie atribútov: {len(attribute_violations)} porušení, {len(attribute_satisfied)} splnených pravidiel")
+        else:
+            print(f"Validácia hodnôt atribútov je vypnutá")
         
         # Spojíme všechny porušení
         all_violations = must_violations + must_not_violations + component_violations + attribute_violations
@@ -322,6 +423,15 @@ class ExampleValidator:
             "component_violations": component_violations,
             "attribute_violations": attribute_violations
         }
+        
+        print(f"\nCelkový počet porušení: {len(all_violations)}")
+        print(f"Z toho porušenia validácie atribútov: {len(attribute_violations)}")
+        
+        # Vypíšme porušenia validácie atribútov
+        if attribute_violations:
+            print("Porušenia validácie atribútov:")
+            for violation in attribute_violations:
+                print(f"  - {violation}")
         
         return {
             "is_valid": len(all_violations) == 0,
@@ -549,30 +659,46 @@ class ExampleValidator:
     
     def _check_attribute_values(self, example: Model) -> Dict[str, List[str]]:
         """
-        Kontroluje, zda hodnoty atributů v příkladu odpovídají hodnotám v modelu.
+        Kontroluje, či hodnoty atribútov v príklade zodpovedajú hodnotám v modeli.
+        Porovnáva hodnoty atribútov v príklade s hodnotami v modeli (vrátane zdedených hodnôt).
         
         Args:
-            example: Příklad k validaci
+            example: Príklad na validáciu
             
         Returns:
-            Slovník s porušenými a splněnými pravidly pro atributy
+            Slovník s porušenými a splnenými pravidlami pre atribúty
         """
         violations = []
         satisfied = []
         
+        print("\n==================== DEBUG: _check_attribute_values START ====================")
+        print("Kontrolovanie hodnôt atribútov v príklade - porovnávam s hodnotami z modelu (vrátane zdedených):")
+        print(f"Počet objektov v attribute_values: {len(self.attribute_values)}")
+        print(f"Triedy s atribútmi: {[cls for cls in self.attribute_values if self.attribute_values[cls]]}")
+        
         # Prejdeme všetky objekty v príklade
+        print(f"\nDEBUG: Checking {len(example.objects)} objects in example")
         for example_obj in example.objects:
+            print(f"\nDEBUG: Checking object {example_obj.name} of class {example_obj.class_name}")
             # Ak objekt má atribúty, kontrolujeme ich
             if example_obj.attributes is not None:
                 class_name = example_obj.class_name
+                print(f"  Kontrolujem objekt {example_obj.name} triedy {class_name}, atribúty: {example_obj.attributes}")
                 
-                # Ak máme definované hodnoty atribútov pre tento typ objektu
-                if class_name in self.attribute_values:
+                # Ak máme definované hodnoty atribútov pre tento typ objektu v modeli
+                if class_name in self.attribute_values and self.attribute_values[class_name]:
+                    print(f"    Trieda {class_name} má definované hodnoty atribútov v modeli:")
+                    for name, value in self.attribute_values[class_name].items():
+                        print(f"      - {name}: {value} (typ: {type(value).__name__})")
+                    
                     # Kontrolujeme každý atribút
                     for attr_name, example_value in example_obj.attributes.items():
+                        print(f"    Kontrolujem atribút {attr_name} s hodnotou {example_value} (typ: {type(example_value).__name__})")
+                        
                         # Ak model definuje tento atribút
                         if attr_name in self.attribute_values[class_name]:
                             model_value = self.attribute_values[class_name][attr_name]
+                            print(f"      Model definuje atribút {attr_name} s očakávanou hodnotou {model_value} (typ: {type(model_value).__name__})")
                             
                             is_valid_value = False
                             
@@ -582,8 +708,10 @@ class ExampleValidator:
                                 if example_value in model_value:
                                     is_valid_value = True
                                     satisfied.append(f"Objekt {example_obj.name} ({class_name}) má platnú hodnotu atribútu {attr_name}: {example_value}")
+                                    print(f"      ✅ Hodnota {example_value} je platná, je v množine povolených hodnôt")
                                 else:
                                     violations.append(f"Objekt {example_obj.name} ({class_name}) má neplatnú hodnotu atribútu {attr_name}: {example_value}, povolené hodnoty sú: {', '.join(map(str, model_value))}")
+                                    print(f"      ❌ Hodnota {example_value} je neplatná, nie je v množine povolených hodnôt: {model_value}")
                             
                             # 2. Numerický interval (minimum, maximum)
                             elif isinstance(model_value, tuple) and len(model_value) == 2:
@@ -591,15 +719,46 @@ class ExampleValidator:
                                 if isinstance(example_value, (int, float)) and min_val <= example_value <= max_val:
                                     is_valid_value = True
                                     satisfied.append(f"Objekt {example_obj.name} ({class_name}) má platnú hodnotu atribútu {attr_name}: {example_value} (v intervale {min_val}-{max_val})")
+                                    print(f"      ✅ Hodnota {example_value} je platná, je v intervale {min_val}-{max_val}")
                                 else:
                                     violations.append(f"Objekt {example_obj.name} ({class_name}) má neplatnú hodnotu atribútu {attr_name}: {example_value}, povolený interval je: {min_val}-{max_val}")
+                                    print(f"      ❌ Hodnota {example_value} je neplatná, nie je v intervale {min_val}-{max_val}")
                             
-                            # 3. Priama hodnota
+                            # 3. Priama hodnota - numerická 
+                            elif isinstance(model_value, (int, float)) and isinstance(example_value, (int, float)):
+                                # Porovnanie číselných hodnôt - musí byť presná zhoda, žiadne intervaly
+                                if example_value == model_value:
+                                    is_valid_value = True
+                                    satisfied.append(f"Objekt {example_obj.name} ({class_name}) má platnú číselnú hodnotu atribútu {attr_name}: {example_value}")
+                                    print(f"      ✅ Číselná hodnota {example_value} je platná, rovná sa očakávanej hodnote {model_value}")
+                                else:
+                                    violations.append(f"Objekt {example_obj.name} ({class_name}) má neplatnú číselnú hodnotu atribútu {attr_name}: {example_value}, očakávaná hodnota je presne: {model_value}")
+                                    print(f"      ❌ Číselná hodnota {example_value} je neplatná, očakávaná hodnota: {model_value}, rozdiel: {example_value - model_value}")
+                            
+                            # 4. Nečíselné hodnoty (stringy, boolean, atď.)
                             elif example_value == model_value:
                                 is_valid_value = True
                                 satisfied.append(f"Objekt {example_obj.name} ({class_name}) má platnú hodnotu atribútu {attr_name}: {example_value}")
+                                print(f"      ✅ Hodnota {example_value} je platná")
                             else:
-                                violations.append(f"Objekt {example_obj.name} ({class_name}) má neplatnú hodnotu atribútu {attr_name}: {example_value}, očakávaná hodnota je: {model_value}")
+                                violations.append(f"Objekt {example_obj.name} ({class_name}) má neplatnú hodnotu atribútu {attr_name}: {example_value}, očakávaná hodnota je presne: {model_value}")
+                                print(f"      ❌ Hodnota {example_value} je neplatná, očakávaná hodnota: {model_value}")
+                        
+                        # Ak model nemá definovaný atribút, ktorý sa nachádza v príklade, môžeme to ignorovať
+                        else:
+                            print(f"      ℹ️ Atribút {attr_name} nie je definovaný v modeli pre triedu {class_name} - preskakujem validáciu")
+                else:
+                    print(f"    Trieda {class_name} nemá definované žiadne atribúty v modeli - preskakujem validáciu")
+            else:
+                print(f"  Objekt {example_obj.name} nemá žiadne atribúty")
+        
+        print("\nVýsledky kontroly atribútov:")
+        print(f"  Počet porušení: {len(violations)}")
+        for v in violations:
+            print(f"    - {v}")
+        print(f"  Počet splnených pravidiel: {len(satisfied)}")
+        
+        print("==================== DEBUG: _check_attribute_values END ====================\n")
         
         return {
             "violations": violations,
@@ -685,6 +844,8 @@ def compare_example(model: Model, example_formula: str, validate_attributes: boo
     Returns:
         Výsledek validace s konkrétním vysvětlením pro daný model auta
     """
+    print(f"\nSpúšťam porovnanie príkladu, validate_attributes={validate_attributes}")
+    
     # Parsování PL1 formule
     formula = parse_pl1_formula(example_formula)
     
@@ -692,11 +853,21 @@ def compare_example(model: Model, example_formula: str, validate_attributes: boo
     from backend.model import formula_to_model
     example_model = formula_to_model(formula)
     
+    # Pridame explicitný výpis pre kontrolu
+    print(f"Počet objektov v príklade: {len(example_model.objects)}")
+    for obj in example_model.objects:
+        print(f"  - Objekt {obj.name}, Trieda: {obj.class_name}, Atribúty: {obj.attributes}")
+    
     # Validace
     validator = ExampleValidator(model)
     result = validator.validate_example(example_model, validate_attributes)
     
     # Přidáme formuli pro lepší kontext
     result["formula"] = example_formula
+    result["validate_attributes"] = validate_attributes
+    
+    # Skontrolujme, či výsledok obsahuje porušenia validácie atribútov
+    if validate_attributes and "categorized_violations" in result:
+        print(f"Výsledok validácie atribútov: {len(result['categorized_violations'].get('attribute_violations', []))} porušení")
     
     return result 

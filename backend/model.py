@@ -725,14 +725,76 @@ def formula_to_model(formula: Formula) -> Model:
     Returns:
         Model vytvoreny z formuly
     """
-    print("DEBUG: Starting formula_to_model")
+    print("\n==================== DEBUG: Starting formula_to_model ====================")
+    print(f"Spracovávam formulu: {formula}")
+    
     objects = []
     links = []
     attributes = {}
     
+    # Pomocná funkcia na spracovanie hodnoty atribútu
+    def process_attribute_value(value_str):
+        print(f"DEBUG: Processing attribute value: {value_str}")
+        # Ak obsahuje disjunkciu (∨), vytvoríme množinu hodnôt
+        if "∨" in value_str:
+            # Rozdelíme podľa symbolu disjunkcie a spracujeme každú hodnotu
+            values = [val.strip() for val in value_str.split("∨")]
+            result_set = set()
+            
+            for val in values:
+                # Skúsime konvertovať na číslo
+                try:
+                    if "." in val:
+                        result_set.add(float(val))
+                    else:
+                        result_set.add(int(val))
+                except ValueError:
+                    # Ak nie je číslo, pridáme ako reťazec
+                    result_set.add(val)
+            
+            print(f"DEBUG: Created set attribute value: {result_set}")
+            return result_set
+        
+        # Ak je v zátvorke a obsahuje čiarku, môže to byť interval
+        elif "(" in value_str and ")" in value_str and "," in value_str:
+            try:
+                # Extrahujeme hodnoty z intervalu
+                value_str = value_str.strip("()")
+                min_val, max_val = [x.strip() for x in value_str.split(",")]
+                
+                # Konvertujeme na čísla
+                if "." in min_val or "." in max_val:
+                    result = (float(min_val), float(max_val))
+                else:
+                    result = (int(min_val), int(max_val))
+                
+                print(f"DEBUG: Created range attribute value: {result}")
+                return result
+            except ValueError:
+                # Ak konverzia zlyhá, vrátime pôvodnú hodnotu
+                print(f"DEBUG: Failed to convert range value, returning original: {value_str}")
+                return value_str
+        
+        # Inak skúsime konvertovať na číslo
+        else:
+            try:
+                # Skúsime konvertovať na číslo
+                if "." in value_str:
+                    result = float(value_str)
+                else:
+                    result = int(value_str)
+                
+                print(f"DEBUG: Converted attribute value to numeric: {result}")
+                return result
+            except ValueError:
+                # Ak konverzia zlyhá, vrátime pôvodnú hodnotu
+                print(f"DEBUG: Failed to convert to numeric, returning original: {value_str}")
+                return value_str
+    
     # Mapovanie predikatov na objekty a spojenia
+    print(f"\nDEBUG: Processing {len(formula.predicates)} predicates")
     for predicate in formula.predicates:
-        print(f"DEBUG: Processing predicate {predicate.name} with args {predicate.arguments}")
+        print(f"\nDEBUG: Processing predicate {predicate.name} with args {predicate.arguments}")
         if predicate.type == PredicateType.UNARY:
             # Unarny predikat reprezentuje triedu objektu
             obj_name = predicate.arguments[0]
@@ -754,11 +816,11 @@ def formula_to_model(formula: Formula) -> Model:
             arg1 = predicate.arguments[0]
             arg2 = predicate.arguments[1]
             
-            if predicate.name == "Π":  # PI
+            if predicate.name == "Π":  # PI - has_part
                 # Spojenie HAS (REGULAR)
                 links.append(Link(arg1, arg2, LinkType.REGULAR))
                 print(f"DEBUG: Added REGULAR link {arg1} -> {arg2}")
-            elif predicate.name == "Ι":  # IOTA
+            elif predicate.name == "Ι":  # IOTA - is_a
                 # Spojenie IS_A (objekt je instanciou triedy)
                 # Check if object already exists
                 existing_obj = next((obj for obj in objects if obj.name == arg1), None)
@@ -775,11 +837,11 @@ def formula_to_model(formula: Formula) -> Model:
                 # Add MUST_BE_A link
                 links.append(Link(arg1, arg2, LinkType.MUST_BE_A))
                 print(f"DEBUG: Added MUST_BE_A link {arg1} -> {arg2}")
-            elif predicate.name == "Μ":  # MU
+            elif predicate.name == "Μ":  # MU - must_have_part
                 # Spojenie MUST
                 links.append(Link(arg1, arg2, LinkType.MUST))
                 print(f"DEBUG: Added MUST link {arg1} -> {arg2}")
-            elif predicate.name == "Ν":  # NU
+            elif predicate.name == "Ν":  # NU - must_not_have_part
                 # Spojenie MUST_NOT
                 links.append(Link(arg1, arg2, LinkType.MUST_NOT))
                 print(f"DEBUG: Added MUST_NOT link {arg1} -> {arg2}")
@@ -790,30 +852,51 @@ def formula_to_model(formula: Formula) -> Model:
                 
                 # Pouzijeme cely nazov predikatu ako nazov atributu
                 attr_name = predicate.name.lower()
-                attributes[arg1][attr_name] = arg2
-                print(f"DEBUG: Added attribute {attr_name}={arg2} to object {arg1}")
+                attr_value = process_attribute_value(arg2)
+                attributes[arg1][attr_name] = attr_value
+                print(f"DEBUG: Added attribute {attr_name}={attr_value} to object {arg1}")
         
         elif predicate.type == PredicateType.TERNARY:
             # Ternarny predikat reprezentuje atribut s nazvom
             obj_name = predicate.arguments[0]
             attr_name = predicate.arguments[1]
-            attr_value = predicate.arguments[2]
+            attr_value_str = predicate.arguments[2]
+            
+            print(f"DEBUG: Ternary predicate -> attribute for {obj_name}.{attr_name} = {attr_value_str}")
             
             if obj_name not in attributes:
                 attributes[obj_name] = {}
+                print(f"DEBUG: Created attributes dictionary for object {obj_name}")
             
+            # Spracuj hodnotu atribútu
+            attr_value = process_attribute_value(attr_value_str)
             attributes[obj_name][attr_name] = attr_value
             print(f"DEBUG: Added attribute {attr_name}={attr_value} to object {obj_name}")
     
     # Pridaj atributy k objektom
+    print("\nDEBUG: Attaching attributes to objects")
     for obj in objects:
+        print(f"DEBUG: Processing object {obj.name} of class {obj.class_name}")
         if obj.name in attributes:
             obj.attributes = attributes[obj.name]
             print(f"DEBUG: Attached attributes {obj.attributes} to object {obj.name}")
+        else:
+            print(f"DEBUG: No attributes found for object {obj.name}")
     
     # Create Model
     result_model = Model(objects=objects, links=links)
-    print(f"DEBUG: Created model with {len(objects)} objects and {len(links)} links")
+    print(f"\nDEBUG: Created model with {len(objects)} objects and {len(links)} links")
+    
+    # Debug výpis všetkých objektov
+    print("\nDEBUG: All objects in model:")
+    for obj in result_model.objects:
+        print(f"  Object: {obj.name}, Class: {obj.class_name}, Attributes: {obj.attributes}")
+    
+    print("\nDEBUG: All links in model:")
+    for link in result_model.links:
+        print(f"  Link: {link.source} -> {link.target} ({link.link_type})")
+    
+    print("====================== DEBUG: End formula_to_model ======================\n")
     return result_model
 
 class ClassificationTree:
