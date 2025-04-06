@@ -27,6 +27,12 @@ const getLogicalSymbolLabel = (type: string): string => {
   }
 };
 
+// Funkcia na kontrolu, či id reprezentuje premennú bez sémantického významu
+const isVariableNode = (id: string) => {
+  // Kontrola či je to jednopísmenový identifikátor (x, e, t, d, w, b, s, c, i, l, su, se)
+  return /^[a-zA-Z]$/.test(id);
+};
+
 // Funkcia na parsovanie PL1 formuly zo vstupného textu
 const parseFormulaToNodesAndLinks = (formulaText: string) => {
   // Rozdelíme formulu na jednotlivé výrazy
@@ -36,9 +42,12 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
   const nodeMap = new Map<string, NetworkNode>();
   const links: NetworkLink[] = [];
   
+  // Mapa pre sledovanie, s akým typom/komponentom je premenná spojená
+  const variableToTypeMap = new Map<string, string>();
+  
   // Funkcia na pridanie uzla, ak ešte neexistuje
   const addNode = (id: string, category: string) => {
-    if (!nodeMap.has(id)) {
+    if (!nodeMap.has(id) && !isVariableNode(id)) {
       nodeMap.set(id, {
         id: id,
         name: id,
@@ -48,7 +57,31 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
     }
   };
   
-  // Spracujeme každý výraz
+  // Funkcia na kontrolu, či id reprezentuje indexovanú premennú (napr. x₁₂, t₁₅)
+  const isIndexedVariable = (id: string) => {
+    // Kontrola, či id začína písmenom nasledovaným indexovým číslom (napr. x₁₂, e₅, t₁₀)
+    return /^[a-zA-Z]₁?\d+$/.test(id);
+  };
+  
+  // Prvý prechod - zozbierame informácie o premenných a ich typoch
+  parts.forEach(part => {
+    part = part.trim();
+    
+    if (part.startsWith('Ι(')) {
+      // IS(x, X5) - typ uzla
+      const match = part.match(/Ι\s*\(\s*([^,]+),\s*([^)]+)\s*\)/);
+      if (match) {
+        const objectId = match[1].trim();
+        const typeId = match[2].trim();
+        
+        if (isVariableNode(objectId)) {
+          variableToTypeMap.set(objectId, typeId);
+        }
+      }
+    }
+  });
+  
+  // Druhý prechod - spracujeme vzťahy, nahradíme premenné ich typmi
   parts.forEach(part => {
     part = part.trim();
     
@@ -60,14 +93,13 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
         const objectId = match[1].trim();
         const typeId = match[2].trim();
         
-        addNode(objectId, 'Object');
-        addNode(typeId, typeId);
+        // Ak jedna z hodnôt je indexovaná premenná, preskočíme
+        if (isIndexedVariable(objectId) && isIndexedVariable(typeId)) {
+          return;
+        }
         
-        links.push({
-          source: objectId,
-          target: typeId,
-          type: 'Ι'
-        });
+        // Pridáme iba cieľový typ, nie premennú
+        addNode(typeId, typeId);
       }
     } else if (part.startsWith('Μ(')) {
       // MUST(X5, Engine) - povinná väzba
@@ -76,12 +108,27 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
         const sourceId = match[1].trim();
         const targetId = match[2].trim();
         
-        addNode(sourceId, sourceId.includes('x') ? 'Object' : sourceId);
-        addNode(targetId, targetId.includes('e') ? 'Component' : targetId);
+        // Ak oba prvky sú indexované premenné alebo jednopísmenové premenné, preskočíme
+        if ((isIndexedVariable(sourceId) && isIndexedVariable(targetId)) || 
+            (isVariableNode(sourceId) && isVariableNode(targetId))) {
+          return;
+        }
+        
+        // Nahradíme premenné ich typmi
+        const actualSourceId = isVariableNode(sourceId) ? variableToTypeMap.get(sourceId) || sourceId : sourceId;
+        const actualTargetId = isVariableNode(targetId) ? variableToTypeMap.get(targetId) || targetId : targetId;
+        
+        // Ak nemáme informácie o typoch, preskočíme
+        if (isVariableNode(actualSourceId) || isVariableNode(actualTargetId)) {
+          return;
+        }
+        
+        addNode(actualSourceId, actualSourceId);
+        addNode(actualTargetId, actualTargetId);
         
         links.push({
-          source: sourceId,
-          target: targetId,
+          source: actualSourceId,
+          target: actualTargetId,
           type: 'Μ'
         });
       }
@@ -92,12 +139,26 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
         const sourceId = match[1].trim();
         const targetId = match[2].trim();
         
-        addNode(sourceId, sourceId.includes('x') ? 'Object' : sourceId);
-        addNode(targetId, targetId);
+        // Ak oba prvky sú indexované premenné, preskočíme
+        if (isIndexedVariable(sourceId) && isIndexedVariable(targetId)) {
+          return;
+        }
+        
+        // Nahradíme premenné ich typmi
+        const actualSourceId = isVariableNode(sourceId) ? variableToTypeMap.get(sourceId) || sourceId : sourceId;
+        const actualTargetId = isVariableNode(targetId) ? variableToTypeMap.get(targetId) || targetId : targetId;
+        
+        // Ak nemáme informácie o typoch, preskočíme
+        if (isVariableNode(actualSourceId) || isVariableNode(actualTargetId)) {
+          return;
+        }
+        
+        addNode(actualSourceId, actualSourceId);
+        addNode(actualTargetId, actualTargetId);
         
         links.push({
-          source: sourceId,
-          target: targetId,
+          source: actualSourceId,
+          target: actualTargetId,
           type: 'Ν'
         });
       }
@@ -108,12 +169,26 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
         const wholeId = match[1].trim();
         const partId = match[2].trim();
         
-        addNode(wholeId, wholeId.includes('x') ? 'Object' : wholeId);
-        addNode(partId, partId.includes('e') ? 'Component' : partId);
+        // Ak oba prvky sú indexované premenné, preskočíme
+        if (isIndexedVariable(wholeId) && isIndexedVariable(partId)) {
+          return;
+        }
+        
+        // Nahradíme premenné ich typmi
+        const actualWholeId = isVariableNode(wholeId) ? variableToTypeMap.get(wholeId) || wholeId : wholeId;
+        const actualPartId = isVariableNode(partId) ? variableToTypeMap.get(partId) || partId : partId;
+        
+        // Ak nemáme informácie o typoch, preskočíme
+        if (isVariableNode(actualWholeId) || isVariableNode(actualPartId)) {
+          return;
+        }
+        
+        addNode(actualWholeId, actualWholeId);
+        addNode(actualPartId, actualPartId);
         
         links.push({
-          source: wholeId,
-          target: partId,
+          source: actualWholeId,
+          target: actualPartId,
           type: 'Π'
         });
       }
@@ -122,15 +197,30 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
       const match = part.match(/Α\s*\(\s*([^,]+),\s*([^,]+),\s*(.+)\s*\)/);
       if (match) {
         const objectId = match[1].trim();
-        const attributeId = `${objectId}_${match[2].trim()}`;
+        
+        // Preskočíme, ak objekt je indexovaná premenná
+        if (isIndexedVariable(objectId)) {
+          return;
+        }
+        
+        // Nahradíme premenné ich typmi
+        const actualObjectId = isVariableNode(objectId) ? variableToTypeMap.get(objectId) || objectId : objectId;
+        
+        // Ak nemáme informácie o typoch, preskočíme
+        if (isVariableNode(actualObjectId)) {
+          return;
+        }
+        
+        const attributeName = match[2].trim();
+        const attributeId = `${actualObjectId}_${attributeName}`;
         const valueText = match[3].trim();
         
-        addNode(objectId, objectId.includes('e') ? 'Component' : objectId);
+        addNode(actualObjectId, actualObjectId);
         addNode(attributeId, 'Attribute');
         
         // Vytvorenie spojenia medzi objektom a jeho atribútom
         links.push({
-          source: objectId,
+          source: actualObjectId,
           target: attributeId,
           type: 'Α'
         });
