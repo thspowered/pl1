@@ -62,6 +62,7 @@ export interface NetworkNode {
   status?: 'common' | 'only_in_a' | 'only_in_b';  // Status pro vizualizaci rozdílů
   value?: any;  // Hodnota atributu
   value_display?: string;  // Textová reprezentace hodnoty pro zobrazení
+  displayName?: string;  // Zobrazované meno uzla, môže obsahovať pridané informácie ako hodnotu atribútu
 }
 
 export interface NetworkLink {
@@ -77,6 +78,7 @@ export interface SigmaNetworkProps {
   showDifferences?: boolean;  // Příznak pro zobrazení rozdílů
   modelA?: string;  // Název prvního modelu
   modelB?: string;  // Název druhého modelu
+  formula?: string;  // Text PL1 formuly na priame zobrazenie
 }
 
 export interface InfoPanelProps {

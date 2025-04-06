@@ -30,7 +30,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import { SavedModel, ModelComparisonResult } from '../types';
-import SigmaNetwork from './SigmaNetwork';
+import NetworkGraph from './NetworkGraph';
 import axios from 'axios';
 
 interface CompareModelsProps {
@@ -432,12 +432,12 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     overflow: 'hidden',
                     border: '1px solid #ddd'
                   }}>
-                    <SigmaNetwork 
+                    <NetworkGraph 
                       nodes={result.visualization.nodes} 
                       links={result.visualization.links}
                       showDifferences={true}
-                      modelA={result.model_a.name}
-                      modelB={result.model_b.name}
+                      modelA={result.model_a?.name}
+                      modelB={result.model_b?.name}
                     />
                   </Box>
                 )}

@@ -1,54 +1,77 @@
 .semantic-network-container {
   position: relative;
   width: 100%;
+  min-height: 800px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
 }
 
 .network-legend {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 20px;
+  right: 20px;
   background-color: rgba(255, 255, 255, 0.95);
-  border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  padding: 12px;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.85rem;
   z-index: 1000;
-  font-size: 14px;
-  min-width: 180px;
-  border: 1px solid #ccc;
-  max-height: 80%;
-  overflow-y: auto;
+  max-width: 250px;
 }
 
 .legend-title {
   font-weight: bold;
   margin-bottom: 8px;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 5px;
-  color: #333;
+  color: #1976d2;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .legend-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  margin-right: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.legend-item div:last-child {
+  font-size: 0.85rem;
+}
+
+.legend-line {
+  display: flex;
+  align-items: center;
+  width: 100px;
+  margin-right: 8px;
+}
+
+.legend-line hr {
+  flex-grow: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+  height: 2px;
+}
+
+.legend-line span {
+  font-size: 0.7rem;
+  color: #333;
+  white-space: nowrap;
 }
 
 .sigma-error {
+  color: #d32f2f;
   padding: 20px;
-  background-color: #fee;
-  color: #c00;
+  text-align: center;
+  background-color: #ffebee;
   border-radius: 4px;
   margin: 10px 0;
   font-weight: bold;
@@ -56,10 +79,14 @@
 
 /* Styly pro Sigma rendering */
 .sigma-labels text {
-  font-weight: bold !important;
+  font-family: Arial, sans-serif;
   font-size: 14px !important;
-  text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white !important;
-  fill: #000 !important;
+  fill: #333 !important;
+  text-shadow: 
+    1px 1px 1px #fff,
+    -1px -1px 1px #fff,
+    1px -1px 1px #fff,
+    -1px 1px 1px #fff;
 }
 
 /* Styling for different node shapes */
@@ -86,30 +113,40 @@
 .sigma-container {
   position: absolute;
   top: 0;
-  bottom: 0;
   left: 0;
   right: 0;
+  bottom: 0;
   background-color: #f5f5f5;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sigma-container .sigma-mouse {
+  cursor: pointer;
+}
+
+.sigma-renderer canvas {
+  touch-action: none;
 }
 
 .info-panel {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
-  max-width: 400px;
-  background-color: rgba(0, 0, 0, 0.75);
-  color: white;
-  padding: 12px;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.9rem;
   z-index: 1000;
-  font-size: 0.85rem;
-  transition: opacity 0.2s ease;
-  max-height: 80%;
+  max-width: 350px;
+  max-height: 400px;
   overflow-y: auto;
+}
+
+.info-panel h3 {
+  margin-top: 0;
+  color: #1976d2;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
 }
 
 .info-panel table {
@@ -119,14 +156,14 @@
 
 .info-panel th {
   text-align: left;
-  padding: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  color: #9ec9ff;
+  color: #616161;
+  font-weight: normal;
+  padding: 4px 8px 4px 0;
+  width: 35%;
 }
 
 .info-panel td {
-  padding: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 0;
 }
 
 .legend {
@@ -202,4 +239,9 @@
 
 .color-Other {
   background-color: #DDA0DD;
+}
+
+.sigma-node {
+  stroke: #fff;
+  stroke-width: 1px;
 } 

@@ -490,7 +490,7 @@ class Model:
             # Pridáme atribúty modelu
             for attr_name, attr_value in model_attributes:
                 # Spracovanie rôznych typov hodnôt
-                if '(' in attr_value and ')' in attr_value and ',' in attr_value:
+                if '(' in attr_value and ')' in attr_value and "," in attr_value:
                     # Interval hodnota
                     try:
                         # Extrahujeme hodnoty z intervalu
@@ -615,11 +615,7 @@ class Model:
         - class: trieda objektu
         - category: kategória uzla (BMW, Engine, Transmission, Drive, Other)
         - attributes: slovník atribútov objektu
-        
-        Každé spojenie má atribúty:
-        - source: ID zdrojového uzla
-        - target: ID cieľového uzla
-        - type: typ spojenia (MUST, MUST_NOT, MUST_BE_A, REGULAR)
+        - value_display: textová reprezentácia hodnoty pre atribútové uzly
         """
         nodes = []
         links = []
@@ -643,7 +639,10 @@ class Model:
             else:
                 return "Other"
         
-        # Vytvor uzly
+        # Sledujeme už pridané atribúty, aby sme zabránili duplikátom
+        added_attributes = set()
+        
+        # Vytvor uzly pre objekty
         for obj in self.objects:
             category = get_node_category(obj.name, obj.class_name)
             
@@ -656,8 +655,69 @@ class Model:
             }
             
             nodes.append(node)
+            
+            # Pridaj atribúty objektu ako samostatné uzly a vytvor spojenia na ne
+            if obj.attributes:
+                for attr_name, attr_value in obj.attributes.items():
+                    # Vytvoríme unikátne ID pre atribút
+                    attr_node_id = f"{obj.name}_{attr_name}"
+                    
+                    if attr_node_id not in added_attributes:
+                        # Pripravíme zobrazenie hodnoty
+                        value_display = ""
+                        if isinstance(attr_value, set):
+                            # Pre množinu hodnôt vytvoríme formátovaný reťazec
+                            value_display = "{" + ", ".join(str(v) for v in attr_value) + "}"
+                        elif isinstance(attr_value, tuple) and len(attr_value) == 2:
+                            # Pre interval vytvoríme formátovaný reťazec
+                            value_display = f"({attr_value[0]}, {attr_value[1]})"
+                        else:
+                            # Pre jednoduchú hodnotu použijeme priamo jej reťazcovú reprezentáciu
+                            value_display = str(attr_value)
+                        
+                        # Pridáme uzol pre atribút
+                        attr_node = {
+                            "id": attr_node_id,
+                            "name": attr_name,
+                            "class": "Attribute",
+                            "category": "Attribute",
+                            "value": attr_value,
+                            "value_display": value_display
+                        }
+                        nodes.append(attr_node)
+                        added_attributes.add(attr_node_id)
+                        
+                        # Vytvoríme spojenie medzi objektom a atribútom
+                        attr_link = {
+                            "source": obj.name,
+                            "target": attr_node_id,
+                            "type": "HAS_ATTRIBUTE"
+                        }
+                        links.append(attr_link)
+                        
+                        # Ak hodnota atribútu je množina, pridáme každú hodnotu ako samostatný uzol
+                        if isinstance(attr_value, set):
+                            for idx, val in enumerate(attr_value):
+                                value_node_id = f"{attr_node_id}_value_{idx}"
+                                
+                                # Pridáme uzol pre hodnotu
+                                value_node = {
+                                    "id": value_node_id,
+                                    "name": str(val),
+                                    "class": "Value",
+                                    "category": "Value"
+                                }
+                                nodes.append(value_node)
+                                
+                                # Spojenie od atribútu k hodnote
+                                value_link = {
+                                    "source": attr_node_id,
+                                    "target": value_node_id,
+                                    "type": "VALUE"
+                                }
+                                links.append(value_link)
         
-        # Vytvor spojenia
+        # Vytvor spojenia medzi objektami
         for link in self.links:
             link_data = {
                 "source": link.source,
@@ -666,6 +726,41 @@ class Model:
             }
             
             links.append(link_data)
+            
+        # Pridaj explicitné uzly pre triedy, ktoré sú v spojeniach, ale nie sú v zozname objektov
+        class_nodes = set()
+        for node in nodes:
+            if node["class"] != "Attribute" and node["class"] != "Value":
+                class_nodes.add(node["class"])
+        
+        # Kontrola tried v spojeniach
+        for link in links:
+            for endpoint in [link["source"], link["target"]]:
+                # Ak endpoint vyzerá ako názov triedy (začína veľkým písmenom) a ešte nie je uzol
+                if (endpoint[0].isupper() and 
+                    not any(node["id"] == endpoint for node in nodes) and 
+                    endpoint not in class_nodes):
+                    
+                    # Určíme kategóriu uzla
+                    category = "Other"
+                    if any(category in endpoint for category in bmw_categories):
+                        category = "BMW"
+                    elif any(category in endpoint for category in engine_categories):
+                        category = "Engine"
+                    elif any(category in endpoint for category in transmission_categories):
+                        category = "Transmission"
+                    elif any(category in endpoint for category in drive_categories):
+                        category = "Drive"
+                    
+                    # Pridáme uzol pre triedu
+                    class_node = {
+                        "id": endpoint,
+                        "name": endpoint,
+                        "class": endpoint,
+                        "category": category
+                    }
+                    nodes.append(class_node)
+                    class_nodes.add(endpoint)
         
         return {
             "nodes": nodes,

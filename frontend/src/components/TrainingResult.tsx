@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TrainingResult as TrainingResultType } from '../types';
-import SigmaNetwork from './SigmaNetwork';
+import NetworkGraph from './NetworkGraph';
 import { useMemo, useEffect, ReactNode } from 'react';
 
 interface TrainingResultProps {
@@ -407,7 +407,9 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                                   lineHeight: 1.5
                                 }}
                               >
-                                {formatRuleWithColorsAsReact(rule as string)}
+                                <div className="formula-container" data-formula={rule as string}>
+                                  {formatRuleWithColorsAsReact(rule as string)}
+                                </div>
                               </Box>
                             </Box>
                           </Grid>
@@ -453,7 +455,9 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                                 color: 'rgba(255,255,255,0.7)'
                               }}
                             >
-                              {formatRuleWithColorsAsReact(result.model_hypothesis)}
+                              <div className="formula-container" data-formula={result.model_hypothesis}>
+                                {formatRuleWithColorsAsReact(result.model_hypothesis)}
+                              </div>
                             </Box>
                           </AccordionDetails>
                         </Accordion>
@@ -663,9 +667,10 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                   }}>
                     {result.model_visualization.nodes.length > 0 ? (
                       <>
-                        <SigmaNetwork 
+                        <NetworkGraph 
                           nodes={result.model_visualization.nodes}
                           links={result.model_visualization.links}
+                          formula={result.model_hypothesis}
                         />
                         <Box
                           sx={{
