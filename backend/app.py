@@ -1366,12 +1366,20 @@ async def step_forward_in_history():
     # Získaní trénovanej formuly
     model_hypothesis = current_model.to_formula() if current_model else None
     
+    # Extrahuj identifikačné pravidlá pre modely áut
+    model_rules = current_model.extract_model_rules() if current_model else {}
+    
     return {
         "success": True,
-        "message": "Krok vpřed v historii úspěšný.",
-        "visualization": visualization,
-        "pl1_representation": model_hypothesis,
-        "current_index": current_history_index
+        "message": f"Model posunutý na stav z histórie (index {current_history_index}).",
+        "current_index": current_history_index,
+        "model_visualization": visualization,
+        "training_steps": history_entry.get("training_steps", []),
+        "used_examples_count": history_entry.get("used_examples_count", 0),
+        "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
+        "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
+        "model_rules": model_rules,  # Pridané extrahované pravidlá 
+        "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 
 @app.post("/api/model/history/step_forward")

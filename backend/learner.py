@@ -72,12 +72,10 @@ class WinstonLearner:
         updated_model = self._apply_require_link(updated_model, good, near_miss)
         
         # 5. Close-interval - zúžení intervalu numerických atributů
-        # COMMENTED OUT: Not a core Winston heuristic
-        # self._debug_log("Skúšam close-interval heuristiku...")
-        # updated_model = self._apply_close_interval(updated_model, good, near_miss)
+        self._debug_log("Skúšam close-interval heuristiku...")
+        updated_model = self._apply_close_interval(updated_model, good, near_miss)
         
         # 6. Enlarge-set - rozšíření množiny přijatelných hodnot atributů
-        # COMMENTED OUT: Not a core Winston heuristic
         self._debug_log("Skúšam enlarge-set heuristiku...")
         updated_model = self._apply_enlarge_set(updated_model, good)
         
@@ -121,6 +119,132 @@ class WinstonLearner:
         if len(self.model_history) > self.max_history_size:
             self.model_history.pop(0)  # Odstraníme nejstarší model
 
+    def _apply_close_interval(self, model: Model, good: Model, near_miss: Model = None) -> Model:
+        """
+        Implementácia close-interval heuristiky.
+        
+        Heuristika slúži na zistenie povolených rozsahov pre numerické atribúty
+        ako je výkon motora alebo počet valcov. Vytvorí interval z minimálnej a
+        maximálnej hodnoty, ktoré sú povolené pre daný atribút.
+        
+        Args:
+            model: Aktuálný model
+            good: Pozitívny príklad
+            near_miss: Negativní příklad (volitelný)
+            
+        Returns:
+            Aktualizovaný model s intervalom hodnôt pre numerické atribúty
+        """
+        updated_model = model.copy()
+        heuristic_applied = False
+        
+        # Zbieranie numerických hodnôt atribútov podľa tried objektov
+        class_numeric_attrs = {}
+        
+        print(f"Applying close-interval heuristic")
+        
+        # Najprv zozbierame hodnoty atribútov z existujúceho modelu
+        for model_obj in updated_model.objects:
+            if not model_obj.attributes:
+                continue
+                
+            class_name = model_obj.class_name
+            if class_name not in class_numeric_attrs:
+                class_numeric_attrs[class_name] = {}
+                
+            for attr_name, attr_value in model_obj.attributes.items():
+                # Spracovávame len numerické atribúty - kontrolujeme typ hodnoty
+                if isinstance(attr_value, (int, float)):
+                    if attr_name not in class_numeric_attrs[class_name]:
+                        class_numeric_attrs[class_name][attr_name] = []
+                    
+                    # Pridáme hodnotu priamo
+                    class_numeric_attrs[class_name][attr_name].append(attr_value)
+                    print(f"  Found numeric value for {class_name}.{attr_name}: {attr_value}")
+                # Ak hodnota je už interval, preskočíme ju
+                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
+                    continue
+                # Ak je to množina, pridáme všetky numerické hodnoty
+                elif isinstance(attr_value, set):
+                    if attr_name not in class_numeric_attrs[class_name]:
+                        class_numeric_attrs[class_name][attr_name] = []
+                        
+                    for val in attr_value:
+                        if isinstance(val, (int, float)):
+                            class_numeric_attrs[class_name][attr_name].append(val)
+                            print(f"  Extracted numeric value from set for {class_name}.{attr_name}: {val}")
+        
+        # Pridáme hodnoty z pozitívneho príkladu
+        for good_obj in good.objects:
+            if not good_obj.attributes:
+                continue
+                
+            class_name = good_obj.class_name
+            print(f"  Processing attributes from positive example for {class_name}")
+            
+            if class_name not in class_numeric_attrs:
+                class_numeric_attrs[class_name] = {}
+                
+            for attr_name, attr_value in good_obj.attributes.items():
+                # Spracovávame len numerické atribúty - kontrolujeme typ hodnoty
+                if isinstance(attr_value, (int, float)):
+                    if attr_name not in class_numeric_attrs[class_name]:
+                        class_numeric_attrs[class_name][attr_name] = []
+                    
+                    # Pridáme hodnotu
+                    class_numeric_attrs[class_name][attr_name].append(attr_value)
+                    print(f"    Added numeric value for {attr_name}: {attr_value}")
+                # Ak je to množina, pridáme všetky numerické hodnoty
+                elif isinstance(attr_value, set):
+                    if attr_name not in class_numeric_attrs[class_name]:
+                        class_numeric_attrs[class_name][attr_name] = []
+                        
+                    for val in attr_value:
+                        if isinstance(val, (int, float)):
+                            class_numeric_attrs[class_name][attr_name].append(val)
+                            print(f"    Extracted numeric value from set for {attr_name}: {val}")
+        
+        # Vytvorenie intervalov pre jednotlivé numerické atribúty
+        for class_name, attrs in class_numeric_attrs.items():
+            for attr_name, values in attrs.items():
+                if len(values) >= 2:  # Na vytvorenie intervalu potrebujeme aspoň 2 hodnoty
+                    min_val = min(values)
+                    max_val = max(values)
+                    
+                    # Vytvoríme interval
+                    interval = (min_val, max_val)
+                    
+                    # Aktualizujeme atribúty všetkých objektov danej triedy
+                    for obj in updated_model.objects:
+                        if obj.class_name == class_name:
+                            if not obj.attributes:
+                                obj.attributes = {}
+                                
+                            # Nastavíme interval pre atribút
+                            obj.attributes[attr_name] = interval
+                            heuristic_applied = True
+                            print(f"Applied close_interval for {class_name}.{attr_name}: {interval}")
+                            self._debug_log(f"Vytvorený interval pre atribút {attr_name} triedy {class_name}: {interval}")
+                elif len(values) == 1:  # Ak máme len jednu hodnotu, použijeme ju ako je
+                    # Aktualizujeme atribúty všetkých objektov danej triedy
+                    for obj in updated_model.objects:
+                        if obj.class_name == class_name:
+                            if not obj.attributes:
+                                obj.attributes = {}
+                                
+                            # Ak atribút neexistuje alebo má inú hodnotu, nastavíme jednu hodnotu
+                            current = obj.attributes.get(attr_name)
+                            if current is None or (not isinstance(current, tuple) and current != values[0]):
+                                obj.attributes[attr_name] = values[0]
+                                heuristic_applied = True
+                                print(f"Set single numeric value for {class_name}.{attr_name}: {values[0]}")
+                                self._debug_log(f"Nastavená jedna číselná hodnota pre atribút {attr_name} triedy {class_name}: {values[0]}")
+        
+        if heuristic_applied:
+            self.applied_heuristics.append("close_interval")
+            
+        return updated_model
+
     def _apply_enlarge_set(self, model: Model, good: Model) -> Model:
         """
         Aplikuje enlarge-set heuristiku.
@@ -141,7 +265,7 @@ class WinstonLearner:
         """
         updated_model = model.copy()
         
-        # 1. Zbieranie hodnôt atribútov podľa tried objektov
+        # 1. Zbieranie hodnôt atribútov podľa tried objektov (okrem numerických)
         class_attributes = {}
         
         print(f"Applying enlarge-set heuristic")
@@ -156,32 +280,26 @@ class WinstonLearner:
                 class_attributes[class_name] = {}
                 
             for attr_name, attr_value in model_obj.attributes.items():
+                # Preskočíme numerické hodnoty, tie spracováva close_interval
+                if isinstance(attr_value, (int, float)):
+                    continue
+                    
                 if attr_name not in class_attributes[class_name]:
                     class_attributes[class_name][attr_name] = set()
                     
                 # Ak hodnota je už množina, pridáme všetky jej prvky
                 if isinstance(attr_value, set):
-                    class_attributes[class_name][attr_name].update(attr_value)
-                    print(f"  Found existing set for {class_name}.{attr_name}: {attr_value}")
-                # Ak je to interval, extrahujeme hodnoty
-                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
-                    # Zistíme či ide o atribút, ktorý by mal byť diskrétny (cylinders)
-                    if attr_name in ["cylinders"]:
-                        # Pre cylinders použijeme celočíselné hodnoty z intervalu
-                        min_val, max_val = attr_value
-                        for val in range(int(min_val), int(max_val) + 1):
-                            class_attributes[class_name][attr_name].add(val)
-                        print(f"  Converted interval {attr_value} to discrete values for {class_name}.{attr_name}: {class_attributes[class_name][attr_name]}")
-                    else:
-                        # Pre ostatné atribúty použijeme interval ako je
-                        class_attributes[class_name][attr_name].add(attr_value)
-                        print(f"  Added interval {attr_value} for {class_name}.{attr_name}")
+                    # Pri množinách skontrolujeme, či neobsahujú numerické hodnoty
+                    non_numeric_values = {v for v in attr_value if not isinstance(v, (int, float))}
+                    if non_numeric_values:
+                        class_attributes[class_name][attr_name].update(non_numeric_values)
+                        print(f"  Found existing set for {class_name}.{attr_name}: {non_numeric_values}")
                 else:
                     # Inak pridáme hodnotu ako je
                     class_attributes[class_name][attr_name].add(attr_value)
                     print(f"  Added value {attr_value} for {class_name}.{attr_name}")
         
-        # 2. Pridáme hodnoty atribútov z pozitívneho príkladu
+        # 2. Pridáme hodnoty atribútov z pozitívneho príkladu (okrem numerických)
         for good_obj in good.objects:
             if not good_obj.attributes:
                 continue
@@ -193,32 +311,24 @@ class WinstonLearner:
                 class_attributes[class_name] = {}
                 
             for attr_name, attr_value in good_obj.attributes.items():
+                # Preskočíme numerické hodnoty
+                if isinstance(attr_value, (int, float)):
+                    continue
+                    
                 if attr_name not in class_attributes[class_name]:
                     class_attributes[class_name][attr_name] = set()
                 
-                # Spracujeme všetky typy hodnôt vrátane numerických
+                # Pridáme nenumerické hodnoty do množiny
                 if isinstance(attr_value, set):
-                    # Ak je to už množina, pridáme všetky hodnoty
-                    class_attributes[class_name][attr_name].update(attr_value)
-                    print(f"    Added set values for {attr_name}: {attr_value}")
-                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
-                    # Ak je to interval, pridáme ho do množiny
-                    class_attributes[class_name][attr_name].add(attr_value)
-                    print(f"    Added interval for {attr_name}: {attr_value}")
+                    # Pri množinách skontrolujeme, či neobsahujú numerické hodnoty
+                    non_numeric_values = {v for v in attr_value if not isinstance(v, (int, float))}
+                    if non_numeric_values:
+                        class_attributes[class_name][attr_name].update(non_numeric_values)
+                        print(f"    Added set values for {attr_name}: {non_numeric_values}")
                 else:
                     # Pridáme hodnotu do množiny
-                    # Špeciálne spracovanie pre numerické atribúty, pre ktoré preferujeme vytvorenie množiny
-                    if attr_name in ["cylinders", "power"]:
-                        class_attributes[class_name][attr_name].add(attr_value)
-                        print(f"    Added numerical value for {attr_name}: {attr_value}")
-                    elif isinstance(attr_value, (int, float)):
-                        # Ostatné numerické hodnoty pridáme tiež do množiny
-                        class_attributes[class_name][attr_name].add(attr_value)
-                        print(f"    Added numerical value for {attr_name}: {attr_value}")
-                    else:
-                        # Nenumerické hodnoty pridáme tiež
-                        class_attributes[class_name][attr_name].add(attr_value)
-                        print(f"    Added value for {attr_name}: {attr_value}")
+                    class_attributes[class_name][attr_name].add(attr_value)
+                    print(f"    Added value for {attr_name}: {attr_value}")
                 
         # 3. Aplikácia zozbieraných množín hodnôt naspäť do modelu
         heuristic_applied = False
@@ -239,38 +349,24 @@ class WinstonLearner:
             for attr_name, values_set in class_attributes[class_name].items():
                 # Ak máme viac ako jednu hodnotu, vytvoríme množinu
                 if len(values_set) > 1:
-                    # Špeciálne spracovanie pre niektoré numerické atribúty
-                    if attr_name in ["cylinders", "power"]:
-                        # Skontrolujeme, či všetky hodnoty sú čísla
-                        all_numeric = all(isinstance(val, (int, float)) for val in values_set)
-                        if all_numeric:
-                            # Vytvoríme množinu numerických hodnôt
-                            model_obj.attributes[attr_name] = values_set
+                    # Pre všetky atribúty štandardné spracovanie - numerické by tu už nemali byť
+                    current_value = model_obj.attributes.get(attr_name)
+                    
+                    # Ak aktuálna hodnota nie je množina, aktualizujeme ju
+                    if not isinstance(current_value, set):
+                        model_obj.attributes[attr_name] = values_set
+                        heuristic_applied = True
+                        print(f"    Created set of values for {attr_name}: {values_set}")
+                        self._debug_log(f"Vytvorená množina hodnôt pre atribút {attr_name} triedy {class_name}: {values_set}")
+                    # Ak už máme množinu, skontrolujeme, či treba pridať nové hodnoty
+                    elif current_value != values_set:
+                        # Pridáme chýbajúce hodnoty
+                        missing_values = values_set - current_value
+                        if missing_values:
+                            current_value.update(missing_values)
                             heuristic_applied = True
-                            print(f"    Created set of values for {attr_name}: {values_set}")
-                            self._debug_log(f"Vytvorená množina hodnôt pre numerický atribút {attr_name} triedy {class_name}: {values_set}")
-                        else:
-                            # Ak máme zmiešané hodnoty, ponecháme pôvodné
-                            print(f"    Mixed values for {attr_name}, skipping")
-                    else:
-                        # Pre ostatné atribúty štandardné spracovanie
-                        current_value = model_obj.attributes.get(attr_name)
-                        
-                        # Ak aktuálna hodnota nie je množina, aktualizujeme ju
-                        if not isinstance(current_value, set):
-                            model_obj.attributes[attr_name] = values_set
-                            heuristic_applied = True
-                            print(f"    Created set of values for {attr_name}: {values_set}")
-                            self._debug_log(f"Vytvorená množina hodnôt pre atribút {attr_name} triedy {class_name}: {values_set}")
-                        # Ak už máme množinu, skontrolujeme, či treba pridať nové hodnoty
-                        elif current_value != values_set:
-                            # Pridáme chýbajúce hodnoty
-                            missing_values = values_set - current_value
-                            if missing_values:
-                                current_value.update(missing_values)
-                                heuristic_applied = True
-                                print(f"    Extended set for {attr_name} with: {missing_values}")
-                                self._debug_log(f"Rozšírená množina hodnôt atribútu {attr_name} pre triedu {class_name} o {missing_values}")
+                            print(f"    Extended set for {attr_name} with: {missing_values}")
+                            self._debug_log(f"Rozšírená množina hodnôt atribútu {attr_name} pre triedu {class_name} o {missing_values}")
                 # Ak máme len jednu hodnotu a atribút ešte neexistuje, pridáme ho
                 elif len(values_set) == 1 and attr_name not in model_obj.attributes:
                     model_obj.attributes[attr_name] = next(iter(values_set))
@@ -332,22 +428,6 @@ class WinstonLearner:
             self.applied_heuristics.append("enlarge_set")
             
         return updated_model
-
-    def _apply_close_interval(self, model: Model, good: Model, near_miss: Model = None) -> Model:
-        """
-        POZNÁMKA: Táto metóda je dočasne zakomentovaná, pretože jej funkcionalitu preberá _apply_enlarge_set,
-        ktorá efektívnejšie spracováva numerické hodnoty pre atribúty ako power a cylinders.
-        
-        Args:
-            model: Aktuálný model
-            good: Pozitívny príklad
-            near_miss: Negativní příklad (volitelný)
-            
-        Returns:
-            Aktualizovaný model bez zmien (prejde priamo na _apply_enlarge_set)
-        """
-        # Vrátime model bez zmien, pretože numerické hodnoty spracováva _apply_enlarge_set
-        return model
 
     def _apply_backup_rule(self, model: Model, good: Model, near_miss: Model = None) -> Model:
         """
