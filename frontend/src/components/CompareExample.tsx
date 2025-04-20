@@ -24,18 +24,16 @@ import {
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import InfoIcon from '@mui/icons-material/Info';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CodeIcon from '@mui/icons-material/Code';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import { ComparisonResult } from '../types';
-import { useApi } from '../hooks/useApi';
 import ExampleNetworkGraph from './ExampleNetworkGraph';
 
 interface CompareExampleProps {
-  exampleFormula: string;
-  validateAttributes?: boolean;
+  isLoading: boolean;
+  onCompare: (formula: string, validateAttributes?: boolean) => Promise<any>;
 }
 
 interface TabPanelProps {
@@ -72,18 +70,16 @@ function a11yProps(index: number) {
   };
 }
 
-const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validateAttributes = true }) => {
+const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const defaultExample = "Ι(c1, X5) ∧ Π(c1, e1) ∧ Ι(e1, DieselEngine) ∧ Π(c1, t1) ∧ Ι(t1, AutomaticTransmission) ∧ Π(c1, d1) ∧ Ι(d1, XDrive) ∧ Α(e1, power, 400) ∧ Α(e1, torque, 450) ∧ Α(e1, cylinders, 6)";
-  const [formula, setFormula] = useState(exampleFormula || defaultExample);
+  const [formula, setFormula] = useState(defaultExample);
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [validateAttrs, setValidateAttrs] = useState(validateAttributes);
+  const [validateAttrs, setValidateAttrs] = useState(true);
   const [tabValue, setTabValue] = useState(0);
-  
-  const { compareExample } = useApi();
   
   const adaptBackendResponse = (result: ComparisonResult | null) => {
     if (!result) {
@@ -168,7 +164,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
     setError(null);
     
     try {
-      const comparisonResult = await compareExample(formula, validateAttrs);
+      const comparisonResult = await onCompare(formula, validateAttrs);
       setResult(comparisonResult);
       // After successful comparison, switch to results tab
       setTabValue(1);
@@ -548,7 +544,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
                             color: '#2196f3'
                           }}
                         >
-                      
+                          Vizualizacia hypotezy
                         </Typography>
                       </Box>
                       <Box sx={{ 
