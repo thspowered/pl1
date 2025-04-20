@@ -8,7 +8,7 @@ interface ExampleNetworkGraphProps {
   comparisonResult: ComparisonResult;
   formula: string;
   showLayeredVisualization?: boolean;
-  viewType?: 'model' | 'example'; // Add view type to control which elements to highlight
+  viewType?: 'model' | 'example' | 'combined'; // Add combined view type option
 }
 
 // Use a completely separate interface for visualization needs instead of extending BaseNetworkNode
@@ -235,14 +235,14 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
 
 // Funkcia na získanie farby podľa statusu prvku
 const getStatusColor = (status: string | undefined): string => {
-  if (status === 'missingInExample') return '#000000'; // Čierna - chýbajúci prvok v užívateľskom príklade
+  if (status === 'missingInExample') return '#000000'; // Black - missing element in user example
   
   switch (status) {
-    case 'valid': return '#4CAF50'; // Zelená - platný prvok
-    case 'invalid': return '#F44336'; // Červená - neplatný prvok (nesprávna hodnota)
-    case 'missing': return '#F44336'; // Červená - chýbajúci povinný prvok
-    case 'extra': return '#F44336'; // Červená - nadbytočný prvok (nemal by tam byť)
-    default: return '#999999'; // Šedá - neutrálny prvok
+    case 'valid': return '#4CAF50'; // Green - valid element
+    case 'invalid': return '#FF9800'; // Orange - invalid element (wrong value)
+    case 'missing': return '#F44336'; // Red - missing required element
+    case 'extra': return '#2196F3'; // Blue - excess element (shouldn't be there)
+    default: return '#999999'; // Gray - neutral element
   }
 };
 
@@ -427,12 +427,23 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
         element.includes(node.name) || element.includes(node.id)
       );
       
+      // In combined view, show both missing and extra elements
+      if (viewType === 'combined') {
+        if (isMissing) {
+          return { ...node, status: 'missing', size: 40, color: '#F44336' }; // Red for missing components
+        } else if (isExtra) {
+          return { ...node, status: 'extra', size: 40, color: '#2196f3' }; // Blue for extra components
+        } else {
+          return { ...node, status: 'valid', size: 30 };
+        }
+      }
       // For model view, highlight missing elements
+      else if (viewType === 'model' && isMissing) {
+        return { ...node, status: 'missing', size: 40, color: '#F44336' }; // Red for missing components
+      } 
       // For example view, highlight extra elements
-      if (viewType === 'model' && isMissing) {
-        return { ...node, status: 'missing', size: 40, color: '#000000' }; // Black for missing components
-      } else if (viewType === 'example' && isExtra) {
-        return { ...node, status: 'extra', size: 40, color: '#F44336' }; // Red for extra components
+      else if (viewType === 'example' && isExtra) {
+        return { ...node, status: 'extra', size: 40, color: '#2196f3' }; // Blue for extra components
       } else {
         return { ...node, status: 'valid', size: 30 };
       }
@@ -450,11 +461,22 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
         element.includes(`${link.source}`) && element.includes(`${link.target}`)
       );
       
+      // In combined view, show both missing and extra links
+      if (viewType === 'combined') {
+        if (isMissing) {
+          return { ...link, status: 'missing', width: 4 }; // Thicker line for better visibility
+        } else if (isExtra) {
+          return { ...link, status: 'extra', width: 4 }; // Thicker line for better visibility
+        } else {
+          return { ...link, status: 'valid', width: 2 };
+        }
+      }
       // For model view, highlight missing links
-      // For example view, highlight extra links
-      if (viewType === 'model' && isMissing) {
+      else if (viewType === 'model' && isMissing) {
         return { ...link, status: 'missing', width: 4 }; // Thicker line for better visibility
-      } else if (viewType === 'example' && isExtra) {
+      } 
+      // For example view, highlight extra links
+      else if (viewType === 'example' && isExtra) {
         return { ...link, status: 'extra', width: 4 }; // Thicker line for better visibility
       } else {
         return { ...link, status: 'valid', width: 2 };
@@ -651,9 +673,9 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
         ? hypothesisNodes
         : [...processedNodes];  // Vytvoríme kópiu, aby sme mohli pridať chýbajúce komponenty
       
-      // Pre user príklad (viewType === 'example') pridáme chýbajúce komponenty
-      if (viewType === 'example' && !showHypothesis) {
-        console.log("Adding missing components to example view");
+      // For the example view AND combined view, add missing components
+      if ((viewType === 'example' || viewType === 'combined') && !showHypothesis) {
+        console.log("Adding missing components to example/combined view");
         
         // Extract missing components directly from violations
         const missingComponents = comparisonResult.categorized_violations?.component_violations 
@@ -1209,11 +1231,15 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
         </div>
         <div className="legend-item" style={{ marginBottom: '8px' }}>
           <span className="legend-color" style={{ display: 'inline-block', backgroundColor: getStatusColor('missing'), width: '18px', height: '18px', marginRight: '10px', borderRadius: '3px' }}></span>
-          <span style={{ fontSize: '14px' }}>Chýbajúci povinný prvok</span>
+          <span style={{ fontSize: '14px' }}>Chýbajúci prvok</span>
         </div>
         <div className="legend-item" style={{ marginBottom: '8px' }}>
           <span className="legend-color" style={{ display: 'inline-block', backgroundColor: getStatusColor('extra'), width: '18px', height: '18px', marginRight: '10px', borderRadius: '3px' }}></span>
-          <span style={{ fontSize: '14px' }}>Nadbytočný prvok</span>
+          <span style={{ fontSize: '14px' }}>Prebytočný prvok</span>
+        </div>
+        <div className="legend-item" style={{ marginBottom: '8px' }}>
+          <span className="legend-color" style={{ display: 'inline-block', backgroundColor: '#000000', width: '18px', height: '18px', marginRight: '10px', borderRadius: '3px' }}></span>
+          <span style={{ fontSize: '14px' }}>Chýbajúci v príklade</span>
         </div>
         {/* Prepínač pre zobrazenie hypotézy */}
         <div className="legend-item" style={{ marginTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '8px' }}>

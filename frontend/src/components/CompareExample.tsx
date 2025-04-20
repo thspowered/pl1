@@ -518,103 +518,52 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
                   }}
                 >
                   <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Grid container spacing={2} sx={{ height: '100%' }}>
-                      <Grid item xs={12} lg={6} sx={{ height: { xs: '50%', lg: '100%' } }}>
-                        <Paper 
-                          elevation={0}
+                    <Paper 
+                      elevation={0}
+                      sx={{ 
+                        height: '100%',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        border: '1px solid',
+                        borderColor: alpha('#fff', 0.1),
+                        display: 'flex',
+                        flexDirection: 'column',
+                        flexGrow: 1
+                      }}
+                    >
+                      <Box sx={{ 
+                        p: 1.5, 
+                        borderBottom: '1px solid',
+                        borderColor: alpha('#fff', 0.1), 
+                        bgcolor: alpha('#000', 0.3),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Typography 
+                          variant="subtitle1" 
                           sx={{ 
-                            height: '100%',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            border: '1px solid',
-                            borderColor: alpha('#fff', 0.1),
-                            display: 'flex',
-                            flexDirection: 'column'
+                            fontWeight: 600, 
+                            textAlign: 'center',
+                            color: '#2196f3'
                           }}
                         >
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderBottom: '1px solid',
-                            borderColor: alpha('#fff', 0.1), 
-                            bgcolor: alpha('#000', 0.3),
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <Typography 
-                              variant="subtitle1" 
-                              sx={{ 
-                                fontWeight: 600, 
-                                textAlign: 'center',
-                                color: '#2196f3'
-                              }}
-                            >
-                              Užívateľský príklad (prebytočné prvky)
-                            </Typography>
-                          </Box>
-                          <Box sx={{ 
-                            flexGrow: 1, 
-                            minHeight: 0,
-                            height: { xs: '380px', sm: '450px', md: '550px' }
-                          }}>
-                            <ExampleNetworkGraph 
-                              comparisonResult={result} 
-                              formula={formula} 
-                              showLayeredVisualization={true}
-                              viewType="example"
-                            />
-                          </Box>
-                        </Paper>
-                      </Grid>
-                      
-                      <Grid item xs={12} lg={6} sx={{ height: { xs: '50%', lg: '100%' } }}>
-                        <Paper 
-                          elevation={0}
-                          sx={{ 
-                            height: '100%',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            border: '1px solid',
-                            borderColor: alpha('#fff', 0.1),
-                            display: 'flex',
-                            flexDirection: 'column'
-                          }}
-                        >
-                          <Box sx={{ 
-                            p: 1.5, 
-                            borderBottom: '1px solid',
-                            borderColor: alpha('#fff', 0.1), 
-                            bgcolor: alpha('#000', 0.3),
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            <Typography 
-                              variant="subtitle1" 
-                              sx={{ 
-                                fontWeight: 600, 
-                                textAlign: 'center',
-                                color: '#ff9800'
-                              }}
-                            >
-                              Validačné pravidlá (chýbajúce prvky)
-                            </Typography>
-                          </Box>
-                          <Box sx={{ 
-                            flexGrow: 1, 
-                            minHeight: 0,
-                            height: { xs: '380px', sm: '450px', md: '550px' }
-                          }}>
-                            <ExampleNetworkGraph 
-                              comparisonResult={result} 
-                              formula={formula} 
-                              showLayeredVisualization={true}
-                              viewType="model"
-                            />
-                          </Box>
-                        </Paper>
-                      </Grid>
-                    </Grid>
+                          Vizualizácia porovnania
+                        </Typography>
+                      </Box>
+                      <Box sx={{ 
+                        flexGrow: 1, 
+                        minHeight: 0,
+                        height: { xs: '650px', sm: '700px', md: '800px' }
+                      }}>
+                        <ExampleNetworkGraph 
+                          comparisonResult={result} 
+                          formula={formula} 
+                          showLayeredVisualization={true}
+                          viewType="combined"
+                        />
+                      </Box>
+                    </Paper>
                     
                     <Box sx={{ pt: 2 }}>
                       <Paper 
@@ -642,7 +591,25 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
                           <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#F44336' }}></Box>
-                              <Typography variant="caption">Neplatný/Chýbajúci prvok</Typography>
+                              <Typography variant="caption">Chýbajúci prvok</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#FF9800' }}></Box>
+                              <Typography variant="caption">Neplatná hodnota</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2196f3' }}></Box>
+                              <Typography variant="caption">Prebytočný prvok</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#000000' }}></Box>
+                              <Typography variant="caption">Chýbajúci v príklade</Typography>
                             </Box>
                           </Grid>
                         </Grid>
