@@ -59,8 +59,8 @@ export interface NetworkNode {
   class: string;
   category: string;
   attributes?: Record<string, any>;
-  status?: 'common' | 'only_in_a' | 'only_in_b';  // Status pro vizualizaci rozdílů
-  value?: any;  // Hodnota atributu
+  status?: 'common' | 'only_in_a' | 'only_in_b' | 'valid' | 'invalid' | 'missing' | 'extra';  // Rozšírený status pre porovnávanie a validáciu
+  value?: any;  // Hodnota atribútu
   value_display?: string;  // Textová reprezentace hodnoty pro zobrazení
   displayName?: string;  // Zobrazované meno uzla, môže obsahovať pridané informácie ako hodnotu atribútu
 }
@@ -69,7 +69,7 @@ export interface NetworkLink {
   source: string;
   target: string;
   type: string;
-  status?: 'common' | 'only_in_a' | 'only_in_b';  // Status pro vizualizaci rozdílů
+  status?: 'common' | 'only_in_a' | 'only_in_b' | 'valid' | 'invalid' | 'missing' | 'extra';  // Rozšírený status pre porovnávanie a validáciu
 }
 
 export interface SigmaNetworkProps {

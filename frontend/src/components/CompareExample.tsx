@@ -7,10 +7,6 @@ import {
   Button,
   Alert,
   Grid,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Divider,
   Card,
   CardContent,
@@ -19,26 +15,73 @@ import {
   FormControlLabel,
   Switch,
   Tooltip,
-  IconButton
+  Tabs,
+  Tab,
+  AppBar,
+  useTheme,
+  useMediaQuery,
+  alpha
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import InfoIcon from '@mui/icons-material/Info';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import CodeIcon from '@mui/icons-material/Code';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import { ComparisonResult } from '../types';
 import { useApi } from '../hooks/useApi';
+import ExampleNetworkGraph from './ExampleNetworkGraph';
 
 interface CompareExampleProps {
   exampleFormula: string;
   validateAttributes?: boolean;
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`visualization-tabpanel-${index}`}
+      aria-labelledby={`visualization-tab-${index}`}
+      {...other}
+      style={{ height: '100%' }}
+    >
+      {value === index && (
+        <Box sx={{ p: 0, height: '100%' }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `visualization-tab-${index}`,
+    'aria-controls': `visualization-tabpanel-${index}`,
+  };
+}
+
 const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validateAttributes = true }) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const defaultExample = "Ι(c1, X5) ∧ Π(c1, e1) ∧ Ι(e1, DieselEngine) ∧ Π(c1, t1) ∧ Ι(t1, AutomaticTransmission) ∧ Π(c1, d1) ∧ Ι(d1, XDrive) ∧ Α(e1, power, 400) ∧ Α(e1, torque, 450) ∧ Α(e1, cylinders, 6)";
   const [formula, setFormula] = useState(exampleFormula || defaultExample);
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validateAttrs, setValidateAttrs] = useState(validateAttributes);
+  const [tabValue, setTabValue] = useState(0);
   
   const { compareExample } = useApi();
   
@@ -62,10 +105,6 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
     else {
       title = `❌ Príklad nie je platný pre model ${result.model_type}`;
       description = `Príklad porušuje ${result.violations.length} z ${result.violations.length + result.satisfied_rules.length} pravidiel.`;
-      
-      if (result.allowed_alternatives && Object.keys(result.allowed_alternatives).length > 0) {
-        description += ' Povolené alternatívy komponentov:';
-      }
     }
 
     if (result.violations && result.violations.length > 0) {
@@ -121,39 +160,6 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
       });
     }
 
-    if (!result.is_valid && result.allowed_alternatives) {
-      if (result.allowed_alternatives.engines && result.allowed_alternatives.engines.length > 0 || 
-          result.allowed_alternatives.transmissions && result.allowed_alternatives.transmissions.length > 0 ||
-          result.allowed_alternatives.drives && result.allowed_alternatives.drives.length > 0) {
-        details.push({ text: '', color: '', symbol: '' });
-        details.push({ text: 'Povolené alternatívy:', color: '#2196f3', symbol: '' });
-        
-        if (result.allowed_alternatives.engines && result.allowed_alternatives.engines.length > 0) {
-          details.push({ 
-            text: `Motory: ${result.allowed_alternatives.engines.join(', ')}`, 
-            color: '#2196f3', 
-            symbol: 'ℹ️' 
-          });
-        }
-        
-        if (result.allowed_alternatives.transmissions && result.allowed_alternatives.transmissions.length > 0) {
-          details.push({ 
-            text: `Prevodovky: ${result.allowed_alternatives.transmissions.join(', ')}`, 
-            color: '#2196f3', 
-            symbol: 'ℹ️' 
-          });
-        }
-        
-        if (result.allowed_alternatives.drives && result.allowed_alternatives.drives.length > 0) {
-          details.push({ 
-            text: `Pohony: ${result.allowed_alternatives.drives.join(', ')}`, 
-            color: '#2196f3', 
-            symbol: 'ℹ️' 
-          });
-        }
-      }
-    }
-
     return { title, description, details };
   };
   
@@ -164,6 +170,8 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
     try {
       const comparisonResult = await compareExample(formula, validateAttrs);
       setResult(comparisonResult);
+      // After successful comparison, switch to results tab
+      setTabValue(1);
     } catch (err) {
       console.error('Error comparing example:', err);
       setError('Nastala chyba pri porovnávaní príkladu');
@@ -181,343 +189,477 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
   const handleValidateAttributesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setValidateAttrs(event.target.checked);
   };
+  
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 3, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ mt: 3, mb: 4, px: { xs: 1, sm: 3 } }}>
       <Paper
-        elevation={6}
+        elevation={4}
         sx={{
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: 'hidden',
           height: '100%',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-          background: 'linear-gradient(145deg, rgba(18,18,18,1) 0%, rgba(30,30,30,1) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
+          backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(30,41,59,1) 0%, rgba(17,24,39,1) 81%)',
+          border: '1px solid',
+          borderColor: 'divider'
         }}
       >
-        <Box sx={{ 
-          p: 3,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-        }}>
-          <Typography 
-            variant="h4" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              color: '#90caf9',
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              '&::after': {
-                content: '""',
-                flexGrow: 1,
-                height: '1px',
-                ml: 2,
-                background: 'linear-gradient(90deg, rgba(144, 202, 249, 0.5) 0%, rgba(144, 202, 249, 0) 100%)'
-              }
-            }}
-          >
-            Porovnanie príkladu s modelom
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Zadajte príklad v predikátovej logike prvého rádu a porovnajte ho s natrénovaným modelom.
-          </Typography>
-        </Box>
-
-        <Grid container spacing={0}>
-          {/* Editor sekcia */}
-          <Grid item xs={12} md={6} sx={{ 
-            p: 3,
-            borderRight: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.05)' }
+        <AppBar position="static" color="transparent" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ 
+            p: 2, 
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 2
           }}>
-            <Typography 
-              variant="h6" 
-              component="h2" 
-              sx={{ 
-                mb: 2, 
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                '&::after': {
-                  content: '""',
-                  flexGrow: 1,
-                  height: '1px',
-                  ml: 2,
-                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%)'
-                }
-              }}
-            >
-              <InfoIcon sx={{ mr: 1, color: '#90caf9' }} />
-              Editor príkladu
-            </Typography>
-
-            <TextField
-              label="Zadajte PL1 formulu príkladu (použite Unicode symboly: Ι, Π, Α, ...)"
-              multiline
-              fullWidth
-              rows={6}
-              value={formula}
-              onChange={handleEditorChange}
-              placeholder="Zadajte PL1 formulu príkladu s Unicode symbolmi (Ι, Π, Α, ∧) namiesto ASCII (I, Pi, A, ^)..."
-              variant="outlined"
-              sx={{ 
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  fontFamily: 'monospace'
-                }
-              }}
-            />
-            
-            <Alert 
-              severity="info" 
-              sx={{ 
-                mb: 2,
-                borderRadius: 1,
-                background: 'rgba(33, 150, 243, 0.15)',
-                border: '1px solid rgba(33, 150, 243, 0.3)',
-                color: 'white'
-              }}
-            >
-              <Typography variant="body2">
-                Prosím, používajte správne Unicode symboly pre PL1 formulu: <br/>
-                • <b>Ι</b> (Unicode IOTA) pre predikat "is_a", nie ASCII "I" <br/>
-                • <b>Π</b> (Unicode PI) pre predikat "has_part", nie ASCII "Pi" <br/>
-                • <b>Α</b> (Unicode ALPHA) pre predikat "has_attribute", nie ASCII "A" <br/>
-                • <b>∧</b> (Unicode AND) pre konjunkciu, nie ASCII "^"
+            <Box>
+              <Typography 
+                variant="h4" 
+                component="h1"
+                sx={{ 
+                  fontWeight: 700,
+                  color: '#90caf9',
+                  fontSize: { xs: '1.5rem', sm: '2rem' }
+                }}
+              >
+                <CompareArrowsIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Validácia príkladu
               </Typography>
-            </Alert>
-
-            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-              <Tooltip title="Kontrolovať aj číselné hodnoty atribútov ako výkon, krútiaci moment, počet valcov...">
-                <FormControlLabel 
-                  control={
-                    <Switch 
-                      checked={validateAttrs} 
-                      onChange={handleValidateAttributesChange}
-                      color="primary" 
-                    />
-                  } 
-                  label="Validovať hodnoty atribútov" 
-                  sx={{ 
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    mr: 0
-                  }}
-                />
-              </Tooltip>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Overte správnosť príkladu voči natrénovanému modelu
+              </Typography>
             </Box>
-
+            
             <Button
               variant="contained"
               color="primary"
-              fullWidth
               onClick={handleCompare}
               disabled={loading || !formula.trim()}
               sx={{
-                py: 1.5,
-                boxShadow: '0 4px 10px rgba(25, 118, 210, 0.3)',
+                py: 1,
+                px: 3,
                 fontWeight: 600,
                 borderRadius: 2,
                 textTransform: 'none',
+                boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)',
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
                 '&:hover': {
-                  boxShadow: '0 6px 12px rgba(25, 118, 210, 0.4)',
-                }
+                  boxShadow: '0 6px 20px rgba(0,118,255,0.4)',
+                },
+                minWidth: '140px'
               }}
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
             >
-              {loading ? (
-                <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-              ) : null}
-              Porovnať s modelom
+              {loading ? "Validujem..." : "Validovať príklad"}
             </Button>
-
-            {error && (
-              <Alert 
-                severity="error" 
-                sx={{ 
-                  mt: 3, 
-                  borderRadius: 1,
-                  background: 'rgba(244, 67, 54, 0.15)',
-                  border: '1px solid rgba(244, 67, 54, 0.3)',
-                  color: 'white',
-                  '& .MuiAlert-icon': { color: '#f44336' },
-                }}
-              >
-                {error}
-              </Alert>
-            )}
-          </Grid>
-
-          {/* Výsledok sekcia */}
-          <Grid item xs={12} md={6} sx={{ p: 3 }}>
-            <Typography 
-              variant="h6" 
-              component="h2" 
+          </Box>
+          
+          <Tabs 
+            value={tabValue} 
+            onChange={handleTabChange} 
+            aria-label="comparison tabs"
+            variant={isMobile ? "fullWidth" : "standard"}
+            sx={{
+              '& .MuiTab-root': {
+                minHeight: '54px',
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '0.9rem',
+              },
+              '& .Mui-selected': {
+                color: '#90caf9 !important',
+                fontWeight: 600
+              },
+              '& .MuiTabs-indicator': {
+                backgroundColor: '#90caf9',
+                height: 3
+              }
+            }}
+          >
+            <Tab icon={<CodeIcon />} iconPosition="start" label="Editor príkladu" {...a11yProps(0)} />
+            <Tab 
+              icon={<PlaylistAddCheckIcon />} 
+              iconPosition="start" 
+              label="Výsledky validácie" 
+              {...a11yProps(1)} 
+              disabled={!result}
+            />
+            <Tab 
+              icon={<AccountTreeIcon />} 
+              iconPosition="start" 
+              label="Vizualizácia" 
+              {...a11yProps(2)} 
+              disabled={!result}
+            />
+          </Tabs>
+        </AppBar>
+        
+        <Box sx={{ p: { xs: 2, md: 3 }, height: 'calc(100% - 140px)' }}>
+          <TabPanel value={tabValue} index={0}>
+            {/* Editor Tab */}
+            <Card 
+              variant="outlined" 
               sx={{ 
-                mb: 2, 
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                '&::after': {
-                  content: '""',
-                  flexGrow: 1,
-                  height: '1px',
-                  ml: 2,
-                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%)'
-                }
+                height: '100%', 
+                bgcolor: alpha('#000', 0.2),
+                boxShadow: 'none',
+                borderColor: alpha('#fff', 0.1)
               }}
             >
-              {result ? (
-                result.is_valid ? (
-                  <CheckCircleOutlineIcon sx={{ mr: 1, color: '#66bb6a' }} />
-                ) : (
-                  <ErrorOutlineIcon sx={{ mr: 1, color: '#f44336' }} />
-                )
-              ) : (
-                <InfoIcon sx={{ mr: 1, color: '#90caf9' }} />
-              )}
-              Výsledok porovnania
-            </Typography>
-
-            {!result && !loading && (
-              <Card sx={{ 
-                mb: 3, 
-                background: 'rgba(0, 0, 0, 0.2)',
-                boxShadow: 'none',
-                border: '1px dashed rgba(255, 255, 255, 0.1)',
-                borderRadius: 2,
-                height: 'calc(100% - 30px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <CardContent sx={{ textAlign: 'center', py: 8 }}>
-                  <InfoIcon sx={{ fontSize: 48, color: 'rgba(255, 255, 255, 0.2)', mb: 2 }} />
-                  <Typography sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-                    Tu sa zobrazia výsledky porovnania príkladu s modelom.
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
-
-            {loading && (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                height: 'calc(100% - 30px)',
-                border: '1px dashed rgba(25, 118, 210, 0.2)',
-                borderRadius: 2,
-                background: 'rgba(25, 118, 210, 0.05)',
-                p: 4
-              }}>
-                <CircularProgress size={40} />
-                <Typography sx={{ ml: 2, color: 'rgba(255, 255, 255, 0.7)' }}>
-                  Porovnávam príklad s modelom...
-                </Typography>
-              </Box>
-            )}
-
-            {result && (
-              <Box>
-                <Alert 
-                  severity={result.is_valid ? "success" : "error"}
-                  sx={{ 
-                    mb: 3,
-                    borderRadius: 2,
-                    background: result.is_valid 
-                      ? 'rgba(102, 187, 106, 0.15)'
-                      : 'rgba(244, 67, 54, 0.15)',
-                    border: result.is_valid
-                      ? '1px solid rgba(102, 187, 106, 0.3)'
-                      : '1px solid rgba(244, 67, 54, 0.3)',
-                    color: 'white'
-                  }}
-                >
-                  <Typography fontWeight={500}>
-                    {adaptedResult.title}
-                  </Typography>
-                </Alert>
-
-                <Typography 
-                  variant="subtitle1" 
-                  sx={{ 
-                    fontWeight: 600, 
-                    mb: 1.5, 
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    pb: 1
-                  }}
-                >
-                  Detaily porovnania:
-                </Typography>
-                
-                {adaptedResult.details.map((detail, index) => (
-                  detail.text ? (
+              <CardContent sx={{ p: 3, height: '100%' }}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
                     <Typography 
-                      key={index} 
-                      variant={detail.symbol === '' ? 'subtitle1' : 'body1'} 
+                      variant="h6" 
                       sx={{ 
-                        color: detail.color, 
-                        my: detail.symbol === '' ? 1 : 0.5,
-                        fontWeight: detail.symbol === '' ? 'bold' : 'normal',
+                        mb: 2, 
+                        fontWeight: 600,
+                        color: 'white',
                         display: 'flex',
                         alignItems: 'center'
                       }}
                     >
-                      {detail.symbol && <span style={{ marginRight: '8px' }}>{detail.symbol}</span>}
-                      {detail.text}
+                      <CodeIcon sx={{ mr: 1, color: '#90caf9' }} />
+                      PL1 Formula príkladu
                     </Typography>
-                  ) : (
-                    <Divider key={index} sx={{ my: 1 }} />
-                  )
-                ))}
-
-                {result && !result.is_valid && result.allowed_alternatives && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" color="warning.main" sx={{ fontWeight: 600 }}>
-                      Povolené alternatívy pre komponenty:
+                    <Alert 
+                      severity="info" 
+                      variant="outlined"
+                      sx={{ 
+                        mb: 2,
+                        borderRadius: 2,
+                        bgcolor: alpha('#2196f3', 0.1)
+                      }}
+                    >
+                      <Typography variant="body2">
+                        Používajte správne Unicode symboly: <b>Ι</b> (is_a), <b>Π</b> (has_part), <b>Α</b> (has_attribute), <b>∧</b> (and)
+                      </Typography>
+                    </Alert>
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Zadajte PL1 formulu príkladu"
+                      multiline
+                      fullWidth
+                      rows={10}
+                      value={formula}
+                      onChange={handleEditorChange}
+                      placeholder="Príklad: Ι(c1, X5) ∧ Π(c1, e1) ∧ Ι(e1, DieselEngine) ∧ ..."
+                      variant="outlined"
+                      sx={{ 
+                        '& .MuiOutlinedInput-root': {
+                          fontFamily: 'monospace',
+                          fontSize: '0.95rem'
+                        },
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: alpha('#fff', 0.2)
+                        }
+                      }}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                      <Tooltip title="Kontrolovať aj číselné hodnoty atribútov ako výkon, krútiaci moment, počet valcov...">
+                        <FormControlLabel 
+                          control={
+                            <Switch 
+                              checked={validateAttrs} 
+                              onChange={handleValidateAttributesChange}
+                              color="primary" 
+                            />
+                          } 
+                          label="Validovať hodnoty atribútov" 
+                        />
+                      </Tooltip>
+                      
+                      {error && (
+                        <Alert 
+                          severity="error" 
+                          variant="filled"
+                          sx={{ borderRadius: 2 }}
+                        >
+                          {error}
+                        </Alert>
+                      )}
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={1}>
+            {/* Results Tab */}
+            {result ? (
+              <Card 
+                variant="outlined" 
+                sx={{ 
+                  height: '100%', 
+                  bgcolor: alpha('#000', 0.2),
+                  boxShadow: 'none',
+                  borderColor: alpha('#fff', 0.1),
+                  overflow: 'auto'
+                }}
+              >
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'flex-start',
+                    mb: 3,
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: 2
+                  }}>
+                    <Typography 
+                      variant="h5" 
+                      sx={{ 
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {result.is_valid ? (
+                        <CheckCircleOutlineIcon sx={{ mr: 1, color: '#66bb6a' }} />
+                      ) : (
+                        <ErrorOutlineIcon sx={{ mr: 1, color: '#f44336' }} />
+                      )}
+                      Výsledok validácie
                     </Typography>
-                    <Card variant="outlined" sx={{ mt: 1, bgcolor: 'rgba(255, 255, 255, 0.03)' }}>
-                      <CardContent>
-                        {result.allowed_alternatives.engines && result.allowed_alternatives.engines.length > 0 && (
-                          <Box sx={{ mb: 1 }}>
-                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 600 }}>
-                              Motory:
-                            </Typography>
-                            <Typography variant="body2">
-                              {result.allowed_alternatives.engines.join(', ')}
-                            </Typography>
-                          </Box>
-                        )}
-                        {result.allowed_alternatives.transmissions && result.allowed_alternatives.transmissions.length > 0 && (
-                          <Box sx={{ mb: 1 }}>
-                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 600 }}>
-                              Prevodovky:
-                            </Typography>
-                            <Typography variant="body2">
-                              {result.allowed_alternatives.transmissions.join(', ')}
-                            </Typography>
-                          </Box>
-                        )}
-                        {result.allowed_alternatives.drives && result.allowed_alternatives.drives.length > 0 && (
-                          <Box>
-                            <Typography variant="body2" sx={{ color: 'info.main', fontWeight: 600 }}>
-                              Pohony:
-                            </Typography>
-                            <Typography variant="body2">
-                              {result.allowed_alternatives.drives.join(', ')}
-                            </Typography>
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
+                    
+                    <Alert 
+                      severity={result.is_valid ? "success" : "error"}
+                      variant="filled"
+                      icon={false}
+                      sx={{ 
+                        borderRadius: 2,
+                        py: 1,
+                        fontWeight: 500
+                      }}
+                    >
+                      {result.is_valid ? 
+                        `Príklad je platný pre model ${result.model_type}` : 
+                        `Príklad nie je platný pre model ${result.model_type}`
+                      }
+                    </Alert>
                   </Box>
-                )}
+                  
+                  <Divider sx={{ mb: 3, bgcolor: alpha('#fff', 0.1) }} />
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12}>
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          borderRadius: 2,
+                          bgcolor: alpha('#000', 0.2),
+                          borderColor: alpha('#fff', 0.1),
+                          mb: 3
+                        }}
+                      >
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#90caf9' }}>
+                          Detaily validácie:
+                        </Typography>
+                        
+                        <Box sx={{ pl: 1 }}>
+                          {adaptedResult.details.map((detail, index) => (
+                            detail.text ? (
+                              <Typography 
+                                key={index} 
+                                variant={detail.symbol === '' ? 'subtitle2' : 'body2'} 
+                                sx={{ 
+                                  color: detail.color, 
+                                  my: detail.symbol === '' ? 1.5 : 0.75,
+                                  fontWeight: detail.symbol === '' ? 600 : 400,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  pl: detail.symbol ? 2 : 0
+                                }}
+                              >
+                                {detail.symbol && <span style={{ marginRight: '8px', fontSize: '1.1rem' }}>{detail.symbol}</span>}
+                                {detail.text}
+                              </Typography>
+                            ) : (
+                              <Divider key={index} sx={{ my: 1.5, bgcolor: alpha('#fff', 0.05) }} />
+                            )
+                          ))}
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                  Nie sú dostupné žiadne výsledky. Najprv validujte príklad.
+                </Typography>
               </Box>
             )}
-          </Grid>
-        </Grid>
+          </TabPanel>
+          
+          <TabPanel value={tabValue} index={2}>
+            {/* Visualization Tab */}
+            {result ? (
+              <Box sx={{ height: '100%' }}>
+                <Card 
+                  variant="outlined" 
+                  sx={{ 
+                    height: '100%',
+                    bgcolor: alpha('#000', 0.2),
+                    boxShadow: 'none',
+                    borderColor: alpha('#fff', 0.1)
+                  }}
+                >
+                  <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Grid container spacing={2} sx={{ height: '100%' }}>
+                      <Grid item xs={12} lg={6} sx={{ height: { xs: '50%', lg: '100%' } }}>
+                        <Paper 
+                          elevation={0}
+                          sx={{ 
+                            height: '100%',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            border: '1px solid',
+                            borderColor: alpha('#fff', 0.1),
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderBottom: '1px solid',
+                            borderColor: alpha('#fff', 0.1), 
+                            bgcolor: alpha('#000', 0.3),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Typography 
+                              variant="subtitle1" 
+                              sx={{ 
+                                fontWeight: 600, 
+                                textAlign: 'center',
+                                color: '#2196f3'
+                              }}
+                            >
+                              Užívateľský príklad (prebytočné prvky)
+                            </Typography>
+                          </Box>
+                          <Box sx={{ 
+                            flexGrow: 1, 
+                            minHeight: 0,
+                            height: { xs: '380px', sm: '450px', md: '550px' }
+                          }}>
+                            <ExampleNetworkGraph 
+                              comparisonResult={result} 
+                              formula={formula} 
+                              showLayeredVisualization={true}
+                              viewType="example"
+                            />
+                          </Box>
+                        </Paper>
+                      </Grid>
+                      
+                      <Grid item xs={12} lg={6} sx={{ height: { xs: '50%', lg: '100%' } }}>
+                        <Paper 
+                          elevation={0}
+                          sx={{ 
+                            height: '100%',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            border: '1px solid',
+                            borderColor: alpha('#fff', 0.1),
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          <Box sx={{ 
+                            p: 1.5, 
+                            borderBottom: '1px solid',
+                            borderColor: alpha('#fff', 0.1), 
+                            bgcolor: alpha('#000', 0.3),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Typography 
+                              variant="subtitle1" 
+                              sx={{ 
+                                fontWeight: 600, 
+                                textAlign: 'center',
+                                color: '#ff9800'
+                              }}
+                            >
+                              Validačné pravidlá (chýbajúce prvky)
+                            </Typography>
+                          </Box>
+                          <Box sx={{ 
+                            flexGrow: 1, 
+                            minHeight: 0,
+                            height: { xs: '380px', sm: '450px', md: '550px' }
+                          }}>
+                            <ExampleNetworkGraph 
+                              comparisonResult={result} 
+                              formula={formula} 
+                              showLayeredVisualization={true}
+                              viewType="model"
+                            />
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                    
+                    <Box sx={{ pt: 2 }}>
+                      <Paper 
+                        elevation={0}
+                        sx={{ 
+                          p: 1.5, 
+                          bgcolor: alpha('#000', 0.3),
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: alpha('#fff', 0.1)
+                        }}
+                      >
+                        <Grid container spacing={1} alignItems="center">
+                          <Grid item xs={12} sm="auto">
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#90caf9', mb: { xs: 1, sm: 0 } }}>
+                              Legenda:
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '130px' } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#4caf50' }}></Box>
+                              <Typography variant="caption">Platný prvok</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#F44336' }}></Box>
+                              <Typography variant="caption">Neplatný/Chýbajúci prvok</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                  Nie sú dostupné žiadne vizualizácie. Najprv validujte príklad.
+                </Typography>
+              </Box>
+            )}
+          </TabPanel>
+        </Box>
       </Paper>
     </Container>
   );
