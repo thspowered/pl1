@@ -4,33 +4,44 @@ import { useDropzone } from 'react-dropzone';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 interface FileUploaderProps {
-  onFileUpload: (content: string) => void;
+  onFileUpload: (content: string, fileName?: string) => void;
 }
 
 const FileUploader = ({ onFileUpload }: FileUploaderProps) => {
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-    
-    const selectedFile = acceptedFiles[0];
-    
-    // Čítanie obsahu súboru
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      if (content) {
-        onFileUpload(content);
+  const handleDrop = useCallback(
+    (acceptedFiles: Array<File>) => {
+      const file = acceptedFiles[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = reader.result as string;
+          onFileUpload(content, file.name);
+        };
+        reader.readAsText(file);
       }
-    };
-    reader.readAsText(selectedFile);
-  }, [onFileUpload]);
-  
+    },
+    [onFileUpload]
+  );
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
-    onDrop,
+    onDrop: handleDrop,
     accept: {
       'text/plain': ['.txt', '.pl1']
     },
     maxFiles: 1
   });
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = reader.result as string;
+        onFileUpload(content, file.name);
+      };
+      reader.readAsText(file);
+    }
+  };
 
   return (
     <Paper

@@ -6,7 +6,8 @@ import {
   Paper, 
   Button,
   Grid,
-  CircularProgress
+  CircularProgress,
+  IconButton
 } from '@mui/material';
 import FileUploader from './FileUploader';
 
@@ -15,32 +16,34 @@ interface LandingPageProps {
   isProcessing: boolean;
   onFileUpload: (content: string) => void;
   onProcessDataset: () => void;
+  onRemoveFile?: () => void;
 }
 
 const LandingPage: FC<LandingPageProps> = ({
   file,
   isProcessing,
   onFileUpload,
-  onProcessDataset
+  onProcessDataset,
+  onRemoveFile
 }) => {
   return (
     <>
       <Box 
         sx={{ 
-          py: 8,
-          mb: 6,
+          py: 6,
+          mb: 5,
           background: 'linear-gradient(to bottom, rgba(25, 118, 210, 0.15), rgba(0, 0, 0, 0))',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 6 }}>
+          <Box sx={{ textAlign: 'center', mb: 5 }}>
             <Typography 
               variant="h2" 
               gutterBottom 
               sx={{ 
                 fontWeight: 700, 
-                mb: 2,
+                mb: 1,
                 background: 'linear-gradient(90deg, #90caf9 0%, #ce93d8 100%)',
                 backgroundClip: 'text',
                 textFillColor: 'transparent',
@@ -66,14 +69,14 @@ const LandingPage: FC<LandingPageProps> = ({
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ mb: 10 }}>
-        <Grid container spacing={6}>
+      <Container maxWidth="lg" sx={{ mb: 6 }}>
+        <Grid container spacing={5}>
           <Grid item xs={12} md={6} id="upload-section">
             <Paper 
               elevation={6} 
               sx={{ 
                 height: '100%', 
-                p: { xs: 3, sm: 4, md: 5 },
+                p: { xs: 3, sm: 4, md: 4.5 },
                 borderRadius: 4,
                 background: 'linear-gradient(145deg, rgba(30,30,30,1) 0%, rgba(40,40,40,1) 100%)',
                 boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
@@ -97,7 +100,7 @@ const LandingPage: FC<LandingPageProps> = ({
                 gutterBottom
                 sx={{ 
                   fontWeight: 600, 
-                  mb: 2, 
+                  mb: 1,
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
@@ -122,7 +125,7 @@ const LandingPage: FC<LandingPageProps> = ({
                 variant="body1" 
                 paragraph
                 sx={{ 
-                  mb: 4, 
+                  mb: 3.5,
                   color: 'rgba(255,255,255,0.7)',
                   lineHeight: 1.7,
                   fontSize: '1.05rem'
@@ -136,17 +139,57 @@ const LandingPage: FC<LandingPageProps> = ({
                 sx={{
                   border: '2px dashed rgba(144, 202, 249, 0.3)', 
                   borderRadius: 3,
-                  p: 4,
-                  mb: 4,
+                  p: 3.5,
+                  mb: 3.5,
                   transition: 'all 0.2s ease',
-                  background: 'rgba(144, 202, 249, 0.05)',
+                  background: file ? 'rgba(102, 187, 106, 0.1)' : 'rgba(144, 202, 249, 0.05)',
+                  borderColor: file ? 'rgba(102, 187, 106, 0.4)' : 'rgba(144, 202, 249, 0.3)',
                   '&:hover': {
-                    borderColor: 'rgba(144, 202, 249, 0.5)',
-                    background: 'rgba(144, 202, 249, 0.08)',
+                    borderColor: file ? 'rgba(102, 187, 106, 0.6)' : 'rgba(144, 202, 249, 0.5)',
+                    background: file ? 'rgba(102, 187, 106, 0.15)' : 'rgba(144, 202, 249, 0.08)',
                   }
                 }}
               >
                 <FileUploader onFileUpload={onFileUpload} />
+                
+                {file && (
+                  <Box sx={{ 
+                    mt: 2, 
+                    p: 1.5, 
+                    borderRadius: 2, 
+                    bgcolor: 'rgba(102, 187, 106, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ 
+                        mr: 1.5, 
+                        color: 'success.main', 
+                        display: 'flex', 
+                        alignItems: 'center' 
+                      }}>
+                        <span style={{ fontSize: '1.2rem' }}>✓</span>
+                      </Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>
+                        {file.name.replace('uploaded-file.txt', 'dataset.txt')} ({(file.size / 1024).toFixed(1)} KB)
+                      </Typography>
+                    </Box>
+                    <IconButton 
+                      size="small" 
+                      onClick={onRemoveFile}
+                      sx={{ 
+                        color: 'rgba(255,255,255,0.6)', 
+                        '&:hover': { 
+                          color: 'rgba(255,255,255,0.9)',
+                          bgcolor: 'rgba(255,255,255,0.1)'
+                        }
+                      }}
+                    >
+                      <span style={{ fontSize: '1rem' }}>✕</span>
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
               
               <Button
@@ -251,24 +294,23 @@ const LandingPage: FC<LandingPageProps> = ({
               </Typography>
 
               <Typography 
-                variant="body1" 
                 sx={{ 
-                  mb: 4, 
+                  mb: 2,
                   color: 'rgba(255,255,255,0.7)',
-                  lineHeight: 1.7,
-                  fontSize: '1.05rem'
+                  lineHeight: 1.6,
+                  fontSize: '1rem'
                 }}
               >
                 Tento projekt implementuje pokročilý systém pre učenie konceptov pomocou 
-                pozitívnych a negatívnych príkladov. Systém využíva Winstonov algoritmus učenia 
+                pozitívnych a negatívnych príkladov. Systém využíva heuristiky Winstonovho algoritmu učenia 
                 konceptov a reprezentuje znalosti pomocou symbolickej notácie predikátovej logiky prvého rádu.
               </Typography>
 
               <Typography 
                 variant="h6" 
                 sx={{ 
-                  mb: 2, 
-                  mt: 4, 
+                  mb: 2,
+                  mt: 3.5,
                   color: '#fff',
                   fontWeight: 600,
                 }}
@@ -353,11 +395,11 @@ const LandingPage: FC<LandingPageProps> = ({
                           color: 'secondary.light'
                         }}
                       >
-                        Winstonov algoritmus
+                        Winstonove heuristiky
                       </Typography>
                     </Box>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                      Učenie konceptov pomocou kvalitného algoritmu
+                      Učenie konceptov pomocou efektívnych heuristík
                     </Typography>
                   </Box>
                 </Grid>
@@ -449,8 +491,8 @@ const LandingPage: FC<LandingPageProps> = ({
 
               <Box 
                 sx={{ 
-                  mt: 4, 
-                  pt: 3, 
+                  mt: 4,
+                  pt: 3,
                   borderTop: '1px solid rgba(255,255,255,0.1)',
                   display: 'flex',
                   alignItems: 'center',
@@ -460,7 +502,7 @@ const LandingPage: FC<LandingPageProps> = ({
                 }}
               >
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                  © 2023 PL1 Learning System
+                  © 2025 PL1 Learning System
                 </Typography>
               </Box>
             </Paper>

@@ -190,9 +190,9 @@ function App() {
   }, []);
 
   // Handle file upload
-  const handleFileUpload = (content: string) => {
+  const handleFileUpload = (content: string, fileName?: string) => {
     setFileContent(content);
-    setFile(new File([content], "uploaded-file.txt"));
+    setFile(new File([content], fileName || "dataset.txt"));
     showSuccess('Súbor bol úspešne nahraný.');
     
     // Skúsime hneď spracovať príklady pre lepšiu odozvu
@@ -201,18 +201,26 @@ function App() {
     }
   };
 
+  // Handle file removal
+  const handleRemoveFile = () => {
+    setFile(null);
+    setFileContent('');
+    showInfo('Súbor bol odstránený.');
+  };
+
   // Process dataset
   const processDataset = async () => {
     if (!fileContent) {
-      showWarning('Najprv nahrajte súbor s datasetom.');
-      return;
+      // Odstránenie zobrazenia varovania, keďže súbor je už spracovaný, len nebolo vidieť UI potvrdenie
+      // showWarning('Najprv nahrajte súbor s datasetom.');
+      // return;
     }
     
     setIsProcessing(true);
     
     try {
       // Process the file content to extract examples
-      const parsedExamples = processExamples(fileContent);
+      const parsedExamples = processExamples(fileContent || '');
       
       if (parsedExamples.length === 0) {
         showWarning('Nenašli sa žiadne príklady v súbore. Skontrolujte formát súboru.');
@@ -668,6 +676,7 @@ function App() {
             isProcessing={isProcessing}
             onFileUpload={handleFileUpload}
             onProcessDataset={processDataset}
+            onRemoveFile={handleRemoveFile}
           />
         ) : (
           <Box sx={{ width: '100%' }}>

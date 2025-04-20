@@ -513,8 +513,8 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
           if ((attributeName === 'power' && value === '400') || 
               (attributeName === 'cylinders' && value === '6')) {
             console.log(`Found invalid value: ${value} for ${attributeName}`);
-            return { 
-              ...node, 
+        return {
+          ...node,
               status: 'invalid', 
               size: 40,
               shape: 'hexagon',
@@ -700,7 +700,7 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
             };
             allNodes.push(x5Node);
             x5NodeId = 'X5';
-          } else {
+              } else {
             const x5Node = allNodes.find(n => n.name === 'X5' || n.id === 'X5');
             x5NodeId = x5Node?.id || 'X5';
           }
@@ -914,7 +914,7 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
               from: link.source,
               to: link.target,
               label: getLogicalSymbolLabel(link.type),
-              font: { 
+          font: { 
                 size: (isMissingInExample || isMissingConnection) ? 12 : 10, 
                 strokeWidth: (isMissingInExample || isMissingConnection) ? 3 : 2, 
                 strokeColor: '#000000',
@@ -931,8 +931,8 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
                 hover: '#FFFFFF'
               },
               length: 150, // Fixed length for better readability
-            smooth: {
-              enabled: true,
+          smooth: {
+            enabled: true,
                 type: 'cubicBezier',
                 roundness: 0.2
               },
@@ -946,21 +946,21 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
               shadow: {
                 enabled: link.status === 'missing' || link.status === 'extra',
                 color: getStatusColor(link.status)
-              }
-            };
-          });
+          }
+        };
+      });
       
       // Create the network  
       const container = containerRef.current;
       
       if (container) {
         // Initialize data and options
-        const data = {
+      const data = {
           nodes: new DataSet<any>(visNodes),
           edges: new DataSet<any>(visEdges)
-        };
-        
-        const options = {
+      };
+      
+      const options = {
           nodes: {
             shape: 'dot',
             size: 35,
@@ -992,17 +992,17 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
               to: { enabled: true, scaleFactor: 1.2 }
             },
             smooth: {
-              enabled: true,
+          enabled: true,
               type: 'dynamic',
               forceDirection: 'none',
               roundness: 0.5
-            },
+          },
             hoverWidth: 4,
             selectionWidth: 4
           },
           physics: {
             enabled: true,
-            barnesHut: {
+          barnesHut: {
               gravitationalConstant: viewType === 'model' ? -20000 : -10000,
               centralGravity: viewType === 'model' ? 0.2 : 0.5,
               springLength: viewType === 'model' ? 350 : 200,
@@ -1018,14 +1018,14 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
             },
             timestep: 0.5,
             adaptiveTimestep: true
-          },
-          interaction: {
+        },
+        interaction: {
             hover: true,
             tooltipDelay: 200,
             zoomView: true,
             dragView: true,
-            navigationButtons: true,
-            keyboard: true,
+          navigationButtons: true,
+          keyboard: true,
             multiselect: true
           },
           layout: {
@@ -1137,11 +1137,11 @@ const ExampleNetworkGraph: React.FC<ExampleNetworkGraphProps> = ({
                 bold: true
               },
               shadow: { enabled: true, size: 15, color: '#FF9800' }
-            }
           }
-        };
+        }
+      };
       
-        // Create the network
+      // Create the network
         const networkInstance = new Network(container, data, options as any);
         
         // Create a separate array to store missing component IDs

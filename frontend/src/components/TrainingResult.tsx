@@ -235,7 +235,7 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                 >
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#90caf9' }}>
-                      Vizualizácia porovnania
+                      Vizualizacia hypotezy
                     </Typography>
                     {onRefreshGraph && (
                       <Button 
@@ -261,9 +261,6 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
                   
                   {/* Single view for visualization */}
                   <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 500, mb: 1, color: '#e0e0e0', textAlign: 'center' }}>
-                      Vizualizácia porovnania
-                    </Typography>
                     <Box sx={{ 
                       height: '600px',
                       border: '1px solid rgba(255, 255, 255, 0.08)',

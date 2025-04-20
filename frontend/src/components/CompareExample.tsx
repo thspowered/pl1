@@ -548,7 +548,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ exampleFormula, validat
                             color: '#2196f3'
                           }}
                         >
-                          Vizualizácia porovnania
+                      
                         </Typography>
                       </Box>
                       <Box sx={{ 
