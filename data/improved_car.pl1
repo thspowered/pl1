@@ -1,0 +1,235 @@
+# Pozitívny príklad 1: Základný model BMW X5
+# Inicializácia modelu s motorom a jeho výkonom
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 250)
+
+# Pozitívny príklad 2: X5 je typom SUV, ktorý je typom Car
+# Aktivuje climb-tree heuristiku
+Ι(x, X5) ∧
+Ι(s, SUV) ∧
+Ι(c, Car) ∧
+Π(x, s) ∧
+Π(s, c) ∧
+Ι(e, Engine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 250)
+
+# Negatívny príklad 1: X5 bez motora
+# Aktivuje require-link heuristiku (toto je zámerný príklad pre odhalenie povinného spojenia)
+Ι(x, X5)
+
+# Pozitívny príklad 3: X5 s diesel motorom
+# Aktivuje close-interval na hodnotu výkonu
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 265)
+
+# Pozitívny príklad 4: X5 s inou konfiguráciou motora
+# Aktivuje enlarge-set pre valce
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 265) ∧
+Α(e, cylinders, 6)
+
+# Pozitívny príklad 5: X5 s benzínovým motorom
+# Aktivuje drop-link medzi X5 a DieselEngine, čím sa vytvára všeobecnejší vzťah
+Ι(x, X5) ∧ 
+Ι(e, PetrolEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 300)
+
+# Pozitívny príklad 6: X5 s rozšírenými dátami motora
+# Aktivuje close-interval pre torque
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 300) ∧
+Α(e, torque, 450)
+
+# Negatívny príklad 2: X5 s manuálnou prevodovkou
+# Aktivuje forbid-link medzi X5 a ManualTransmission
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, ManualTransmission) ∧ 
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Α(e, power, 265)
+
+# Pozitívny príklad 7: X5 s automatickou prevodovkou
+# Aktivuje add-missing-object pre typ prevodovky
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Α(e, power, 265) ∧
+Α(t, gears, 8)
+
+# Negatívny príklad 3: X5 bez XDrive (s RWD)
+# Aktivuje require-link medzi X5 a typom pohonu
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, RWD) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Α(e, power, 265)
+
+# Pozitívny príklad 8: X5 s XDrive
+# Nastavuje správny typ pohonu
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Α(e, power, 265)
+
+# Negatívny príklad 4: X5 s malými kolesami
+# Aktivuje forbid-link pre neprijateľný rozmer kolies
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Α(e, power, 265) ∧
+Α(w, size, 17)
+
+# Pozitívny príklad 9: X5 s kolesami správnej veľkosti
+# Aktivuje close-interval pre veľkosť kolies
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Α(e, power, 265) ∧
+Α(w, size, 20)
+
+# Pozitívny príklad 10: X5 s väčšími kolesami
+# Aktivuje close-interval pre horný limit veľkosti kolies
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Α(e, power, 265) ∧
+Α(w, size, 22)
+
+# Negatívny príklad 5: X5 so slabým motorom
+# Aktivuje close-interval pre spodný limit výkonu motora
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Α(e, power, 180)
+
+# Negatívny príklad 6: X5 s trojvalcovým motorom
+# Aktivuje forbid-link pre neprijateľný počet valcov
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Α(e, power, 250) ∧
+Α(e, cylinders, 3)
+
+# Negatívny príklad 7: X5 nemôže byť kompaktný
+# Aktivuje forbid-link pre nesprávny typ SUV
+Ι(x, X5) ∧ 
+Ι(s, CompactSUV) ∧
+Π(x, s) ∧
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Α(e, power, 265)
+
+# Pozitívny príklad 11: X5 s doplnkovými komponentmi
+# Aktivuje add-missing-objects pre povinné bezpečnostné prvky
+Ι(x, X5) ∧ 
+Ι(s, SUV) ∧
+Π(x, s) ∧
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Ι(b, Brakes) ∧
+Ι(sa, SafetySystem) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Π(x, b) ∧
+Π(x, sa) ∧
+Α(e, power, 320) ∧
+Α(w, size, 21) ∧
+Α(b, type, disc)
+
+# Pozitívny príklad 12: Kompletný X5 v plnej výbave
+# Aktivuje add-missing-objects pre luxusné prvky
+Ι(x, X5) ∧ 
+Ι(s, SUV) ∧
+Π(x, s) ∧
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Ι(b, Brakes) ∧
+Ι(sa, SafetySystem) ∧
+Ι(i, Infotainment) ∧
+Ι(se, Seats) ∧
+Ι(l, Lights) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Π(x, b) ∧
+Π(x, sa) ∧
+Π(x, i) ∧
+Π(x, se) ∧
+Π(x, l) ∧
+Α(e, power, 390) ∧
+Α(w, size, 22) ∧
+Α(b, type, disc) ∧
+Α(i, display_size, 12.3) ∧
+Α(se, material, leather) ∧
+Α(l, type, led)
+
+# Negatívny príklad 8: X5 s halogénovými svetlami
+# Aktivuje forbid-link pre neprijateľný typ svetiel
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(l, Lights) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, l) ∧
+Α(e, power, 265) ∧
+Α(l, type, halogen) 

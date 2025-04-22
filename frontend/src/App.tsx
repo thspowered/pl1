@@ -303,17 +303,10 @@ function App() {
     
     // Check if we have at least one positive and one negative example
     const hasPositive = selectedExamples.some(ex => ex.isPositive);
-    const hasNegative = selectedExamples.some(ex => !ex.isPositive);
     
     // If model hasn't been initialized, check if we have at least one positive example
     if (!modelStatus?.model_initialized && !hasPositive) {
       showWarning('Pre inicializáciu modelu je potrebný aspoň jeden pozitívny príklad.');
-      return;
-    }
-    
-    // If model has been initialized, check if we have negative examples
-    if (modelStatus?.model_initialized && !hasNegative && modelStatus.negative_examples_count === 0) {
-      showWarning('Pre trénovanie modelu je potrebný aspoň jeden negatívny príklad.');
       return;
     }
     
@@ -726,7 +719,7 @@ function App() {
                 isTraining={isTraining}
                 isUpdatingModel={isUpdatingModel}
                 trainingResult={trainingResult}
-                trainingSteps={trainingSteps}
+                trainingSteps={trainingResult?.training_steps || []}
                 isLoading={isLoading}
                 historyIndex={modelHistory.current_index}
                 historyLength={modelHistory.total_entries}

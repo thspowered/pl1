@@ -605,6 +605,17 @@ def track_winston_learner(original_learner, tracker):
             self.classification_tree = original_learner.classification_tree
             self.debug_enabled = True  # Zapneme debugovanie pre lepšiu diagnostiku
             
+            # Zdieľanie zoznamu heuristík
+            self.applied_heuristics = original_learner.applied_heuristics
+            
+            # Inicializácia histórie príkladov - nové atribúty pre sekvenčné spracovanie
+            self.positive_examples = original_learner.positive_examples
+            self.negative_examples = original_learner.negative_examples
+            
+            # Zdieľanie histórie modelu
+            self.model_history = original_learner.model_history
+            self.max_history_size = original_learner.max_history_size
+            
             # Kontrola, či klasifikačný strom obsahuje údaje
             parent_relations = len(self.classification_tree.parent_map)
             print(f"[WinstonLearnerProxy] Klasifikačný strom obsahuje {parent_relations} vzťahov rodič-dieťa.")
@@ -658,14 +669,86 @@ def track_winston_learner(original_learner, tracker):
                 # Pre spätnú kompatibilitu poskytneme prázdny model ako near_miss
                 empty_model = Model(objects=[], links=[])
                 return self.original_learner._apply_close_interval(model, good, empty_model)
+        
+        def update_model_sequential(self, model, example, is_positive):
+            """
+            Deleguje volanie update_model_sequential na pôvodnú inštanciu WinstonLearnera.
+            Zaznamenáva aplikované heuristiky pre účely sledovania.
+            
+            Args:
+                model: Aktuálny model
+                example: Príklad na spracovanie
+                is_positive: True ak je príklad pozitívny, False ak je negatívny
+                
+            Returns:
+                Aktualizovaný model
+            """
+            # Zavoláme sekvenčnú implementáciu na originálnom learneri
+            # Očakávame, že vráti tuple (updated_model, applied_heuristics)
+            result = self.original_learner.update_model_sequential(model, example, is_positive)
+            
+            # Rozbalíme výsledok - môže byť tuple (model, heuristics) alebo iba model
+            if isinstance(result, tuple) and len(result) == 2:
+                updated_model, applied_heuristics = result
+            else:
+                # Spätná kompatibilita - ak metóda vracia iba model
+                updated_model = result
+                applied_heuristics = self.original_learner.applied_heuristics
+            
+            # Zaznamenáme aplikované heuristiky
+            if applied_heuristics:
+                # Posledná aplikovaná heuristika
+                self.last_applied_heuristic = applied_heuristics[-1] if applied_heuristics else None
+                
+                # Mapovanie názvov heuristík na užívateľsky zrozumiteľné popisky
+                heuristic_descriptions = {
+                    "require_link": "Heuristika REQUIRE-LINK - Identifikácia spojení, ktoré musia byť prítomné",
+                    "forbid_link": "Heuristika FORBID-LINK - Identifikácia spojení, ktoré nesmú byť prítomné",
+                    "drop_link": "Heuristika DROP-LINK - Eliminácia nepotrebných spojení",
+                    "climb_tree": "Heuristika CLIMB-TREE - Generalizácia hľadaním spoločných predkov",
+                    "enlarge_set": "Heuristika ENLARGE-SET - Vytváranie zjednotení pre funkčne ekvivalentné komponenty",
+                    "close_interval": "Heuristika CLOSE-INTERVAL - Spracovanie numerických atribútov zúžením intervalov",
+                    "add_object": "Pridanie nového objektu do modelu",
+                    "add_link": "Pridanie nového spojenia do modelu",
+                    "resolve_class_conflict": "Riešenie konfliktu tried objektov",
+                    "find_common_ancestor": "Hľadanie spoločného predka pre konfliktné triedy",
+                    "update_attribute": "Aktualizácia hodnoty atribútu objektu"
+                }
+                
+                for heuristic in applied_heuristics:
+                    self.tracker.add_heuristic(
+                        heuristic,
+                        heuristic_descriptions.get(heuristic, f"Heuristika {heuristic.upper()}"),
+                        details={
+                            "is_positive": is_positive,
+                            "example_objects": len(example.objects),
+                            "changes_made": True
+                        }
+                    )
+            return updated_model
     
     return WinstonLearnerProxy(original_learner, tracker)
+
+def generate_model_hypothesis(model: Model) -> str:
+    """
+    Generuje textovú reprezentáciu hypotézy modelu vo formáte PL1.
+    
+    Args:
+        model: Model, pre ktorý sa má generovať hypotéza
+        
+    Returns:
+        Textová reprezentácia hypotézy (formula v PL1)
+    """
+    if not model:
+        return ""
+        
+    return model.to_formula()
 
 @app.post("/api/train")
 async def train_model(training_request: TrainingRequest):
     """
     Trénovanie modelu s pozitívnymi a negatívnymi príkladmi.
-    Implementuje zjednodušenú verziu Winstonovho algoritmu.
+    Implementuje Winstonov algoritmus s inkrementálnym sekvenčným spracovaním príkladov.
     """
     global current_model
     global dataset_examples
@@ -784,6 +867,11 @@ async def train_model(training_request: TrainingRequest):
                 })
                 
                 print(f"Model initialized with positive example {example_id}, model has {len(current_model.objects)} objects")
+                
+                # Odstráň prvý pozitívny príklad zo zoznamu na ďalšie spracovanie,
+                # keďže už bol použitý na inicializáciu
+                if positive_examples:
+                    positive_examples = positive_examples[1:]
             else:
                 # Nie je k dispozícii žiadny pozitívny príklad pre inicializáciu
                 return {
@@ -791,323 +879,154 @@ async def train_model(training_request: TrainingRequest):
                     "message": "Nie je k dispozícii žiadny pozitívny príklad pre inicializáciu modelu."
                 }
                 
-        # KROK 2: Aktualizácia modelu s ďalšími príkladmi
-        
-        # Režim trénovania s jedným pozitívnym a viacerými negatívnymi príkladmi
+        # KROK 2: Sekvenčná aktualizácia modelu pre každý príklad osobitne
         used_examples = []  # Sledovanie všetkých použitých príkladov
         
-        # Ak ešte neboli použité negatívne príklady, pokúsime sa aplikovať všetky dostupné
-        if negative_examples:
-            # Existuje aspoň jeden negatívny príklad
-            update_step_description = "Aktualizácia modelu s "
+        # Vytvor tracker pre zaznamenávanie heuristík
+        step_tracker = HeuristicTracker()
+        step_learner = track_winston_learner(local_learner, step_tracker)
+        
+        # 2a: Spracuj všetky pozitívne príklady sekvenčne
+        for pos_idx, (pos_id, pos_model) in enumerate(positive_examples):
+            example_name = dataset_examples[pos_id]["name"]
+            print(f"Processing positive example {pos_id}: {example_name}")
             
-            if len(positive_examples) <= 1 and current_model.objects:
-                # Použitie aktuálneho modelu ako pozitívneho príkladu s negatívnymi príkladmi
-                print(f"Updating model with {len(negative_examples)} negative examples only")
+            # Vytvor tracker pre tento konkrétny príklad
+            example_tracker = HeuristicTracker()
+            example_learner = track_winston_learner(local_learner, example_tracker)
+            
+            # Aktualizuj model so sekvenčnou implementáciou - pozitívny príklad
+            before_model_hash = hash(str(current_model.to_dict()))
+            updated_model = example_learner.update_model_sequential(
+                current_model.copy(), pos_model, is_positive=True
+            )
+            after_model_hash = hash(str(updated_model.to_dict()))
+            
+            # Skontroluj, či došlo k zmene modelu
+            if before_model_hash != after_model_hash:
+                # Model sa zmenil, zachovajme zmeny
+                current_model = updated_model
+                used_examples.append(pos_id)
                 
-                negative_example_ids = [ne[0] for ne in negative_examples]
-                negative_example_models = [ne[1] for ne in negative_examples]
-                negative_names = [dataset_examples[ne_id]["name"] for ne_id in negative_example_ids]
-                
-                # Vytvor nový tracker pre tento krok
-                step_tracker = HeuristicTracker()
-                step_learner = track_winston_learner(local_learner, step_tracker)
-                
-                # UPRAVENÉ: Namiesto update_model_with_new_negatives použijeme postupné spracovanie
-                # Podľa Winstonovho prístupu, potrebujeme vždy pár (pozitívny + negatívny)
-                # Použijeme prvý pozitívny príklad ako referenčný pre všetky negatívne
-                first_positive_id, first_positive_model = positive_examples[0]
-                first_positive_name = dataset_examples[first_positive_id]["name"]
-                
-                # Postupné párovanie prvého pozitívneho príkladu s každým negatívnym
-                applied_heuristics = []
-                used_negative_examples = []
-                
-                for neg_idx, (neg_id, neg_model) in enumerate(negative_examples):
-                    # Vytvor nový tracker pre tento konkrétny pár
-                    pair_tracker = HeuristicTracker()
-                    pair_learner = track_winston_learner(local_learner, pair_tracker)
-                    
-                    # Aktualizuj model s jedným pozitívnym a jedným negatívnym príkladom
-                    updated_model = pair_learner.update_model(
-                        current_model.copy(), first_positive_model, neg_model
-                    )
-                    
-                    # Ak sa model zmenil, uloží zmeny
-                    if pair_learner.last_applied_heuristic:
-                        current_model = updated_model
-                        applied_heuristics.extend(pair_tracker.get_all())
-                        used_negative_examples.append(neg_id)
-                        
-                        print(f"  Applied heuristic '{pair_learner.last_applied_heuristic}' with negative example {neg_id}")
-                
-                # Pridaj záznamy do histórie trénovania
-                for neg_id in used_negative_examples:
-                    training_history.append({
-                        "action": "update_incremental",
-                        "example_id": first_positive_id,
-                        "near_miss_id": neg_id,
-                        "timestamp": datetime.now().isoformat(),
-                        "current": True
-                    })
-                    used_examples.append(neg_id)
-                
-                # Pridaj krok aktualizácie do zoznamu krokov
-                update_step_description += f"{len(negative_examples)} negatívnymi príkladmi"
-                
-                negative_examples_text = ", ".join([f"'{name}'" for name in negative_names])
-                
-                training_steps.append({
-                    "step": "update_multi",
-                    "description": update_step_description + f" ({negative_examples_text}).",
-                    "negative_examples": negative_names,
-                    "heuristics": step_tracker.get_all()  # Použij heuristiky z tohto kroku
+                # Pridaj krok do histórie
+                training_history.append({
+                    "action": "update_positive",
+                    "example_id": pos_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "current": True
                 })
                 
-                print(f"Model updated with negative examples, model has {len(current_model.objects)} objects and {len(current_model.links)} links")
+                # Pridaj krok do zoznamu krokov trénovania
+                heuristics_info = example_tracker.get_all()
+                training_steps.append({
+                    "step": "update",
+                    "description": f"Aktualizácia modelu s pozitívnym príkladom '{example_name}'.",
+                    "example_name": example_name,
+                    "is_positive": True,
+                    "heuristics": [h["name"] for h in heuristics_info]
+                })
                 
+                print(f"  Applied heuristics with positive example {pos_id}: {[h['name'] for h in heuristics_info]}")
             else:
-                # Máme viac pozitívnych príkladov, použijeme prvý na ďalšie trénovanie
-                print(f"Updating model with {len(positive_examples) - 1} positive examples and {len(negative_examples)} negative examples")
+                print(f"  No changes made with positive example {pos_id}")
                 
-                # Použij len zostávajúce pozitívne príklady (bez prvého, ktorý už bol použitý na inicializáciu)
-                remaining_positive = positive_examples[1:] if positive_examples and not retrain_mode else positive_examples
+        # 2b: Spracuj všetky negatívne príklady sekvenčne
+        for neg_idx, (neg_id, neg_model) in enumerate(negative_examples):
+            example_name = dataset_examples[neg_id]["name"]
+            print(f"Processing negative example {neg_id}: {example_name}")
+            
+            # Vytvor tracker pre tento konkrétny príklad
+            example_tracker = HeuristicTracker()
+            example_learner = track_winston_learner(local_learner, example_tracker)
+            
+            # Aktualizuj model so sekvenčnou implementáciou - negatívny príklad
+            before_model_hash = hash(str(current_model.to_dict()))
+            updated_model = example_learner.update_model_sequential(
+                current_model.copy(), neg_model, is_positive=False
+            )
+            after_model_hash = hash(str(updated_model.to_dict()))
+            
+            # Skontroluj, či došlo k zmene modelu
+            if before_model_hash != after_model_hash:
+                # Model sa zmenil, zachovajme zmeny
+                current_model = updated_model
+                used_examples.append(neg_id)
                 
-                for pos_id, pos_model in remaining_positive:
-                    pos_example_name = dataset_examples[pos_id]["name"]
-                    
-                    # Vytvor nový tracker pre tento krok pozitívneho príkladu
-                    pos_step_tracker = HeuristicTracker()
-                    pos_step_learner = track_winston_learner(local_learner, pos_step_tracker)
-                    
-                    # Párovanie pozitívneho príkladu s každým negatívnym príkladom postupne (inkrementálne)
-                    # Toto je v súlade s Winstonovým algoritmom, kde sa model aktualizuje postupne
-                    # jedným pozitívnym a jedným negatívnym príkladom naraz
-                    applied_heuristics = []
-                    used_negative_examples = []
-                    
-                    for neg_idx, (neg_id, neg_model) in enumerate(negative_examples):
-                        # Vytvor nový tracker pre tento konkrétny pár
-                        pair_tracker = HeuristicTracker()
-                        pair_learner = track_winston_learner(local_learner, pair_tracker)
-                        
-                        # Aktualizuj model s jedným pozitívnym a jedným negatívnym príkladom
-                        updated_model = pair_learner.update_model(
-                            current_model.copy(), pos_model, neg_model
-                        )
-                        
-                        # Ak sa model zmenil, uloží zmeny
-                        if pair_learner.last_applied_heuristic:
-                            current_model = updated_model
-                            applied_heuristics.extend(pair_tracker.get_all())
-                            used_negative_examples.append(neg_id)
-                            
-                            print(f"  Applied heuristic '{pair_learner.last_applied_heuristic}' with negative example {neg_id}")
-                    
-                    # Pridaj záznam do histórie trénovania
-                    training_history.append({
-                        "action": "update_incremental",
-                        "example_id": pos_id,
-                        "near_miss_ids": used_negative_examples,
-                        "timestamp": datetime.now().isoformat(),
-                        "current": True
-                    })
-                    
-                    used_examples.append(pos_id)
-                    used_examples.extend(used_negative_examples)
-                    
-                    # Pridaj krok aktualizácie do zoznamu krokov
-                    training_steps.append({
-                        "step": "update_incremental",
-                        "description": f"Inkrementálna aktualizácia modelu s pozitívnym príkladom '{pos_example_name}' a {len(used_negative_examples)} negatívnymi príkladmi.",
-                        "example_name": pos_example_name,
-                        "is_positive": True,
-                        "negative_examples": [dataset_examples[neg_id]["name"] for neg_id in used_negative_examples],
-                        "heuristics": applied_heuristics  # Použij zozbierané heuristiky
-                    })
-                    
-                    print(f"Model updated with positive example {pos_id} and negative examples, model has {len(current_model.objects)} objects")
+                # Pridaj krok do histórie
+                training_history.append({
+                    "action": "update_negative",
+                    "example_id": neg_id,
+                    "timestamp": datetime.now().isoformat(),
+                    "current": True
+                })
                 
-                # Ak nemáme žiadne zostávajúce pozitívne príklady, použijeme len negatívne
-                if not remaining_positive and negative_examples:
-                    print(f"Updating model with just {len(negative_examples)} negative examples")
-                    
-                    negative_example_ids = [ne[0] for ne in negative_examples]
-                    
-                    # UPRAVENÉ: Winston nemá koncept práce len s negatívnymi príkladmi
-                    # Podľa pôvodného algoritmu, potrebujeme vždy pár (pozitívny + negatívny)
-                    # Preto použijeme posledný pozitívny príklad ako referenčný pre všetky negatívne
-                    if positive_examples:
-                        last_positive_id, last_positive_model = positive_examples[-1]
-                        last_positive_name = dataset_examples[last_positive_id]["name"]
-                        
-                        # Vytvor nový tracker pre túto aktualizáciu
-                        step_tracker = HeuristicTracker()
-                        step_learner = track_winston_learner(local_learner, step_tracker)
-                        
-                        # Postupné párovanie posledného pozitívneho príkladu s každým negatívnym
-                        applied_heuristics = []
-                        used_negative_examples = []
-                        
-                        for neg_idx, (neg_id, neg_model) in enumerate(negative_examples):
-                            # Vytvor nový tracker pre tento konkrétny pár
-                            pair_tracker = HeuristicTracker()
-                            pair_learner = track_winston_learner(local_learner, pair_tracker)
-                            
-                            # Aktualizuj model s jedným pozitívnym a jedným negatívnym príkladom
-                            updated_model = pair_learner.update_model(
-                                current_model.copy(), last_positive_model, neg_model
-                            )
-                            
-                            # Ak sa model zmenil, uloží zmeny
-                            if pair_learner.last_applied_heuristic:
-                                current_model = updated_model
-                                applied_heuristics.extend(pair_tracker.get_all())
-                                used_negative_examples.append(neg_id)
-                                
-                                print(f"  Applied heuristic '{pair_learner.last_applied_heuristic}' with negative example {neg_id}")
-                        
-                        # Pridaj záznamy do histórie trénovania
-                        for neg_id in used_negative_examples:
-                            training_history.append({
-                                "action": "update_incremental",
-                                "example_id": last_positive_id,
-                                "near_miss_id": neg_id,
-                                "timestamp": datetime.now().isoformat(),
-                                "current": True
-                            })
-                            
-                            if neg_id not in used_examples:
-                                used_examples.append(neg_id)
-                        
-                        # Pridaj krok aktualizácie do zoznamu krokov
-                        update_step_description = f"Inkrementálna aktualizácia modelu s posledným pozitívnym príkladom '{last_positive_name}' a {len(used_negative_examples)} negatívnymi príkladmi."
-                        
-                        negative_names = [dataset_examples[ne_id]["name"] for ne_id in used_negative_examples]
-                        negative_examples_text = ", ".join([f"'{name}'" for name in negative_names])
-                        
-                        training_steps.append({
-                            "step": "update_incremental",
-                            "description": update_step_description + f" ({negative_examples_text}).",
-                            "example_name": last_positive_name,
-                            "is_positive": True,
-                            "negative_examples": negative_names,
-                            "heuristics": applied_heuristics  # Použij zozbierané heuristiky
-                        })
-                        
-                        print(f"Model updated using last positive example with negative examples, model has {len(current_model.objects)} objects and {len(current_model.links)} links")
-                    else:
-                        # Nemáme žiadny pozitívny príklad, nemôžeme pokračovať s Winstonovým prístupom
-                        print("No positive examples available, cannot apply Winston's algorithm with only negative examples")
-                else:
-                    # Nie sú k dispozícii žiadne negatívne príklady, skúsime aspoň aktualizovať model s ďalšími pozitívnymi
-                    print("No negative examples available, updating model with remaining positive examples only")
-                    
-                    # Použij zvyšné pozitívne príklady (bez prvého, ktorý už bol použitý na inicializáciu)
-                    remaining_positive = positive_examples[1:] if positive_examples and not retrain_mode else positive_examples
-                    
-                    for pos_id, pos_model in remaining_positive:
-                        pos_example_name = dataset_examples[pos_id]["name"]
-                        
-                        # Vytvor nový tracker pre tento krok
-                        step_tracker = HeuristicTracker()
-                        step_learner = track_winston_learner(local_learner, step_tracker)
-                        
-                        # UPRAVENÉ: V pôvodnom Winstonovom algoritme nemôžeme pracovať len s pozitívnym príkladom
-                        # Skutočný Winston potrebuje párový negatívny príklad
-                        # Môžeme ale použiť aspoň close_interval, ktorá funguje aj bez negatívneho príkladu
-                        updated_model = current_model.copy()
-                        
-                        # Aplikuj aspoň close_interval heuristiku, ktorá závisí len od pozitívneho príkladu
-                        step_learner._apply_close_interval(updated_model, pos_model)
-                        
-                        # Aktualizuj aktuálny model
-                        current_model = updated_model
-                        
-                        # Pridaj záznam do histórie trénovania
-                        training_history.append({
-                            "action": "update_close_interval",
-                            "example_id": pos_id,
-                            "timestamp": datetime.now().isoformat(),
-                            "current": True
-                        })
-                        
-                        used_examples.append(pos_id)
-                        
-                        # Pridaj krok aktualizácie do zoznamu krokov
-                        training_steps.append({
-                            "step": "update",
-                            "description": f"Obmedzená aktualizácia modelu s pozitívnym príkladom '{pos_example_name}' (bez negatívnych príkladov).",
-                            "example_name": pos_example_name,
-                            "is_positive": True,
-                            "heuristics": step_tracker.get_all()  # Použij heuristiky z tohto kroku
-                        })
-                        
-                        print(f"Applied close_interval heuristic with positive example {pos_id}, model has {len(current_model.objects)} objects")
+                # Pridaj krok do zoznamu krokov trénovania
+                heuristics_info = example_tracker.get_all()
+                training_steps.append({
+                    "step": "update",
+                    "description": f"Aktualizácia modelu s negatívnym príkladom '{example_name}'.",
+                    "example_name": example_name,
+                    "is_positive": False,
+                    "heuristics": [h["name"] for h in heuristics_info]
+                })
                 
-        # Zjednoť zoznam použitých príkladov (odstráň duplicity)
-        all_used_example_ids = list(set(used_examples))
-        used_count = len(all_used_example_ids)
+                print(f"  Applied heuristics with negative example {neg_id}: {[h['name'] for h in heuristics_info]}")
+            else:
+                print(f"  No changes made with negative example {neg_id}")
+                
+        # KROK 3: Priprav výsledok
+        end_time = datetime.now()
+        training_duration = (end_time - start_time).total_seconds()
+        print(f"Training completed in {training_duration:.2f} seconds. Used {len(used_examples)}/{len(example_ids)} examples.")
         
-        # Vypočítaj celkový čas trénovania
-        total_time = (datetime.now() - start_time).total_seconds()
-        print(f"Total training time: {total_time:.2f} seconds")
+        # Ak sa žiadna heuristika neaplikovala, vráť upozornenie
+        if not used_examples:
+            return {
+                "success": True,
+                "message": "Žiadna z heuristík nebola aplikovaná. Model zostal nezmenený.",
+                "training_steps": training_steps,
+                "training_mode": "sequential",
+                "used_examples_count": 0,
+                "total_examples_count": len(example_ids)
+            }
+            
+        # Generuj vizualizáciu modelu
+        model_visualization = generate_model_visualization(current_model)
         
-        # KROK 5: Príprava odpovede
-        training_time = (datetime.now() - start_time).total_seconds()
-        print(f"Training completed in {training_time:.2f} seconds")
+        # Generuj hypotézu modelu
+        model_hypothesis = generate_model_hypothesis(current_model)
         
-        # Priprav vizualizáciu modelu
-        model_visualization = current_model.to_semantic_network()
-        
-        # Vytvor textovú reprezentáciu hypotézy
-        model_hypothesis = current_model.to_formula()
-        
-        # Extrahuj identifikačné pravidlá pre modely áut
-        model_rules = current_model.extract_model_rules()
-        
-        # Aktualizuj informácie o použitých príkladoch
-        for example_id in example_ids:
-            if example_id < len(dataset_examples):
-                dataset_examples[example_id]["used_in_training"] = True
-        
-        # Na konci po úspěšném tréninku uložíme stav do historie
-        # Přidáme na konec funkce před return:
-        
-        # Uložíme aktuální stav modelu do historie
-        save_model_to_history(
-            model_state=current_model,
-            visualization=model_visualization,
-            steps=training_steps,
-            examples_count=used_count
-        )
-        
-        # Vrať výsledok trénovania
-        return {
+        # Priprav response
+        response = {
             "success": True,
-            "message": "Model bol úspešne natrénovaný.",
-            "model_updated": True,
+            "message": f"Model bol úspešne aktualizovaný s {len(used_examples)} príkladmi.",
             "model_visualization": model_visualization,
             "model_hypothesis": model_hypothesis,
-            "model_rules": model_rules,  # Pridané extrahované pravidlá
             "training_steps": training_steps,
-            "training_mode": "batch" if len(example_ids) > 1 else "single",
-            "used_examples_count": used_count,
-            "total_examples_count": len(dataset_examples)
+            "training_duration": training_duration,
+            "used_example_ids": used_examples,
+            "used_examples_count": len(used_examples),
+            "total_examples_count": len(example_ids),
+            "training_mode": "sequential"
         }
+        
+        # Pridaj model do histórie
+        save_model_to_history(
+            model_state=current_model.to_dict(),
+            visualization=model_visualization,
+            steps=training_steps,
+            examples_count=len(used_examples)
+        )
+        
+        return response
     
     except Exception as e:
-        print(f"Error during training: {str(e)}")
         traceback.print_exc()
-        
-        error_step = {
-            "step": "error",
-            "description": f"Error during training: {str(e)}",
-            "timestamp": datetime.now().isoformat()
+        return {
+            "success": False,
+            "message": "Chyba pri trénovaní modelu.",
+            "error": str(e)
         }
-        training_steps.append(error_step)
-        
-        return {"status": "error", "message": str(e), "steps": training_steps}
 
 @app.post("/api/compare")
 async def compare_example_endpoint(example: PL1Example):
@@ -1559,7 +1478,7 @@ def save_model_to_history(model_state, visualization=None, steps=None, examples_
     
     # Uložíme aktuální stav modelu včetně seznamu použitých příkladů
     model_history.append({
-        "model_state": model_state.to_dict() if model_state else None,
+        "model_state": model_state,  # model_state už je dict, nepotrebujeme volať to_dict()
         "model_visualization": visualization,
         "training_steps": steps,
         "used_examples_count": examples_count,

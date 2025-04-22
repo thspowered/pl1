@@ -14,17 +14,227 @@ import {
   Alert,
   Container,
   IconButton,
-  Tooltip
+  Tooltip,
+  Chip
 } from '@mui/material';
 import { NetworkNode, NetworkLink, Example, TrainingResult } from "../types";
 import TrainingPanel from "./TrainingPanel";
 import TrainingResultDisplay from "./TrainingResult";
 import { ModelControls } from "./ModelControls";
 
+// Nová komponenta pro zobrazení logu heuristik
+const HeuristicsLog: React.FC<{ trainingSteps: any[] }> = ({ trainingSteps }) => {
+  // Projdeme všechny kroky trénovania a zobrazíme heuristiky v chronologickém pořadí
+  if (!trainingSteps || trainingSteps.length === 0) return null;
+  
+  return (
+    <Box sx={{ mt: 2, p: 0 }}>
+      <Typography variant="subtitle1" sx={{ 
+        fontWeight: 600, 
+        color: '#90caf9', 
+        mb: 1.5,
+        display: 'flex',
+        alignItems: 'center',
+        '&::after': {
+          content: '""',
+          height: '1px',
+          flexGrow: 1,
+          ml: 2,
+          background: 'linear-gradient(90deg, rgba(144, 202, 249, 0.5) 0%, rgba(144, 202, 249, 0) 100%)'
+        }
+      }}>
+        Aplikované heuristiky
+      </Typography>
+      
+      {/* Rolovací okno s chronologickým seznamem heuristik */}
+      <Box 
+        sx={{ 
+          maxHeight: '200px',
+          overflowY: 'auto',
+          p: 1.5,
+          bgcolor: 'rgba(0,0,0,0.2)',
+          borderRadius: 1.5,
+          border: '1px solid rgba(255,255,255,0.05)',
+          '&::-webkit-scrollbar': {
+            width: '6px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: '3px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'rgba(144, 202, 249, 0.2)',
+            borderRadius: '3px',
+            '&:hover': {
+              background: 'rgba(144, 202, 249, 0.4)',
+            },
+          }
+        }}
+      >
+        {trainingSteps.map((step, stepIndex) => {
+          // Pokud krok neobsahuje heuristiky, přeskočíme ho
+          if (!step.heuristics || step.heuristics.length === 0) return null;
+          
+          return (
+            <Box 
+              key={`step-${stepIndex}`} 
+              sx={{ 
+                mb: 1.5,
+                pb: 1.5,
+                borderBottom: stepIndex < trainingSteps.length - 1 ? '1px dashed rgba(255,255,255,0.1)' : 'none',
+                position: 'relative'
+              }}
+            >
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                mb: 1 
+              }}>
+                <Box sx={{ 
+                  width: '24px', 
+                  height: '24px', 
+                  borderRadius: '50%', 
+                  bgcolor: 'rgba(144, 202, 249, 0.2)', 
+                  border: '1px solid rgba(144, 202, 249, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  color: '#90caf9',
+                  mr: 1.5
+                }}>
+                  {stepIndex + 1}
+                </Box>
+                <Typography variant="caption" sx={{ 
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: '0.75rem',
+                  fontWeight: 500
+                }}>
+                  {step.example_name ? `Príklad: ${step.example_name}` : 'Krok trénovania'}
+                  {step.is_positive !== undefined && (
+                    <Box 
+                      component="span" 
+                      sx={{ 
+                        ml: 1,
+                        borderRadius: 1, 
+                        px: 1, 
+                        py: 0.2, 
+                        display: 'inline-block',
+                        bgcolor: step.is_positive ? 'rgba(102, 187, 106, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+                        color: step.is_positive ? '#66bb6a' : '#f44336',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        border: step.is_positive ? '1px solid rgba(102, 187, 106, 0.4)' : '1px solid rgba(244, 67, 54, 0.4)',
+                      }}
+                    >
+                      {step.is_positive ? 'Pozitívny' : 'Negatívny'}
+                    </Box>
+                  )}
+                </Typography>
+              </Box>
+              
+              <Box sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: 1,
+                ml: 4.5, // odsadenie od čísla kroku
+                position: 'relative',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  left: '-10px',
+                  top: 0,
+                  bottom: 0,
+                  width: '1px',
+                  bgcolor: 'rgba(144, 202, 249, 0.2)',
+                  zIndex: 0
+                }
+              }}>
+                {step.heuristics.map((heuristic: string | { name: string; description: string }, hIndex: number) => {
+                  // Spracujeme rôzne formáty heuristík - niektoré môžu byť len stringy, iné objekty
+                  const heuristicName = typeof heuristic === 'string' ? heuristic : heuristic.name;
+                  const heuristicDescription = typeof heuristic === 'string' ? '' : (heuristic.description || '');
+                  
+                  return (
+                    <Chip
+                      key={`${heuristicName}-${stepIndex}-${hIndex}`}
+                      label={heuristicName}
+                      sx={{ 
+                        backgroundColor: getHeuristicColor(heuristicName),
+                        color: '#000',
+                        fontWeight: 500,
+                        fontSize: '0.72rem',
+                        px: 0.5,
+                        height: '24px',
+                        '& .MuiChip-label': { px: 1.5 }
+                      }}
+                      title={heuristicDescription}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+};
+
+// Funkce pro přiřazení barvy podle typu heuristiky
+const getHeuristicColor = (heuristicName: string): string => {
+  // Kontrola na undefined alebo null hodnotu
+  if (!heuristicName) {
+    return 'rgba(189, 189, 189, 0.8)'; // šedá
+  }
+  
+  switch (heuristicName.toLowerCase()) {
+    case 'require_link':
+      return 'rgba(144, 202, 249, 0.8)'; // modrá
+    case 'forbid_link':
+      return 'rgba(244, 67, 54, 0.7)'; // červená
+    case 'drop_link':
+      return 'rgba(255, 167, 38, 0.8)'; // oranžová
+    case 'climb_tree':
+      return 'rgba(102, 187, 106, 0.8)'; // zelená
+    case 'enlarge_set':
+      return 'rgba(186, 104, 200, 0.7)'; // fialová
+    case 'close_interval':
+      return 'rgba(255, 235, 59, 0.8)'; // žlutá
+    case 'add_object':
+      return 'rgba(0, 188, 212, 0.7)'; // tyrkysová
+    case 'add_link':
+      return 'rgba(0, 150, 136, 0.7)'; // teal
+    case 'resolve_class_conflict':
+      return 'rgba(121, 85, 72, 0.7)'; // hnedá
+    case 'find_common_ancestor':
+      return 'rgba(96, 125, 139, 0.7)'; // modrošedá
+    case 'update_attribute':
+      return 'rgba(233, 30, 99, 0.7)'; // ružová
+    default:
+      return 'rgba(189, 189, 189, 0.8)'; // šedá
+  }
+};
+
 interface ExamplesTrainingViewProps {
   examples: Example[];
   trainingResult: TrainingResult | null;
-  trainingSteps: string[];
+  trainingSteps: Array<{
+    step: string;
+    description: string;
+    example_name?: string;
+    is_positive?: boolean;
+    positive_example?: string;
+    negative_example?: string;
+    negative_examples?: string[];
+    heuristics?: Array<{
+      name: string;
+      description: string;
+      example_id?: number;
+      details?: Record<string, any>;
+    }>;
+  }>;
   isLoading: boolean;
   onTrain: (retrainAll: boolean) => void;
   isTraining: boolean;
@@ -441,6 +651,10 @@ const ExamplesTrainingView: React.FC<ExamplesTrainingViewProps> = ({
                 onTrain={onTrain}
                 isLoading={isTraining}
               />
+              
+              {trainingResult?.training_steps && trainingResult.training_steps.length > 0 && (
+                <HeuristicsLog trainingSteps={trainingResult.training_steps} />
+              )}
             </Box>
           </Grid>
           
