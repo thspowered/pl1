@@ -1,4 +1,375 @@
-# 1. Prvy pozitivny priklad - inicializacia modelu
+# 1. Prvý pozitívny príklad - inicializácia modelu
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20)
+
+# 1. Negatívny príklad - inicializácia modelu
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20)
+
+# 1. Negatívny príklad - inicializácia modelu
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20)
+
+# 2. Negatívny príklad - aktivuje require-link pre motor
+# Heuristika: REQUIRE-LINK pre motor
+# Odlišnosť: Chýba motor - model sa naučí, že motor je povinný
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 3. Negatívny príklad - aktivuje require-link pre prevodovku
+# Heuristika: REQUIRE-LINK pre prevodovku
+# Odlišnosť: Chýba prevodovka - model sa naučí, že prevodovka je povinná
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 4. Negatívny príklad - aktivuje require-link pre pohon
+# Heuristika: REQUIRE-LINK pre pohon
+# Odlišnosť: Chýba pohon - model sa naučí, že pohon je povinný
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 5. Negatívny príklad - aktivuje forbid-link pre manuálnu prevodovku
+# Heuristika: FORBID-LINK
+# Odlišnosť: Manuálna prevodovka namiesto automatickej - model sa naučí, že manuálna prevodovka nie je povolená
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, ManualnaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 6) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 6. Negatívny príklad - aktivuje forbid-link pre RWD pohon
+# Heuristika: FORBID-LINK
+# Odlišnosť: RWD namiesto xDrive - model sa naučí, že RWD nie je povolený
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 7. Pozitívny príklad - aktivuje climb-tree pre motor
+# Heuristika: CLIMB-TREE
+# Odlišnosť: Benzínový motor namiesto dieselového - model sa naučí generalizovať typ motora
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 8. Pozitívny príklad - aktivuje close-interval pre výkon motora
+# Heuristika: CLOSE-INTERVAL
+# Odlišnosť: Znížený výkon motora - model sa naučí interval pre výkon
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 180) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 9. Pozitívny príklad - aktivuje ďalší close-interval pre výkon (rozšírenie intervalu)
+# Heuristika: CLOSE-INTERVAL
+# Odlišnosť: Zvýšený výkon motora - model sa naučí širší interval pre výkon
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 240) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 10. Negatívny príklad - aktivuje heuristiku pre výkon mimo intervalu
+# Heuristika: VALIDATE-INTERVAL
+# Odlišnosť: Výkon pod minimálnou hranicou - model sa naučí minimálnu hranicu výkonu
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 140) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 11. Pozitívny príklad - aktivuje close-interval pre veľkosť kolies
+# Heuristika: CLOSE-INTERVAL
+# Odlišnosť: Menšie kolesá - model sa naučí interval pre veľkosť kolies
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, DieselovyMotor) ∧ 
@@ -26,18 +397,15 @@
 Α(v, idrive, ano) ∧
 Α(v, navigacia, profesional) ∧
 Α(v, sedadla, kozene) ∧
-Α(k, velkost, 20)
+Α(k, velkost, 18) ∧
+Α(a, hmotnost, 2175)
 
-# 2. Negativny priklad - aktivuje require-link (vyzaduje motor)
+# 12. Pozitívny príklad - aktivuje enlarge-set pre farbu
+# Heuristika: ENLARGE-SET
+# Odlišnosť: Iná farba - model sa naučí množinu povolených farieb
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
-Π(a, r) ∧
-Α(r, oznacenie, X5)
-
-# 3. Pozitivny priklad - aktivuje climb-tree (generalizacia na urovni hierarchie tried)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, BenzinovyMotor) ∧ 
+Ι(e, DieselovyMotor) ∧ 
 Ι(p, AutomatickaPrevodovka) ∧
 Ι(d, Pohon) ∧
 Ι(f, Farba) ∧
@@ -52,14 +420,22 @@
 Π(a, k) ∧
 Α(r, oznacenie, X5) ∧
 Α(r, segment, SUV) ∧
-Α(e, vykon, 250) ∧
+Α(e, vykon, 210) ∧
 Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
 Α(d, typ, xDrive) ∧
 Α(f, odtien, cierna) ∧
+Α(f, metaliza, ano) ∧
 Α(v, idrive, ano) ∧
-Α(v, navigacia, profesional)
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
 
-# 4. Pozitivny priklad - aktivuje close-interval (intervaly pre vykon)
+# 13. Pozitívny príklad - aktivuje drop-link pre navigáciu
+# Heuristika: DROP-LINK
+# Odlišnosť: Iný typ navigácie - model sa naučí, že navigácia môže mať rôzne hodnoty
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, DieselovyMotor) ∧ 
@@ -67,112 +443,59 @@
 Ι(d, Pohon) ∧
 Ι(f, Farba) ∧
 Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
 Π(a, r) ∧
 Π(a, e) ∧
 Π(a, p) ∧
 Π(a, d) ∧
 Π(a, f) ∧
 Π(a, v) ∧
+Π(a, k) ∧
 Α(r, oznacenie, X5) ∧
-Α(d, typ, xDrive) ∧
-Α(e, vykon, 180) ∧
-Α(e, objem, 2.0) ∧
-Α(f, odtien, modra) ∧
-Α(v, idrive, ano)
-
-# 5. Negativny priklad - aktivuje forbid-link (zakaze manualnu prevodovku)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, DieselovyMotor) ∧ 
-Ι(p, ManualnaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Α(r, oznacenie, X5) ∧
-Α(d, typ, xDrive)
-
-# 6. Negativny priklad - aktivuje forbid-link (zakaze RWD)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, DieselovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Α(r, oznacenie, X5) ∧
-Α(d, typ, RWD)
-
-# 7. Pozitivny priklad - aktivuje close-interval (intervaly pre vykon)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, BenzinovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Α(r, oznacenie, X5) ∧
-Α(d, typ, xDrive) ∧
-Α(e, vykon, 280) ∧
-Α(e, objem, 4.4) ∧
-Α(e, valce, 8)
-
-# 8. Negativny priklad - zakaze slaby motor (< 150 kW)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, DieselovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Α(r, oznacenie, X5) ∧
-Α(d, typ, xDrive) ∧
-Α(e, vykon, 140) ∧
-Α(e, objem, 2.0)
-
-# 9. Pozitivny priklad - model X3 (iny model BMW)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, DieselovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Α(r, oznacenie, X3) ∧
 Α(r, segment, SUV) ∧
-Α(d, typ, xDrive) ∧
-Α(e, vykon, 190) ∧
-Α(e, objem, 2.0)
-
-# 10. Pozitivny priklad - rozne typy vybav (aktivuje enlarge-set)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, BenzinovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Ι(f, Farba) ∧
-Ι(v, Vybava) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Π(a, f) ∧
-Π(a, v) ∧
-Α(r, oznacenie, X5) ∧
-Α(d, typ, xDrive) ∧
-Α(e, vykon, 265) ∧
+Α(e, vykon, 210) ∧
 Α(e, objem, 3.0) ∧
-Α(f, odtien, siva) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
 Α(v, idrive, ano) ∧
 Α(v, navigacia, standard) ∧
-Α(v, sedadla, textilne) ∧
-Α(v, audio, standard)
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20) ∧
+Α(a, hmotnost, 2175)
+
+# 14. Pozitívny príklad - aktivuje enlarge-set pre označenie modelu
+# Heuristika: ENLARGE-SET
+# Odlišnosť: Iný model - model sa naučí množinu povolených modelov
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X3) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 190) ∧
+Α(e, objem, 2.0) ∧
+Α(e, valce, 4) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 19) ∧
+Α(a, hmotnost, 1950)
+

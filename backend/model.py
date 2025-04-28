@@ -962,6 +962,38 @@ class Model:
         # Pridáme priame spojenie medzi triedami
         new_link = Link(source_class, target_class, link_type)
         self.add_link(new_link)
+        
+    def remove_duplicate_links(self):
+        """
+        Odstráni duplicitné spojenia z modelu.
+        
+        Táto metóda prechádza všetky linky a ponechá iba jedinečné spojenia,
+        odstrániac akékoľvek duplicity.
+        
+        Returns:
+            Počet odstránených duplicít
+        """
+        # Vytvoríme množinu pre sledovanie jedinečných spojení
+        unique_links = set()
+        links_to_keep = []
+        removed_count = 0
+        
+        for link in self.links:
+            # Vytvoríme kľúč pre spojenie
+            link_key = (link.source, link.target, link.link_type)
+            
+            # Ak toto spojenie ešte nemáme v množine, pridáme ho
+            if link_key not in unique_links:
+                unique_links.add(link_key)
+                links_to_keep.append(link)
+            else:
+                # Ak už existuje, toto je duplicita
+                removed_count += 1
+                
+        # Aktualizujeme zoznam spojení len na jedinečné spojenia
+        self.links = links_to_keep
+        
+        return removed_count
 
 def formula_to_model(formula: Formula) -> Model:
     """

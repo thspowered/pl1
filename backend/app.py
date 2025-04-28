@@ -81,35 +81,30 @@ def initialize_classification_tree():
     classification_tree = ClassificationTree()
     print(f"Inicializujem klasifikačný strom...")
     
-    # Základné triedy pre BMW príklady
-    classification_tree.add_relationship("Vehicle", None)  # Koreňová trieda
-    
-    # Triedy BMW
-    classification_tree.add_relationship("BMW", "Vehicle")
-    classification_tree.add_relationship("Series3", "BMW")
-    classification_tree.add_relationship("Series5", "BMW")
-    classification_tree.add_relationship("Series7", "BMW")
-    classification_tree.add_relationship("X5", "BMW")
-    classification_tree.add_relationship("X7", "BMW")
-    
-
-    
     # Motory
-    classification_tree.add_relationship("Engine", None)
-    classification_tree.add_relationship("DieselEngine", "Engine")
-    classification_tree.add_relationship("PetrolEngine", "Engine")
-    classification_tree.add_relationship("HybridEngine", "Engine")
+    classification_tree.add_relationship("Motor", None)
+    classification_tree.add_relationship("DieselovyMotor", "Motor")
+    classification_tree.add_relationship("BenzinovyMotor", "Motor")
+    classification_tree.add_relationship("HybridnyMotor", "Motor")
     
     # Prevodovky
-    classification_tree.add_relationship("Transmission", None)
-    classification_tree.add_relationship("AutomaticTransmission", "Transmission")
-    classification_tree.add_relationship("ManualTransmission", "Transmission")
+    classification_tree.add_relationship("Prevodovka", None)
+    classification_tree.add_relationship("AutomatickaPrevodovka", "Prevodovka")
+    classification_tree.add_relationship("ManualnaPrevodovka", "Prevodovka")
     
     # Pohony
-    classification_tree.add_relationship("DriveSystem", None)
-    classification_tree.add_relationship("RWD", "DriveSystem")  # Rear-wheel drive
-    classification_tree.add_relationship("AWD", "DriveSystem")  # All-wheel drive
+    classification_tree.add_relationship("Pohon", None)
+    classification_tree.add_relationship("RWD", "Pohon")  # Rear-wheel drive
+    classification_tree.add_relationship("AWD", "Pohon")  # All-wheel drive
     classification_tree.add_relationship("XDrive", "AWD")       # BMW xDrive je typ AWD
+
+    # Vybava
+    classification_tree.add_relationship("Vybava", None)
+    classification_tree.add_relationship("Basic", "Vybava")
+    classification_tree.add_relationship("Sport", "Vybava")
+    classification_tree.add_relationship("Lux", "Vybava")
+
+ 
     
     print(f"Klasifikačný strom inicializovaný, obsahuje {len(classification_tree.parent_map)} vzťahov rodič-dieťa")
     
@@ -646,7 +641,7 @@ def track_winston_learner(original_learner, tracker):
             # Kontrola, či klasifikačný strom obsahuje údaje
             parent_relations = len(self.classification_tree.parent_map)
             print(f"[WinstonLearnerProxy] Klasifikačný strom obsahuje {parent_relations} vzťahov rodič-dieťa.")
-            
+        
             # Vypíšeme niekoľko vzťahov pre kontrolu
             count = 0
             for child, parent in self.classification_tree.parent_map.items():

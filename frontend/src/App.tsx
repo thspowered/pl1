@@ -311,12 +311,6 @@ function App() {
       return;
     }
     
-    // If model has been initialized, check if we have negative examples
-    if (modelStatus?.model_initialized && !hasNegative && modelStatus.negative_examples_count === 0) {
-      showWarning('Pre trénovanie modelu je potrebný aspoň jeden negatívny príklad.');
-      return;
-    }
-    
     setIsTraining(true);
     
     try {
