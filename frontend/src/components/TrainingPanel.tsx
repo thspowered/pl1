@@ -4,8 +4,10 @@ import {
   Typography,
   Button,
   CircularProgress,
-  Paper
+  Paper,
+  Tooltip
 } from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 interface TrainingPanelProps {
   selectedCount: number;
@@ -44,36 +46,38 @@ const TrainingPanel = ({
         </Typography>
         
         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 1 }}>
-          Trénovanie bude vykonané inkrementálne - aktuálna hypotéza bude upravená len pomocou vybraných príkladov.
+          Trénovanie bude vykonané postupne podľa poradia príkladov v datasete.
         </Typography>
         
         <Box sx={{ mt: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            fullWidth
-            onClick={() => onTrain(false)}
-            disabled={isLoading || selectedCount === 0}
-            startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
-            sx={{
-              py: 1.5,
-              boxShadow: '0 4px 10px rgba(25, 118, 210, 0.3)',
-              fontWeight: 600,
-              borderRadius: 2,
-              textTransform: 'none',
-              '&:hover': {
-                boxShadow: '0 6px 12px rgba(25, 118, 210, 0.4)',
-              }
-            }}
-          >
-            {isLoading ? 'Trénovanie...' : 'Trénovať model'}
-            <Box 
-              component="span" 
-              sx={{ ml: 1, color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}
+          <Tooltip title="Vybrané príklady sa spracujú postupne v poradí, ako sú v datasete">
+            <Button
+              variant="contained"
+              color="primary"
+              fullWidth
+              onClick={() => onTrain(false)}
+              disabled={isLoading || selectedCount === 0}
+              startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+              sx={{
+                py: 1.5,
+                boxShadow: '0 4px 10px rgba(25, 118, 210, 0.3)',
+                fontWeight: 600,
+                borderRadius: 2,
+                textTransform: 'none',
+                '&:hover': {
+                  boxShadow: '0 6px 12px rgba(25, 118, 210, 0.4)',
+                }
+              }}
             >
-              ({selectedCount})
-            </Box>
-          </Button>
+              {isLoading ? 'Trénovanie...' : 'Trénovať model'}
+              <Box 
+                component="span" 
+                sx={{ ml: 1, color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}
+              >
+                ({selectedCount})
+              </Box>
+            </Button>
+          </Tooltip>
         </Box>
         
         <Box sx={{ 

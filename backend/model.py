@@ -965,35 +965,32 @@ class Model:
         
     def remove_duplicate_links(self):
         """
-        Odstráni duplicitné spojenia z modelu.
-        
-        Táto metóda prechádza všetky linky a ponechá iba jedinečné spojenia,
-        odstrániac akékoľvek duplicity.
-        
-        Returns:
-            Počet odstránených duplicít
+        Odstráni duplicitné spojenia v modeli.
+        Vráti počet odstránených duplicitných spojení.
         """
-        # Vytvoríme množinu pre sledovanie jedinečných spojení
         unique_links = set()
-        links_to_keep = []
+        unique_links_list = []
         removed_count = 0
         
         for link in self.links:
-            # Vytvoríme kľúč pre spojenie
-            link_key = (link.source, link.target, link.link_type)
-            
-            # Ak toto spojenie ešte nemáme v množine, pridáme ho
-            if link_key not in unique_links:
-                unique_links.add(link_key)
-                links_to_keep.append(link)
+            # Vytvorenie unikátneho kľúča pre spojenie
+            key = (link.source, link.target, link.link_type)
+            if key not in unique_links:
+                unique_links.add(key)
+                unique_links_list.append(link)
             else:
-                # Ak už existuje, toto je duplicita
                 removed_count += 1
-                
-        # Aktualizujeme zoznam spojení len na jedinečné spojenia
-        self.links = links_to_keep
         
+        # Nahradenie pôvodných spojení unikátnymi spojeniami
+        self.links = unique_links_list
         return removed_count
+
+    def __repr__(self):
+        return f"Model(objects={len(self.objects)}, links={len(self.links)})"
+
+    def to_json(self):
+        # ... existing code ...
+        pass
 
 def formula_to_model(formula: Formula) -> Model:
     """

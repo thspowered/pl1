@@ -48,6 +48,7 @@ class TrainingRequest(BaseModel):
     example_ids: List[int]
     retrain_mode: str = "incremental"  # "incremental" alebo "full"
     batch_size: int = 5  # Počet príkladov v jednej dávke
+    retrain_all: bool = False  # Označuje, či sa trénujú všetky príklady v datasete
 
 class TrainingResult(BaseModel):
     success: bool
@@ -732,12 +733,13 @@ def track_winston_learner(original_learner, tracker):
 @app.post("/api/train")
 async def train_model(training_request: TrainingRequest):
     """
-    Trénuje model na základě vybraného príkladu.
+    Trénuje model na základě vybraného príkladu alebo celého datasetu.
     
-    Ak sú dostupné aj negatívne príklady, vyberie ich prioritne.
+    Príklady sú spracované postupne v poradí, v akom sa nachádzajú v datasete bez ohľadu na to,
+    či sa jedná o pozitívne alebo negatívne príklady.
     
     Args:
-        training_request: Požadavek na trénování obsahující ID příkladov
+        training_request: Požadavek na trénování obsahující ID příkladov alebo nastavenie pre dávkové spracovanie
         
     Returns:
         Výsledek trénování s informacemi o průběhu
@@ -760,87 +762,145 @@ async def train_model(training_request: TrainingRequest):
                 error="Prázdny dataset"
             )
         
-        # Najprv skontrolujeme, či existujú nejaké nepoužité príklady
-        unused_examples = [ex for ex in dataset_examples if not ex.get("used_in_training", False)]
-        
-        if not unused_examples:
-            return TrainingResult(
-                success=False,
-                message="Všetky príklady už boli použité na trénovanie",
-                error="Niet k dispozícii žiadne nepoužité príklady"
+        # Ak máme špecifické ID príkladov, použijeme len tie
+        if training_request.example_ids and len(training_request.example_ids) > 0:
+            # Zoraďujeme príklady podľa ID - toto zabezpečí spracovanie v poradí, ako boli definované v datasete
+            examples_to_process = sorted(
+                [ex for ex in dataset_examples if ex["id"] in training_request.example_ids],
+                key=lambda x: x["id"]
             )
-        
-        # Uprednostníme negatívne príklady, ak sú k dispozícii
-        negative_examples = [ex for ex in unused_examples if not ex.get("is_positive", True)]
-        
-        # Vyberieme buď negatívny príklad, alebo akýkoľvek nepoužitý
-        example = negative_examples[0] if negative_examples else unused_examples[0]
-        example_id = example["id"]
-            
-        # Spracuj formulu a vytvor model
-        try:
-            formula_str = example.get("formula")
-            is_positive = example.get("is_positive", True)
-            
-            if not isinstance(formula_str, str):
+            if not examples_to_process:
                 return TrainingResult(
                     success=False,
-                    message=f"Chyba pri spracovaní príkladu {example_id}: formula nie je reťazec",
-                    error="Neplatný formát formuly"
+                    message="Žiadny z vybraných príkladov nebol nájdený",
+                    error="Neplatné ID príkladov"
                 )
-            
-            # Použijeme parse_pl1_formula na vytvorenie objektu Formula
-            formula = parse_pl1_formula(formula_str)
-            example_model = formula_to_model(formula)
-            
-            print(f"\nSpracovávam príklad {example_id} (pozitívny: {is_positive})")
-            print(f"Príklad obsahuje {len(example_model.objects)} objektov a {len(example_model.links)} spojení")
-            
-        except Exception as e:
-            return TrainingResult(
-                success=False,
-                message=f"Chyba pri spracovaní príkladu {example_id}: {str(e)}",
-                error=str(e)
+        else:
+            # Inak vezmeme všetky nepoužité príklady, zoradené podľa ID
+            examples_to_process = sorted(
+                [ex for ex in dataset_examples if not ex.get("used_in_training", False)],
+                key=lambda x: x["id"]
             )
-            
+            if not examples_to_process:
+                return TrainingResult(
+                    success=False,
+                    message="Všetky príklady už boli použité na trénovanie",
+                    error="Niet k dispozícii žiadne nepoužité príklady"
+                )
+        
         # Trénovacie kroky
         steps = []
+        processed_count = 0
+        batch_count = 0
         
-        # Aktualizácia modelu na základe typu príkladu
+        # Potrebujeme nájsť prvý pozitívny príklad, ak ešte nemáme inicializovaný model
         if current_model is None or not hasattr(current_model, 'objects') or len(current_model.objects) == 0:
-            # Prvotná inicializácia modelu pri prvom príklade
-            print(f"Inicializujem model s prvým príkladom (ID: {example_id})")
+            # Nájdeme prvý pozitívny príklad na inicializáciu modelu
+            first_positive = next((ex for ex in examples_to_process if ex.get("is_positive", True)), None)
             
-            # Vytvoríme nový prázdny model a použijeme ho na inicializáciu
-            empty_model = Model(objects=[], links=[])
-            current_model = learner.update_model(empty_model, example_model, "first_positive")
-            
-            # Debug výpis aktualizovaného modelu
-            print(f"Aktualizovaný model po inicializácii: {len(current_model.objects)} objektov a {len(current_model.links)} spojení")
-            for obj in current_model.objects:
-                print(f"  Objekt: {obj.name} ({obj.class_name})")
+            if not first_positive:
+                return TrainingResult(
+                    success=False,
+                    message="Na inicializáciu modelu je potrebný aspoň jeden pozitívny príklad",
+                    error="Chýba pozitívny príklad na inicializáciu"
+                )
                 
-            step_message = f"Model inicializovaný s príkladom {example_id}"
-        elif is_positive:
-            # Spracovanie pozitívneho príkladu
-            print(f"Aktualizujem model s pozitívnym príkladom {example_id}")
-            current_model = learner.update_model(current_model, example_model, "positive")
+            # Presunieme prvý pozitívny príklad na začiatok zoznamu
+            examples_to_process.remove(first_positive)
+            examples_to_process.insert(0, first_positive)
+        
+        # Postupne spracujeme všetky príklady v poradí ich ID
+        for example in examples_to_process:
+            example_id = example["id"]
             
-            print(f"Aktualizovaný model: {len(current_model.objects)} objektov a {len(current_model.links)} spojení")
-            step_message = f"Model aktualizovaný s pozitívnym príkladom {example_id}"
-        else:
-            # Spracovanie negatívneho príkladu
-            print(f"Aktualizujem model s negatívnym príkladom {example_id}")
-            current_model = learner.update_model(current_model, example_model, "negative")
-            
-            print(f"Aktualizovaný model: {len(current_model.objects)} objektov a {len(current_model.links)} spojení")
-            step_message = f"Model aktualizovaný s negatívnym príkladom {example_id}"
-            
-        # Označíme príklad ako použitý
-        example["used_in_training"] = True
-        print(f"Príklad {example_id} označený ako použitý")
+            # Spracuj formulu a vytvor model
+            try:
+                formula_str = example.get("formula")
+                is_positive = example.get("is_positive", True)
                 
-        steps.append(step_message)
+                if not isinstance(formula_str, str):
+                    steps.append(f"Chyba pri spracovaní príkladu {example_id}: formula nie je reťazec")
+                    continue
+                
+                # Použijeme parse_pl1_formula na vytvorenie objektu Formula
+                formula = parse_pl1_formula(formula_str)
+                example_model = formula_to_model(formula)
+                
+                print(f"\nSpracovávam príklad {example_id} (pozitívny: {is_positive})")
+                print(f"Príklad obsahuje {len(example_model.objects)} objektov a {len(example_model.links)} spojení")
+                
+            except Exception as e:
+                steps.append(f"Chyba pri spracovaní príkladu {example_id}: {str(e)}")
+                continue
+                
+            # Aktualizácia modelu na základe typu príkladu
+            if current_model is None or not hasattr(current_model, 'objects') or len(current_model.objects) == 0:
+                # Prvotná inicializácia modelu pri prvom príklade
+                if not is_positive:
+                    steps.append(f"Preskakujem negatívny príklad {example_id} - prvý príklad musí byť pozitívny")
+                    continue
+                    
+                print(f"Inicializujem model s prvým príkladom (ID: {example_id})")
+                
+                # Vytvoríme nový prázdny model a použijeme ho na inicializáciu
+                empty_model = Model(objects=[], links=[])
+                current_model = learner.update_model(empty_model, example_model, "first_positive")
+                
+                # Odstránenie duplicitných spojení
+                removed_duplicates = current_model.remove_duplicate_links()
+                if removed_duplicates > 0:
+                    print(f"Odstránených {removed_duplicates} duplicitných spojení")
+                
+                # Debug výpis aktualizovaného modelu
+                print(f"Aktualizovaný model po inicializácii: {len(current_model.objects)} objektov a {len(current_model.links)} spojení")
+                for obj in current_model.objects:
+                    print(f"  Objekt: {obj.name} ({obj.class_name})")
+                    
+                step_message = f"Model inicializovaný s príkladom {example_id}"
+            elif is_positive:
+                # Spracovanie pozitívneho príkladu
+                print(f"Aktualizujem model s pozitívnym príkladom {example_id}")
+                current_model = learner.update_model(current_model, example_model, "positive")
+                
+                # Odstránenie duplicitných spojení
+                removed_duplicates = current_model.remove_duplicate_links()
+                if removed_duplicates > 0:
+                    print(f"Odstránených {removed_duplicates} duplicitných spojení")
+                
+                print(f"Aktualizovaný model: {len(current_model.objects)} objektov a {len(current_model.links)} spojení")
+                step_message = f"Model aktualizovaný s pozitívnym príkladom {example_id}"
+            else:
+                # Spracovanie negatívneho príkladu
+                print(f"Aktualizujem model s negatívnym príkladom {example_id}")
+                current_model = learner.update_model(current_model, example_model, "negative")
+                
+                # Odstránenie duplicitných spojení
+                removed_duplicates = current_model.remove_duplicate_links()
+                if removed_duplicates > 0:
+                    print(f"Odstránených {removed_duplicates} duplicitných spojení")
+                
+                print(f"Aktualizovaný model: {len(current_model.objects)} objektov a {len(current_model.links)} spojení")
+                step_message = f"Model aktualizovaný s negatívnym príkladom {example_id}"
+                
+            # Označíme príklad ako použitý
+            example["used_in_training"] = True
+            print(f"Príklad {example_id} označený ako použitý")
+                    
+            steps.append(step_message)
+            processed_count += 1
+            
+            # Ak sme dosiahli batch_size, aktualizujeme históriu
+            if processed_count % training_request.batch_size == 0:
+                batch_count += 1
+                
+                # Aktualizujeme vizualizáciu a históriu po každej dávke
+                visualization = generate_model_visualization(current_model)
+                save_model_to_history(
+                    current_model,
+                    visualization,
+                    steps[-training_request.batch_size:],
+                    training_request.batch_size
+                )
         
         # Získanie formuly a pravidiel modelu pre frontend
         model_formula = current_model.to_formula()
@@ -849,23 +909,27 @@ async def train_model(training_request: TrainingRequest):
         # Vytvorenie vizualizácie modelu
         visualization = generate_model_visualization(current_model)
         
-        # Uloženie stavu modelu do histórie
-        save_model_to_history(
-            current_model,
-            visualization,
-            steps,
-            1  # Jeden príklad spracovaný
-        )
+        # Uloženie stavu modelu do histórie pre zvyšné príklady
+        remaining_examples = processed_count % training_request.batch_size
+        if remaining_examples > 0:
+            save_model_to_history(
+                current_model,
+                visualization,
+                steps[-remaining_examples:],
+                remaining_examples
+            )
+            batch_count += 1
         
-        print(f"Trénovanie úspešné, hypotéza: {model_formula}")
+        print(f"Trénovanie úspešné, spracovaných {processed_count} príkladov, hypotéza: {model_formula}")
         
         return TrainingResult(
             success=True,
-            message=f"Model úspešne natrénovaný s príkladom {example_id}",
+            message=f"Model úspešne natrénovaný s {processed_count} príkladmi",
             model_state=current_model.to_dict(),
             steps=steps,
-            processed_examples=1,
-            training_mode="single",
+            batch_count=batch_count,
+            processed_examples=processed_count,
+            training_mode="batch",
             model_hypothesis=model_formula,  # Hypotéza pre frontend
             model_visualization=visualization # Vizualizácia pre frontend
         )
