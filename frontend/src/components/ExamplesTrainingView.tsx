@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -20,6 +20,8 @@ import { NetworkNode, NetworkLink, Example, TrainingResult } from "../types";
 import TrainingPanel from "./TrainingPanel";
 import TrainingResultDisplay from "./TrainingResult";
 import { ModelControls } from "./ModelControls";
+import HeuristicsLog from "./HeuristicsLog";
+import { useApi } from '../hooks/useApi';
 
 interface ExamplesTrainingViewProps {
   examples: Example[];
@@ -59,6 +61,30 @@ const ExamplesTrainingView: React.FC<ExamplesTrainingViewProps> = ({
   const selectedExamplesCount = examples.filter(e => e.selected).length;
   const allSelected = examples.length > 0 && examples.every(e => e.selected);
   const usedInTrainingCount = examples.filter(e => e.usedInTraining).length;
+
+  const [heuristicsHistory, setHeuristicsHistory] = useState<Array<{
+    id: number;
+    name: string;
+    is_positive: boolean;
+    heuristics: Array<{
+      name: string;
+      description: string;
+      details?: Record<string, any>;
+    }>;
+  }>>([]);
+  
+  const { fetchHeuristicsHistory } = useApi();
+  
+  useEffect(() => {
+    const loadHeuristicsHistory = async () => {
+      const result = await fetchHeuristicsHistory();
+      if (result.success && result.data.examples) {
+        setHeuristicsHistory(result.data.examples);
+      }
+    };
+    
+    loadHeuristicsHistory();
+  }, [trainingResult, usedInTrainingCount]);
 
   const handleExampleClick = (example: Example) => {
     onExampleSelect(example.id, !example.selected);
@@ -440,6 +466,19 @@ const ExamplesTrainingView: React.FC<ExamplesTrainingViewProps> = ({
                 totalCount={examples.length}
                 onTrain={onTrain}
                 isLoading={isTraining}
+              />
+            </Box>
+            
+            <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.05)' }} />
+            
+            <Box sx={{ p: 2 }}>
+              <HeuristicsLog
+                examples={examples}
+                trainedExamples={heuristicsHistory.map(ex => ({
+                  id: ex.id,
+                  heuristics: ex.heuristics,
+                  isPositive: ex.is_positive
+                }))}
               />
             </Box>
           </Grid>

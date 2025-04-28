@@ -255,6 +255,24 @@ export const useApi = () => {
     }
   };
 
+  // Fetch heuristics history
+  const fetchHeuristicsHistory = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await axios.get(`${API_BASE_URL}/api/heuristics/history`);
+      
+      return { success: true, data: response.data };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Neznáma chyba';
+      setError(`Chyba pri získavaní histórie heuristík: ${errorMessage}`);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     isLoading,
     error,
@@ -265,6 +283,7 @@ export const useApi = () => {
     resetModel,
     stepBack,
     stepForward,
-    compareExample
+    compareExample,
+    fetchHeuristicsHistory
   };
 }; 

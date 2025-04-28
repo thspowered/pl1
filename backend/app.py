@@ -655,8 +655,24 @@ def track_winston_learner(original_learner, tracker):
         def _debug_log(self, message):
             """Debugovacie logovanie pre sledovanie priebehu algoritmu."""
             print(f"[WinstonLearnerProxy] {message}")
+            
+        def _similar_formulas(self, formula1, formula2):
+            """
+            Compares two formulas for similarity, ignoring whitespace and order differences.
+            """
+            # Remove whitespace and normalize
+            f1 = ''.join(formula1.split())
+            f2 = ''.join(formula2.split())
+            
+            # If identical after whitespace removal, return True
+            if f1 == f2:
+                return True
+                
+            # For more complex comparison, we could split by ∧ and check predicate by predicate
+            # but this simple check should catch many cases
+            return False
         
-        def update_model(self, current_model, example, example_type):
+        def update_model(self, current_model, example, example_type, example_id=None):
             """
             Aktualizuje model podľa dodaného príkladu.
             
@@ -664,18 +680,55 @@ def track_winston_learner(original_learner, tracker):
                 current_model: Aktuálny model
                 example: Príklad na spracovanie
                 example_type: Typ príkladu ("first_positive", "positive", "negative")
+                example_id: ID príkladu (voliteľný parameter)
                 
             Returns:
                 Aktualizovaný model
             """
-            self._debug_log(f"Volám update_model s typom príkladu: {example_type}")
+            self._debug_log(f"Volám update_model s typom príkladu: {example_type}, example_id: {example_id}")
+            
+            # Ak sme dostali example_id ako parameter, použijeme ho
+            # a nebudeme hľadať príklad podľa formuly
+            if example_id is None:
+                # Toto je pôvodná logika pre hľadanie príkladu podľa formuly
+                # Skúsime nájsť príklad v dataset_examples podľa formuly
+                if hasattr(example, 'to_formula'):
+                    example_formula = example.to_formula()
+                    print(f"\nDEBUG: Looking for matching example with formula: {example_formula[:50]}...")
+                    print(f"DEBUG: Dataset examples count: {len(dataset_examples)}")
+                    
+                    # Print first 5 formulas from dataset for comparison
+                    for i, ex in enumerate(dataset_examples[:5]):
+                        print(f"DEBUG: Dataset example {i} formula: {ex['formula'][:50]}...")
+                    
+                    matching_example = next((e for e in dataset_examples if e["formula"] == example_formula), None)
+                    
+                    if matching_example:
+                        example_id = matching_example["id"]
+                        self._debug_log(f"Našiel som príklad s ID: {example_id} podľa formuly")
+                    else:
+                        print("DEBUG: No matching example found by exact formula comparison")
+                        
+                        # Try a more flexible match
+                        for e in dataset_examples:
+                            if self._similar_formulas(e["formula"], example_formula):
+                                example_id = e["id"]
+                                print(f"DEBUG: Found similar formula match with ID: {example_id}")
+                                break
             
             # Zavolať originálnu metódu
             if example_type == "first_positive":
+                # Pre prvý pozitívny príklad použijeme len _add_missing_objects
+                self.original_learner.applied_heuristics = []
                 result = self.original_learner._add_missing_objects(current_model.copy(), example)
             elif example_type == "positive":
                 # Pre pozitívny príklad použijeme GENERALIZE heuristiky
                 result = current_model.copy()
+                
+                # Resetujeme heuristiky pre tento príklad
+                self.original_learner.applied_heuristics = []
+                
+                # Volanie jednotlivých metód
                 result = self.original_learner._check_consistency(result, example)
                 result = self.original_learner._apply_climb_tree(result, example)
                 result = self.original_learner._apply_close_interval(result, example)
@@ -684,6 +737,11 @@ def track_winston_learner(original_learner, tracker):
             elif example_type == "negative":
                 # Pre negatívny príklad použijeme SPECIALIZE heuristiky
                 result = current_model.copy()
+                
+                # Resetujeme heuristiky pre tento príklad
+                self.original_learner.applied_heuristics = []
+                
+                # Volanie jednotlivých metód
                 result = self.original_learner._apply_require_link(result, example)
                 result = self.original_learner._apply_forbid_link(result, example)
             else:
@@ -704,7 +762,9 @@ def track_winston_learner(original_learner, tracker):
                     "drop_link": "Heuristika DROP-LINK - Eliminácia nepotrebných spojení",
                     "climb_tree": "Heuristika CLIMB-TREE - Generalizácia hľadaním spoločných predkov",
                     "enlarge_set": "Heuristika ENLARGE-SET - Vytváranie zjednotení pre funkčne ekvivalentné komponenty",
-                    "close_interval": "Heuristika CLOSE-INTERVAL - Spracovanie numerických atribútov zúžením intervalov"
+                    "close_interval": "Heuristika CLOSE-INTERVAL - Spracovanie numerických atribútov zúžením intervalov",
+                    "add_object": "Heuristika ADD-OBJECT - Pridanie nového objektu do modelu",
+                    "add_link": "Heuristika ADD-LINK - Pridanie nového spojenia do modelu"
                 }
                 
                 # Základné informácie o zmene
@@ -716,11 +776,24 @@ def track_winston_learner(original_learner, tracker):
                 if hasattr(example, 'objects'):
                     details["example_objects"] = len(example.objects)
                 
-                self.tracker.add_heuristic(
-                    self.last_applied_heuristic,
-                    heuristic_descriptions.get(self.last_applied_heuristic, f"Heuristika {self.last_applied_heuristic.upper()}"),
-                    details=details
-                )
+                # Pre každú aplikovanú heuristiku pridáme záznam (bez duplicít)
+                processed_heuristics = set()
+                for heuristic_name in self.applied_heuristics:
+                    if heuristic_name in processed_heuristics:
+                        continue
+                    processed_heuristics.add(heuristic_name)
+                    self._debug_log(f"Pridávam heuristiku {heuristic_name} pre príklad {example_id}")
+                    self.tracker.add_heuristic(
+                        heuristic_name,
+                        heuristic_descriptions.get(heuristic_name, f"Heuristika {heuristic_name.upper()}"),
+                        example_id=example_id,
+                        details=details
+                    )
+            
+            # Odstránenie duplicitných spojení pred vrátením modelu
+            removed_count = result.remove_duplicate_links()
+            if removed_count > 0:
+                self._debug_log(f"Odstránených {removed_count} duplicitných spojení z výsledného modelu")
             
             return result
         
@@ -733,19 +806,27 @@ def track_winston_learner(original_learner, tracker):
 @app.post("/api/train")
 async def train_model(training_request: TrainingRequest):
     """
-    Trénuje model na základě vybraného príkladu alebo celého datasetu.
+    Trénuje model na základě vybraného príkladu alebo viacerých príkladov (batch).
     
-    Príklady sú spracované postupne v poradí, v akom sa nachádzajú v datasete bez ohľadu na to,
-    či sa jedná o pozitívne alebo negatívne príklady.
+    Príklady sú spracované INKREMENTÁLNE - postupne jeden po druhom v poradí ich ID.
+    Každý príklad je spracovaný PRÁVE RAZ pri danom trénovacom behu, bez opätovného prehodnocovania 
+    predchádzajúcich príkladov (čo zodpovedá pôvodnému Winstonovmu algoritmu).
+    
+    Ak príklad už bol použitý na trénovanie, je preskočený (pokiaľ nie je nastavené retrain_all=True).
+    Heuristiky pre príklady zostávajú zachované aj po opätovnom trénovaní.
     
     Args:
-        training_request: Požadavek na trénování obsahující ID příkladov alebo nastavenie pre dávkové spracovanie
+        training_request: Požiadavka na trénovanie obsahujúca ID príkladov, ktoré sa majú použiť,
+                         alebo nastavenie pre dávkové spracovanie
         
     Returns:
-        Výsledek trénování s informacemi o průběhu
+        Výsledok trénovania s informáciami o priebehu
     """
     try:
-        global learner, current_model, dataset_examples
+        global learner, current_model, dataset_examples, tracker
+        
+        # Poznámka: Už nevymazávame heuristiky pre príklady, ktoré sa trénujú
+        # aby ostala zachovaná história aplikovaných heuristík
         
         # Overenie, či máme inicializované potrebné premenné
         if learner is None:
@@ -813,6 +894,12 @@ async def train_model(training_request: TrainingRequest):
         for example in examples_to_process:
             example_id = example["id"]
             
+            # Preskočiť príklady, ktoré už boli použité na trénovanie
+            # (toto zabezpečí, že príklady sa budú trénovať len raz, bez opätovného prehodnocovania)
+            if example.get("used_in_training", False) and not training_request.retrain_all:
+                print(f"Preskakujem príklad {example_id}, pretože už bol použitý na trénovanie")
+                continue
+                
             # Spracuj formulu a vytvor model
             try:
                 formula_str = example.get("formula")
@@ -844,7 +931,7 @@ async def train_model(training_request: TrainingRequest):
                 
                 # Vytvoríme nový prázdny model a použijeme ho na inicializáciu
                 empty_model = Model(objects=[], links=[])
-                current_model = learner.update_model(empty_model, example_model, "first_positive")
+                current_model = learner.update_model(empty_model, example_model, "first_positive", example_id=example_id)
                 
                 # Odstránenie duplicitných spojení
                 removed_duplicates = current_model.remove_duplicate_links()
@@ -860,7 +947,7 @@ async def train_model(training_request: TrainingRequest):
             elif is_positive:
                 # Spracovanie pozitívneho príkladu
                 print(f"Aktualizujem model s pozitívnym príkladom {example_id}")
-                current_model = learner.update_model(current_model, example_model, "positive")
+                current_model = learner.update_model(current_model, example_model, "positive", example_id=example_id)
                 
                 # Odstránenie duplicitných spojení
                 removed_duplicates = current_model.remove_duplicate_links()
@@ -872,7 +959,7 @@ async def train_model(training_request: TrainingRequest):
             else:
                 # Spracovanie negatívneho príkladu
                 print(f"Aktualizujem model s negatívnym príkladom {example_id}")
-                current_model = learner.update_model(current_model, example_model, "negative")
+                current_model = learner.update_model(current_model, example_model, "negative", example_id=example_id)
                 
                 # Odstránenie duplicitných spojení
                 removed_duplicates = current_model.remove_duplicate_links()
@@ -922,6 +1009,19 @@ async def train_model(training_request: TrainingRequest):
         
         print(f"Trénovanie úspešné, spracovaných {processed_count} príkladov, hypotéza: {model_formula}")
         
+        # Zapíšeme aktuálnu hypotézu
+        model_hypothesis = current_model.to_formula() if current_model else ""
+        
+        # Debug print pre kontrolu heuristík
+        print(f"\n--- DEBUG HEURISTIKY ---")
+        print(f"Počet heuristík v trackeri: {len(tracker.heuristics)}")
+        for h in tracker.heuristics:
+            print(f" - {h.get('name')}: {h.get('description')} pre príklad {h.get('example_id')}")
+        print(f"------------------------\n")
+        
+        print(f"Inkrementálne trénovanie dokončené - každý príklad bol spracovaný iba raz v poradí ID")
+        print(f"Celkový počet spracovaných príkladov: {processed_count}")
+        
         return TrainingResult(
             success=True,
             message=f"Model úspešne natrénovaný s {processed_count} príkladmi",
@@ -930,8 +1030,10 @@ async def train_model(training_request: TrainingRequest):
             batch_count=batch_count,
             processed_examples=processed_count,
             training_mode="batch",
-            model_hypothesis=model_formula,  # Hypotéza pre frontend
-            model_visualization=visualization # Vizualizácia pre frontend
+            model_formula=model_formula,  # Hypotéza pre frontend
+            model_visualization=visualization, # Vizualizácia pre frontend
+            model_hypothesis=model_hypothesis,  # Pridaná natrénovaná formula
+            model_rules=model_rules  # Pridané extrahované pravidlá 
         )
         
     except Exception as e:
@@ -1721,6 +1823,103 @@ async def compare_models(request: CompareModelsRequest):
         print(f"Error in compare_models: {str(e)}")
         traceback.print_exc()  # Výpis traceback pro podrobnější informace
         raise HTTPException(status_code=500, detail=f"Chyba při porovnávání modelů: {str(e)}")
+
+@app.get("/api/heuristics/history")
+async def get_heuristics_history():
+    """
+    Vráti históriu heuristík aplikovaných na jednotlivé príklady.
+    Zobrazí všetky príklady, ktoré boli použité na trénovanie, vrátane tých z predošlých behov.
+    Filtruje ADD-LINK a ADD-OBJECT heuristiky, ktoré sa používajú pri inicializácii.
+    """
+    global tracker, dataset_examples, training_history
+    
+    # Získanie všetkých heuristík z trackera
+    all_heuristics = tracker.get_all()
+    
+    # Vytvoríme štruktúru, ktorá mapuje ID príkladu na zoznam jedinečných heuristík
+    example_heuristics = {}
+    
+    # Najprv spracujeme, ktoré príklady majú heuristiky a zoradíme ich podľa času (posledný tréning)
+    heuristics_by_example = {}
+    
+    for heuristic in all_heuristics:
+        example_id = heuristic.get("example_id")
+        if example_id is not None:
+            if example_id not in heuristics_by_example:
+                heuristics_by_example[example_id] = []
+            
+            # Pridáme heuristiku do zoznamu pre daný príklad
+            heuristics_by_example[example_id].append(heuristic)
+    
+    # Nájdeme ID prvého príkladu, ktorý bol použitý na inicializáciu (ak existuje)
+    first_example_id = None
+    if len(training_history) > 0 and "examples" in training_history[0]:
+        for example in training_history[0]["examples"]:
+            if example.get("is_positive", True):
+                first_example_id = example.get("id")
+                break
+    
+    # Pre každý príklad, vytvoríme list heuristík (vrátane duplicít)
+    for example_id, heuristics in heuristics_by_example.items():
+        # Nájdeme príklad
+        example = next((e for e in dataset_examples if e["id"] == example_id), None)
+        if example:
+            # Inicializujeme záznam pre príklad
+            example_heuristics[example_id] = {
+                "id": example_id,
+                "name": example.get("name", f"Príklad {example_id}"),
+                "is_positive": example.get("is_positive", True),
+                "heuristics": []
+            }
+            
+            # Ak je to prvý príklad (inicializácia), pridáme špeciálnu heuristiku "initialization"
+            if example_id == first_example_id:
+                example_heuristics[example_id]["heuristics"].append({
+                    "name": "initialization",
+                    "description": "Inicializácia modelu prvým pozitívnym príkladom",
+                    "details": {}
+                })
+            
+            # Pridáme všetky heuristiky pre príklad, okrem ADD-LINK a ADD-OBJECT
+            for heuristic in heuristics:
+                heuristic_name = heuristic["name"]
+                # Preskočiť ADD-LINK a ADD-OBJECT heuristiky
+                if heuristic_name in ["add_link", "add_object"]:
+                    continue
+                    
+                # Pridáme heuristiku (vrátane duplicít)
+                example_heuristics[example_id]["heuristics"].append({
+                    "name": heuristic_name,
+                    "description": heuristic["description"],
+                    "details": heuristic.get("details", {})
+                })
+    
+    # Teraz pridáme aj trénované príklady, ktoré možno nemajú heuristiky
+    for example in dataset_examples:
+        if example.get("used_in_training", False) and example["id"] not in example_heuristics:
+            example_id = example["id"]
+            
+            # Ak je to prvý príklad (inicializácia), pridáme špeciálnu heuristiku "initialization"
+            is_first_example = (example_id == first_example_id)
+            
+            example_heuristics[example_id] = {
+                "id": example_id,
+                "name": example.get("name", f"Príklad {example_id}"),
+                "is_positive": example.get("is_positive", True),
+                "heuristics": [] if not is_first_example else [
+                    {
+                        "name": "initialization",
+                        "description": "Inicializácia modelu prvým pozitívnym príkladom",
+                        "details": {}
+                    }
+                ]
+            }
+    
+    # Prekonvertujeme slovník na zoznam a zoradíme podľa ID príkladu
+    result = list(example_heuristics.values())
+    result.sort(key=lambda x: x["id"])
+    
+    return {"examples": result}
 
 # Spustenie aplikácie (pre lokálny vývoj)
 if __name__ == "__main__":
