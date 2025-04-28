@@ -161,11 +161,35 @@ class WinstonLearner:
         for model_obj in updated_model.objects:
             class_name = model_obj.class_name
             
-            # Nájdeme zodpovedajúce objekty rovnakej triedy v príklade
-            matching_example_objects = [obj for obj in good.objects if obj.class_name == class_name]
+            # Nájdeme zodpovedajúce objekty v príklade, ktoré sú:
+            # 1. Rovnakej triedy, alebo
+            # 2. Podtriedou triedy v modeli, alebo
+            # 3. Známou podtriedou generalizovanej triedy v modeli
+            matching_example_objects = []
+            
+            for example_obj in good.objects:
+                # Kontrola, či sa názvy objektov zhodujú (preferujeme presné zhody podľa názvu)
+                if example_obj.name == model_obj.name:
+                    matching_example_objects.append(example_obj)
+                    print(f"[CLOSE_INTERVAL] Našiel som objekt s rovnakým názvom: {example_obj.name}")
+                    continue
+                
+                # Ak nenájdeme presne zhodný názov, skúsime nájsť zhodu podľa triedy
+                # Kontrola, či je trieda objektu v príklade rovnaká, podtriedou alebo známou podtriedou
+                matches_class = (example_obj.class_name == class_name or
+                                self.classification_tree.is_subclass(example_obj.class_name, class_name) or
+                                (class_name in model.known_subclasses and 
+                                 example_obj.class_name in model.known_subclasses[class_name]))
+                
+                if matches_class:
+                    matching_example_objects.append(example_obj)
+                    print(f"[CLOSE_INTERVAL] Našiel som objekt so zodpovedajúcou triedou: {example_obj.name} ({example_obj.class_name})")
+            
+            print(f"[CLOSE_INTERVAL] Našlo sa {len(matching_example_objects)} zodpovedajúcich objektov pre {model_obj.name} ({class_name})")
             
             for example_obj in matching_example_objects:
                 if not example_obj.attributes:
+                    print(f"[CLOSE_INTERVAL] Objekt {example_obj.name} nemá atribúty, preskakujem")
                     continue
                 
                 # Inicializácia atribútov pre model_obj, ak ešte neexistujú
@@ -174,7 +198,7 @@ class WinstonLearner:
                 
                 # Spracovanie atribútov z príkladu
                 for attr_name, example_value in example_obj.attributes.items():
-                    print(f"[CLOSE_INTERVAL] Kontrolujem atribút {attr_name} v objekte {model_obj.name}")
+                    print(f"[CLOSE_INTERVAL] Kontrolujem atribút {attr_name} v objekte {example_obj.name}")
                     
                     # Prípad 1: Atribút nie je v modeli, ale je v príklade
                     if attr_name not in model_obj.attributes:
@@ -183,38 +207,39 @@ class WinstonLearner:
                             heuristic_applied = True
                             print(f"[CLOSE_INTERVAL] Pridaný nový atribút {model_obj.name}.{attr_name}: {example_value}")
                             self._debug_log(f"Pridaný nový atribút {model_obj.name}.{attr_name}: {example_value}")
-                        continue
+                            continue
                     
-                    # Teraz spracujeme existujúce atribúty
-                    model_value = model_obj.attributes[attr_name]
-                    
-                    # Prípad 2: Model obsahuje číslo a príklad obsahuje číslo
-                    if isinstance(model_value, (int, float)) and isinstance(example_value, (int, float)):
-                        # Vytvoríme interval od minimálnej po maximálnu hodnotu
-                        new_interval = (min(model_value, example_value), max(model_value, example_value))
-                        model_obj.attributes[attr_name] = new_interval
-                        heuristic_applied = True
-                        print(f"[CLOSE_INTERVAL] Vytvorený interval pre {model_obj.name}.{attr_name}: {new_interval}")
-                        self._debug_log(f"Vytvorený interval pre {model_obj.name}.{attr_name}: {new_interval}")
-                    
-                    # Prípad 3: Model obsahuje interval a príklad obsahuje číslo
-                    elif (isinstance(model_value, tuple) and len(model_value) == 2 and 
-                          isinstance(example_value, (int, float))):
-                        min_val, max_val = model_value
+                    # Ak atribút existuje v modeli, spracovávame existujúce hodnoty
+                    if attr_name in model_obj.attributes:
+                        model_value = model_obj.attributes[attr_name]
                         
-                        # Rozšírime interval, ak je to potrebné
-                        if example_value < min_val:
-                            new_interval = (example_value, max_val)
+                        # Prípad 2: Model obsahuje číslo a príklad obsahuje číslo
+                        if isinstance(model_value, (int, float)) and isinstance(example_value, (int, float)):
+                            # Vytvoríme interval od minimálnej po maximálnu hodnotu
+                            new_interval = (min(model_value, example_value), max(model_value, example_value))
                             model_obj.attributes[attr_name] = new_interval
                             heuristic_applied = True
-                            print(f"[CLOSE_INTERVAL] Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
-                            self._debug_log(f"Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
-                        elif example_value > max_val:
-                            new_interval = (min_val, example_value)
-                            model_obj.attributes[attr_name] = new_interval
-                            heuristic_applied = True
-                            print(f"[CLOSE_INTERVAL] Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
-                            self._debug_log(f"Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                            print(f"[CLOSE_INTERVAL] Vytvorený interval pre {model_obj.name}.{attr_name}: {new_interval}")
+                            self._debug_log(f"Vytvorený interval pre {model_obj.name}.{attr_name}: {new_interval}")
+                        
+                        # Prípad 3: Model obsahuje interval a príklad obsahuje číslo
+                        elif (isinstance(model_value, tuple) and len(model_value) == 2 and 
+                              isinstance(example_value, (int, float))):
+                            min_val, max_val = model_value
+                            
+                            # Rozšírime interval, ak je to potrebné
+                            if example_value < min_val:
+                                new_interval = (example_value, max_val)
+                                model_obj.attributes[attr_name] = new_interval
+                                heuristic_applied = True
+                                print(f"[CLOSE_INTERVAL] Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                                self._debug_log(f"Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                            elif example_value > max_val:
+                                new_interval = (min_val, example_value)
+                                model_obj.attributes[attr_name] = new_interval
+                                heuristic_applied = True
+                                print(f"[CLOSE_INTERVAL] Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                                self._debug_log(f"Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
         
         if heuristic_applied:
             self.applied_heuristics.append("close_interval")
@@ -1015,9 +1040,13 @@ class WinstonLearner:
                     if common_ancestor not in updated_model.known_subclasses:
                         updated_model.known_subclasses[common_ancestor] = set()
                     
-                    # Pridaj obe triedy ako známe podtriedy
-                    updated_model.known_subclasses[common_ancestor].add(original_class)
-                    updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
+                    # Pridaj obe triedy ako známe podtriedy, ale len ak nie sú identické so spoločným predkom
+                    if original_class != common_ancestor:
+                        updated_model.known_subclasses[common_ancestor].add(original_class)
+                    
+                    if matching_example_obj.class_name != common_ancestor:
+                        updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
+                    
                     print(f"[CLIMB_TREE] Zaznamenávam známe podtriedy pre {common_ancestor}: {updated_model.known_subclasses[common_ancestor]}")
                     
                     heuristic_applied = True
@@ -1060,11 +1089,13 @@ class WinstonLearner:
                 if field == 'source':
                     if new not in updated_model.known_subclasses:
                         updated_model.known_subclasses[new] = set()
-                    updated_model.known_subclasses[new].add(original)
+                    if original != new:  # Nepridávame triedu ako podtriedu samej seba
+                        updated_model.known_subclasses[new].add(original)
                 else:
                     if new not in updated_model.known_subclasses:
                         updated_model.known_subclasses[new] = set()
-                    updated_model.known_subclasses[new].add(original)
+                    if original != new:  # Nepridávame triedu ako podtriedu samej seba
+                        updated_model.known_subclasses[new].add(original)
                 
                 heuristic_applied = True
         

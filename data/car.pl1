@@ -1,53 +1,100 @@
 # 1. Prvý pozitívny príklad - inicializácia modelu
 Ι(x, X5) ∧ 
+Ι(c, Car) ∧
+Ι(s, SUV) ∧
 Ι(e, DieselEngine) ∧ 
-Π(x, e)
+Ι(t, AutomaticTransmission) ∧
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Ι(l, LEDLights) ∧
+Ι(i, Infotainment) ∧
+Ι(p, TrimPackage) ∧
+Π(x, c) ∧
+Π(x, s) ∧
+Π(x, e) ∧
+Π(x, t) ∧
+Π(x, d) ∧
+Π(x, w) ∧
+Π(x, l) ∧
+Π(x, i) ∧
+Π(x, p) ∧
+Α(p, level, Premium) ∧
+Α(p, interior, leather) ∧
+Α(p, technology, advanced) ∧
+Α(e, power, 265) ∧
+Α(e, torque, 620) ∧
+Α(e, cylinders, 6) ∧
+Α(t, gears, 8) ∧
+Α(w, size, 20) ∧
+Α(w, material, alloy) ∧
+Α(i, display_size, 10.25) ∧
+Α(x, weight, 2175) ∧
+Α(x, seats, 5)
 
 # 2. Negatívny príklad - aktivuje require-link (vyžaduje motor)
 Ι(x, X5)
 
 # 3. Pozitívny príklad - aktivuje climb-tree (generalizácia na úrovni hierarchie tried)
 Ι(x, X5) ∧ 
-Ι(e, DieselEngine) ∧ 
-Π(x, e) ∧ 
-Α(e, power, 250)
+Ι(e, PetrolEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧
+Ι(d, XDrive) ∧
+Π(x, e) ∧
+Π(x, t) ∧
+Π(x, d)
 
-# 4. Pozitívny príklad - aktivuje enlarge-set (rozšírenie množiny na DieselEngine)
+# 4. Pozitívny príklad - aktivuje close-interval (intervaly pre výkon)
 Ι(x, X5) ∧ 
 Ι(e, DieselEngine) ∧ 
-Π(x, e) ∧ 
-Α(e, power, 265)
+Ι(t, AutomaticTransmission) ∧
+Ι(d, XDrive) ∧
+Π(x, e) ∧
+Π(x, t) ∧
+Π(x, d) ∧
+Α(e, power, 290)
 
 # 5. Pozitívny príklad - aktivuje close-interval (intervaly pre výkon)
 Ι(x, X5) ∧ 
-Ι(e, DieselEngine) ∧ 
-Π(x, e) ∧ 
-Α(e, power, 290)
-
-# 6. Pozitívny príklad - aktivuje climb-tree 
-Ι(x, X5) ∧ 
 Ι(e, PetrolEngine) ∧ 
-Π(x, e) ∧ 
+Ι(t, AutomaticTransmission) ∧
+Ι(d, XDrive) ∧
+Π(x, e) ∧
+Π(x, t) ∧
+Π(x, d) ∧
 Α(e, power, 340)
 
-# 7. Negatívny príklad - aktivuje forbid-link (zakáže manuálnu prevodovku)
+# 6. Negatívny príklad - aktivuje forbid-link (zakáže manuálnu prevodovku)
 Ι(x, X5) ∧ 
 Ι(e, Engine) ∧ 
-Ι(t, ManualTransmission) ∧ 
+Ι(t, ManualTransmission) ∧
+Ι(d, XDrive) ∧
+Π(x, e) ∧
+Π(x, t) ∧
+Π(x, d)
+
+# 7. Negatívny príklad - aktivuje forbid-link (zakáže RWD)
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, RWD) ∧
 Π(x, e) ∧ 
-Π(x, t)
+Π(x, t) ∧
+Π(x, d)
 
 # 8. Pozitívny príklad - aktivuje enlarge-set (povolí automatickú prevodovku)
 Ι(x, X5) ∧ 
-Ι(e, Engine) ∧ 
+Ι(e, PetrolEngine) ∧ 
 Ι(t, AutomaticTransmission) ∧ 
+Ι(d, AutomaticTransmission) ∧
 Π(x, e) ∧ 
-Π(x, t)
+Π(x, t) ∧ 
+Π(x, d)
 
 # 9. Negatívny príklad - aktivuje forbid-link (zakáže RWD)
 Ι(x, X5) ∧ 
-Ι(e, Engine) ∧ 
+Ι(e, DieselEngine) ∧ 
 Ι(t, AutomaticTransmission) ∧ 
+Ι(d, AutomaticTransmission) ∧
 Ι(d, RWD) ∧
 Π(x, e) ∧ 
 Π(x, t) ∧ 
@@ -57,6 +104,7 @@
 Ι(x, X5) ∧ 
 Ι(e, Engine) ∧ 
 Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
 Ι(d, XDrive) ∧
 Π(x, e) ∧ 
 Π(x, t) ∧ 

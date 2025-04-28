@@ -1,0 +1,178 @@
+# 1. Prvy pozitivny priklad - inicializacia modelu
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, biela) ∧
+Α(f, metaliza, ano) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 20)
+
+# 2. Negativny priklad - aktivuje require-link (vyzaduje motor)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Π(a, r) ∧
+Α(r, oznacenie, X5)
+
+# 3. Pozitivny priklad - aktivuje climb-tree (generalizacia na urovni hierarchie tried)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 250) ∧
+Α(e, objem, 3.0) ∧
+Α(d, typ, xDrive) ∧
+Α(f, odtien, cierna) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, profesional)
+
+# 4. Pozitivny priklad - aktivuje close-interval (intervaly pre vykon)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Α(r, oznacenie, X5) ∧
+Α(d, typ, xDrive) ∧
+Α(e, vykon, 180) ∧
+Α(e, objem, 2.0) ∧
+Α(f, odtien, modra) ∧
+Α(v, idrive, ano)
+
+# 5. Negativny priklad - aktivuje forbid-link (zakaze manualnu prevodovku)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, ManualnaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Α(r, oznacenie, X5) ∧
+Α(d, typ, xDrive)
+
+# 6. Negativny priklad - aktivuje forbid-link (zakaze RWD)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Α(r, oznacenie, X5) ∧
+Α(d, typ, RWD)
+
+# 7. Pozitivny priklad - aktivuje close-interval (intervaly pre vykon)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Α(r, oznacenie, X5) ∧
+Α(d, typ, xDrive) ∧
+Α(e, vykon, 280) ∧
+Α(e, objem, 4.4) ∧
+Α(e, valce, 8)
+
+# 8. Negativny priklad - zakaze slaby motor (< 150 kW)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Α(r, oznacenie, X5) ∧
+Α(d, typ, xDrive) ∧
+Α(e, vykon, 140) ∧
+Α(e, objem, 2.0)
+
+# 9. Pozitivny priklad - model X3 (iny model BMW)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Α(r, oznacenie, X3) ∧
+Α(r, segment, SUV) ∧
+Α(d, typ, xDrive) ∧
+Α(e, vykon, 190) ∧
+Α(e, objem, 2.0)
+
+# 10. Pozitivny priklad - rozne typy vybav (aktivuje enlarge-set)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, Farba) ∧
+Ι(v, Vybava) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Α(r, oznacenie, X5) ∧
+Α(d, typ, xDrive) ∧
+Α(e, vykon, 265) ∧
+Α(e, objem, 3.0) ∧
+Α(f, odtien, siva) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, standard) ∧
+Α(v, sedadla, textilne) ∧
+Α(v, audio, standard)

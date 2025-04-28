@@ -46,11 +46,11 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
   const variableToTypeMap = new Map<string, string>();
   
   // Funkcia na pridanie uzla, ak ešte neexistuje
-  const addNode = (id: string, category: string) => {
+  const addNode = (id: string, category: string, displayName?: string) => {
     if (!nodeMap.has(id) && !isVariableNode(id)) {
       nodeMap.set(id, {
         id: id,
-        name: id,
+        name: displayName || id,  // Ak je zadaný displayName, použijeme ho, inak id
         class: category,
         category: category
       });
@@ -216,7 +216,8 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
         const valueText = match[3].trim();
         
         addNode(actualObjectId, actualObjectId);
-        addNode(attributeId, 'Attribute');
+        // Zobrazíme názov atribútu
+        addNode(attributeId, 'Attribute', attributeName);
         
         // Vytvorenie spojenia medzi objektom a jeho atribútom
         links.push({
@@ -229,7 +230,8 @@ const parseFormulaToNodesAndLinks = (formulaText: string) => {
         const values = valueText.split('∨').map(v => v.trim());
         values.forEach(value => {
           const valueId = `${attributeId}_${value}`;
-          addNode(valueId, 'Value');
+          // Zobrazíme konkrétnu hodnotu
+          addNode(valueId, 'Value', value);
           
           links.push({
             source: attributeId,
@@ -313,15 +315,19 @@ const NetworkGraph = ({ nodes: providedNodes, links: providedLinks, showDifferen
             case 'BMW': color = '#5D8AA8'; size = 25; break;
             case 'X5': color = '#4169E1'; size = 25; break;
             case 'Engine': 
-            case 'DieselEngine': 
+            case 'DieselovyMotor': 
+            case 'BenzinovyMotor': 
             case 'PetrolEngine': 
               color = '#DC143C'; size = 20; break;
             case 'Transmission': 
+            case 'AutomatickaPrevodovka': 
+            case 'ManualnaPrevodovka': 
             case 'AutomaticTransmission': 
             case 'ManualTransmission': 
               color = '#CD5C5C'; size = 20; break;
             case 'Drive': 
             case 'DriveSystem': 
+            case 'Pohon': 
             case 'XDrive': 
             case 'AWD': 
             case 'RWD': 
@@ -329,8 +335,13 @@ const NetworkGraph = ({ nodes: providedNodes, links: providedLinks, showDifferen
             case 'SUV': 
             case 'CompactSUV': 
             case 'Car': 
+            case 'Auto': 
             case 'Vehicle': 
               color = '#4682B4'; size = 20; break;
+            case 'ModelovaRada': color = '#5D8AA8'; size = 20; break;
+            case 'Farba': color = '#8A2BE2'; size = 20; break;
+            case 'Vybava': color = '#2E8B57'; size = 20; break;
+            case 'Kolesa': color = '#B8860B'; size = 20; break;
             case 'Component': color = '#A0522D'; size = 18; break;
             case 'Attribute': color = '#9370DB'; shape = 'diamond'; size = 15; break;
             case 'Value': color = '#FFD700'; shape = 'square'; size = 12; break;
@@ -339,9 +350,34 @@ const NetworkGraph = ({ nodes: providedNodes, links: providedLinks, showDifferen
           }
         }
         
+        // Extrahujeme názvy atribútov a hodnôt z ID
+        let displayLabel = node.category;
+        
+        // Špeciálne spracovanie pre atribúty
+        if (node.category === 'Attribute') {
+          // Extrahujeme názov atribútu z ID (format: object_attributeName)
+          const parts = node.id.split('_');
+          if (parts.length >= 2) {
+            // Použijeme druhú časť ako názov atribútu
+            displayLabel = parts[1];
+          }
+        }
+        
+        // Špeciálne spracovanie pre hodnoty
+        if (node.category === 'Value') {
+          // Extrahujeme hodnotu z ID (format: attribute_value)
+          const parts = node.id.split('_');
+          if (parts.length >= 3) {
+            // Použijeme poslednú časť ako hodnotu
+            displayLabel = parts[parts.length - 1];
+          }
+        }
+        
+        // Preferujeme zobrazovať kategóriu (triedu) namiesto názvu objektu (identifikátora)
+        // Ak kategória nie je dostupná, použijeme názov
         return {
           id: node.id,
-          label: node.name,
+          label: displayLabel,
           color: { 
             background: color,
             border: '#ffffff' 
