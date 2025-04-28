@@ -459,9 +459,32 @@ def get_timestamp():
 # Inicializácia aplikácie
 @app.on_event("startup")
 async def startup_event():
-    """Inicializuje aplikáciu pri štarte."""
+    """
+    Inicializácia aplikácie pri spustení.
+    
+    Inicializuje klasifikačný strom a ďalšie globálne premenné.
+    """
+    global learner, classification_tree, tracker, current_model, training_history, saved_models, dataset_examples
+    
+    # Inicializácia prázdnych kolekcií
+    current_model = None
+    training_history = []
+    saved_models = []
+    dataset_examples = []
+    
+    # Inicializácia klasifikačného stromu
     initialize_classification_tree()
-    print("Aplikácia bola inicializovaná.")
+    
+    # Vytvoríme tracker pre sledovanie aplikácie heuristík
+    tracker = HeuristicTracker()
+    
+    # Inicializujeme learner s klasifikačným stromom
+    learner = WinstonLearner(classification_tree)
+    
+    # Vytvoríme proxy objekt, ktorý sleduje aplikáciu heuristík
+    learner = track_winston_learner(learner, tracker)
+    
+    print(f"Aplikácia bola inicializovaná.")
 
 # API endpointy
 @app.get("/")
@@ -605,28 +628,79 @@ class HeuristicTracker:
     def get_all(self):
         return self.heuristics
 
-# Presmerovanie logu Winston Learnera do trackera
 def track_winston_learner(original_learner, tracker):
     """
     Vytvorí proxy objekt, ktorý zachytáva a zaznamenáva heuristiky aplikované v learnerovi.
     """
-    class WinstonLearnerProxy(WinstonLearner):
+    global classification_tree
+    
+    class WinstonLearnerProxy:
         def __init__(self, original_learner, tracker):
             self.original_learner = original_learner
             self.tracker = tracker
             self.last_applied_heuristic = None
-            self.classification_tree = original_learner.classification_tree
-            self.debug_enabled = True  # Zapneme debugovanie pre lepšiu diagnostiku
+            self.classification_tree = classification_tree
+            self.debug_enabled = True
+            self.applied_heuristics = []
             
             # Kontrola, či klasifikačný strom obsahuje údaje
             parent_relations = len(self.classification_tree.parent_map)
             print(f"[WinstonLearnerProxy] Klasifikačný strom obsahuje {parent_relations} vzťahov rodič-dieťa.")
-        
-        def update_model(self, current_model, good_example, near_miss):
-            result = self.original_learner.update_model(current_model, good_example, near_miss)
-            self.last_applied_heuristic = self.original_learner.applied_heuristics[-1] if self.original_learner.applied_heuristics else None
             
-            if self.last_applied_heuristic:
+            # Vypíšeme niekoľko vzťahov pre kontrolu
+            count = 0
+            for child, parent in self.classification_tree.parent_map.items():
+                print(f"[WinstonLearnerProxy] Vzťah: {child} -> {parent or 'ROOT'}")
+                count += 1
+                if count >= 5:  # Obmedzíme výpis len na niekoľko prvých vzťahov
+                    print(f"[WinstonLearnerProxy] ... a ďalších {parent_relations - count} vzťahov.")
+                    break
+        
+        def _debug_log(self, message):
+            """Debugovacie logovanie pre sledovanie priebehu algoritmu."""
+            print(f"[WinstonLearnerProxy] {message}")
+        
+        def update_model(self, current_model, example, example_type):
+            """
+            Aktualizuje model podľa dodaného príkladu.
+            
+            Args:
+                current_model: Aktuálny model
+                example: Príklad na spracovanie
+                example_type: Typ príkladu ("first_positive", "positive", "negative")
+                
+            Returns:
+                Aktualizovaný model
+            """
+            self._debug_log(f"Volám update_model s typom príkladu: {example_type}")
+            
+            # Zavolať originálnu metódu
+            if example_type == "first_positive":
+                result = self.original_learner._add_missing_objects(current_model.copy(), example)
+            elif example_type == "positive":
+                # Pre pozitívny príklad použijeme GENERALIZE heuristiky
+                result = current_model.copy()
+                result = self.original_learner._check_consistency(result, example)
+                result = self.original_learner._apply_climb_tree(result, example)
+                result = self.original_learner._apply_close_interval(result, example)
+                result = self.original_learner._apply_enlarge_set(result, example)
+                result = self.original_learner._apply_drop_link(result, example)
+            elif example_type == "negative":
+                # Pre negatívny príklad použijeme SPECIALIZE heuristiky
+                result = current_model.copy()
+                result = self.original_learner._apply_require_link(result, example)
+                result = self.original_learner._apply_forbid_link(result, example)
+            else:
+                # Neočakávaný typ príkladu
+                raise ValueError(f"Neplatný typ príkladu: {example_type}")
+            
+            # Získame aplikované heuristiky
+            self.applied_heuristics = self.original_learner.applied_heuristics
+            
+            # Logujeme aplikované heuristiky
+            if self.applied_heuristics:
+                self.last_applied_heuristic = self.applied_heuristics[-1]
+                
                 # Mapovanie názvov heuristík na užívateľsky zrozumiteľné popisky
                 heuristic_descriptions = {
                     "require_link": "Heuristika REQUIRE-LINK - Identifikácia spojení, ktoré musia byť prítomné",
@@ -637,36 +711,26 @@ def track_winston_learner(original_learner, tracker):
                     "close_interval": "Heuristika CLOSE-INTERVAL - Spracovanie numerických atribútov zúžením intervalov"
                 }
                 
+                # Základné informácie o zmene
+                details = {
+                    "changes_made": len(result.links) - len(current_model.links)
+                }
+                
+                # Logujeme počet objektov, ak sú k dispozícii
+                if hasattr(example, 'objects'):
+                    details["example_objects"] = len(example.objects)
+                
                 self.tracker.add_heuristic(
                     self.last_applied_heuristic,
                     heuristic_descriptions.get(self.last_applied_heuristic, f"Heuristika {self.last_applied_heuristic.upper()}"),
-                    details={
-                        "good_objects": len(good_example.objects),
-                        "near_miss_objects": len(near_miss.objects),
-                        "changes_made": len(result.links) - len(current_model.links)
-                    }
+                    details=details
                 )
+            
             return result
         
-        def _apply_require_link(self, model, near_miss):
-            return self.original_learner._apply_require_link(model, near_miss)
-        
-        def _apply_forbid_link(self, model, near_miss):
-            return self.original_learner._apply_forbid_link(model, near_miss)
-        
-        def _apply_drop_link(self, model, good):
-            return self.original_learner._apply_drop_link(model, good)
-        
-        def _apply_climb_tree(self, model, good):
-            return self.original_learner._apply_climb_tree(model, good)
-        
-        def _apply_enlarge_set(self, model, good, near_miss):
-            return self.original_learner._apply_enlarge_set(model, good, near_miss)
-        
-        def _apply_close_interval(self, model, good):
-            # Volanie pôvodnej metódy a sledovanie aplikácie heuristík
-            self.tracker.add_heuristic("close_interval", "Vytvorenie intervalov pre numerické hodnoty")
-            return self.original_learner._apply_close_interval(model, good)
+        # Delegujeme všetky ostatné metódy na originálny learner
+        def __getattr__(self, name):
+            return getattr(self.original_learner, name)
     
     return WinstonLearnerProxy(original_learner, tracker)
 
@@ -685,6 +749,21 @@ async def train_model(training_request: TrainingRequest):
     """
     try:
         global learner, current_model, dataset_examples
+        
+        # Overenie, či máme inicializované potrebné premenné
+        if learner is None:
+            return TrainingResult(
+                success=False,
+                message="Chyba: Learner nie je inicializovaný",
+                error="Learner nie je inicializovaný"
+            )
+            
+        if dataset_examples is None or len(dataset_examples) == 0:
+            return TrainingResult(
+                success=False,
+                message="Chyba: Dataset neobsahuje žiadne príklady",
+                error="Prázdny dataset"
+            )
         
         # Najprv skontrolujeme, či existujú nejaké nepoužité príklady
         unused_examples = [ex for ex in dataset_examples if not ex.get("used_in_training", False)]
@@ -733,7 +812,7 @@ async def train_model(training_request: TrainingRequest):
         steps = []
         
         # Aktualizácia modelu na základe typu príkladu
-        if current_model is None or len(current_model.objects) == 0:
+        if current_model is None or not hasattr(current_model, 'objects') or len(current_model.objects) == 0:
             # Prvotná inicializácia modelu pri prvom príklade
             print(f"Inicializujem model s prvým príkladom (ID: {example_id})")
             
@@ -797,11 +876,16 @@ async def train_model(training_request: TrainingRequest):
         )
         
     except Exception as e:
-        traceback.print_exc()
+        import traceback
+        tb = traceback.format_exc()
+        print(f"Chyba pri trénovaní: {str(e)}")
+        print(tb)
+        
         return TrainingResult(
             success=False,
             message=f"Neočakávaná chyba pri trénovaní: {str(e)}",
-            error=str(e)
+            error=str(e),
+            steps=[]
         )
 
 @app.post("/api/compare")

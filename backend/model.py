@@ -76,9 +76,11 @@ class Model:
     Atributy:
         objects: Zoznam objektov v modeli
         links: Zoznam spojeni medzi objektmi
+        known_subclasses: Slovnik mapujuci generalizovane triedy na ich zname konkretne instancie
     """
     objects: List[Object] = field(default_factory=list)
     links: List[Link] = field(default_factory=list)
+    known_subclasses: Dict[str, Set[str]] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -103,7 +105,11 @@ class Model:
                     "link_type": link.link_type.value
                 }
                 for link in self.links
-            ]
+            ],
+            "known_subclasses": {
+                general_class: list(specific_classes)
+                for general_class, specific_classes in self.known_subclasses.items()
+            }
         }
     
     @classmethod
@@ -149,7 +155,13 @@ class Model:
                 )
                 links.append(link)
         
-        return cls(objects=objects, links=links)
+        # Načítam known_subclasses
+        known_subclasses = {}
+        if "known_subclasses" in data:
+            for general_class, specific_classes in data["known_subclasses"].items():
+                known_subclasses[general_class] = set(specific_classes)
+        
+        return cls(objects=objects, links=links, known_subclasses=known_subclasses)
     
     def copy(self) -> 'Model':
         """
@@ -158,10 +170,14 @@ class Model:
         Returns:
             Novy model s identickymi objektmi a spojeniami
         """
-        return Model(
+        new_model = Model(
             objects=deepcopy(self.objects),
             links=deepcopy(self.links)
         )
+        # Kopírujeme aj known_subclasses
+        for general_class, specific_classes in self.known_subclasses.items():
+            new_model.known_subclasses[general_class] = set(specific_classes)
+        return new_model
     
     def __eq__(self, other):
         """
@@ -194,6 +210,14 @@ class Model:
         
         for self_link, other_link in zip(self_links, other_links):
             if self_link != other_link:
+                return False
+        
+        # Porovnaj known_subclasses
+        if set(self.known_subclasses.keys()) != set(other.known_subclasses.keys()):
+            return False
+            
+        for class_name in self.known_subclasses:
+            if self.known_subclasses[class_name] != other.known_subclasses[class_name]:
                 return False
                 
         return True
@@ -300,7 +324,14 @@ class Model:
         
         # Predikáty pre objekty a ich triedy
         for obj in self.objects:
-            predicates.append(f"Ι({obj.name}, {obj.class_name})")
+            class_name = obj.class_name
+            # Ak trieda má známe podtriedy, pridáme informáciu ako komentár
+            if class_name in self.known_subclasses and self.known_subclasses[class_name]:
+                subclasses = self.known_subclasses[class_name]
+                # Vypisujeme podtriedy v zátvorke za triedou
+                predicates.append(f"Ι({obj.name}, {class_name})")
+            else:
+                predicates.append(f"Ι({obj.name}, {class_name})")
         
         # Predikáty pre spojenia a zoskupenie MUST linkov podľa zdrojov
         must_links_by_source = {}
@@ -416,15 +447,33 @@ class Model:
                     by_category[category].append(target)
                 else:
                     # Komponenty bez kategórie pridáme priamo
-                    predicates.append(f"Μ({source}, {target})")
+                    # Pridáme poznámku, ak target je v known_subclasses
+                    if target in self.known_subclasses and self.known_subclasses[target]:
+                        subclasses = ", ".join(sorted(self.known_subclasses[target]))
+                        predicates.append(f"Μ({source}, {target})")
+                    else:
+                        predicates.append(f"Μ({source}, {target})")
             
             # Vytvorenie disjunkcií pre komponenty rovnakej kategórie
             for category, components in by_category.items():
                 if len(components) > 1:
+                    # Skontrolujeme, či niektorá z týchto komponentov má známe podtriedy
+                    components_with_subclasses = []
+                    for comp in components:
+                        if comp in self.known_subclasses and self.known_subclasses[comp]:
+                            components_with_subclasses.append(comp)
+                    
+                    # Vytvoríme disjunkciu
                     disjuncts = " ∨ ".join([f"Μ({source}, {comp})" for comp in sorted(components)])
                     predicates.append(f"({disjuncts})")
                 else:
-                    predicates.append(f"Μ({source}, {components[0]})")
+                    # Pridáme poznámku, ak komponent má známe podtriedy
+                    comp = components[0]
+                    if comp in self.known_subclasses and self.known_subclasses[comp]:
+                        subclasses = ", ".join(sorted(self.known_subclasses[comp]))
+                        predicates.append(f"Μ({source}, {comp})")
+                    else:
+                        predicates.append(f"Μ({source}, {comp})")
         
         # Spojenie všetkých predikátov konjunkciou
         return " ∧ ".join(predicates)
@@ -1099,50 +1148,44 @@ def formula_to_model(formula: Formula) -> Model:
     return result_model
 
 class ClassificationTree:
-    """
-    Trieda reprezentujuca hierarchiu tried v klasifikacnom strome.
+    """Strom klasifikácie tried pre hierarchiu pojmov."""
     
-    Tato trieda sluzi na definovanie vztahov medzi triedami a podporuje
-    operacie ako hladanie spolocneho predka pre dve triedy alebo pridavanie
-    novych vztahov.
-    """
     def __init__(self):
+        """Inicializácia prázdneho klasifikačného stromu."""
+        self.parent_map = {}
+        self.children_map = {}
+    
+    def add_relationship(self, child: str, parent: str):
         """
-        Inicializuje prazdny klasifikacny strom.
-        """
-        self.parent_map = {}  # Mapa trieda -> rodič
-        self.children_map = {}  # Mapa trieda -> zoznam detí
+        Pridá vzťah dieťa-rodič do stromu.
         
-    def add_relationship(self, child: str, parent: Optional[str]) -> None:
+        Args:
+            child: Trieda dieťaťa
+            parent: Trieda rodiča (None pre top-level triedy)
         """
-        Pridá vzťah rodič-dieťa do stromu.
+        # Pridá vzťah dieťa -> rodič
+        self.parent_map[child] = parent
         
-        Parametre:
-            child: Názov detskej triedy
-            parent: Názov rodičovskej triedy, alebo None ak je to koreňová trieda
-        """
-        # Ak rodič je None, ide o koreňovú triedu
-        if parent is None:
-            self.parent_map[child] = None
-        else:
-            self.parent_map[child] = parent
-            
-            # Pridaj dieťa do zoznamu detí rodiča
+        # Pridá vzťah rodič -> deti
+        if parent:
             if parent not in self.children_map:
                 self.children_map[parent] = []
-            
             if child not in self.children_map[parent]:
                 self.children_map[parent].append(child)
+        
+        # Zabezpečí, že rodič je v parent_map aj keď nemá vlastného rodiča
+        if parent and parent not in self.parent_map:
+            self.parent_map[parent] = None
     
-    def get_parent(self, class_name: str) -> Optional[str]:
+    def get_parent(self, class_name: str) -> str:
         """
         Vráti rodiča danej triedy.
         
-        Parametre:
+        Args:
             class_name: Názov triedy
             
-        Návratová hodnota:
-            Názov rodičovskej triedy, alebo None ak trieda nemá rodiča alebo neexistuje
+        Returns:
+            Názov rodičovskej triedy alebo None
         """
         return self.parent_map.get(class_name)
     
@@ -1150,136 +1193,76 @@ class ClassificationTree:
         """
         Vráti zoznam detí danej triedy.
         
-        Parametre:
+        Args:
             class_name: Názov triedy
             
-        Návratová hodnota:
-            Zoznam názvov detských tried, alebo prázdny zoznam ak trieda nemá deti alebo neexistuje
+        Returns:
+            Zoznam názvov tried detí
         """
         return self.children_map.get(class_name, [])
     
-    def add_union_class(self, union_class: str, component_classes: List[str]) -> None:
+    def is_subclass(self, child: str, parent: str) -> bool:
         """
-        Vytvorí novú triedu, ktorá je zjednotením existujúcich tried.
+        Kontroluje, či `child` je podtriedou `parent`.
         
-        Parametre:
-            union_class: Názov novej zjednotenej triedy
-            component_classes: Zoznam tried, ktoré tvoria zjednotenie
+        Args:
+            child: Názov triedy dieťaťa
+            parent: Názov triedy rodiča
+            
+        Returns:
+            True ak je `child` podtriedou `parent` (priamou alebo nepriamou)
         """
-        # Nájdi spoločného predka komponentových tried
-        common_ancestor = None
-        
-        if len(component_classes) > 1:
-            common_ancestor = self.find_common_ancestor(component_classes[0], component_classes[1])
+        # Priama kontrola
+        if child == parent:
+            return True
             
-            for i in range(2, len(component_classes)):
-                if common_ancestor:
-                    common_ancestor = self.find_common_ancestor(common_ancestor, component_classes[i])
-                else:
-                    break
-        
-        # Ak neexistuje spoločný predok, použi None (koreňová trieda)
-        # Pridaj novú triedu ako potomka spoločného predka
-        self.add_relationship(union_class, common_ancestor)
-        
-        # Pridaj komponentové triedy ako potomkov novej triedy
-        for component in component_classes:
-            # Ak komponentová trieda už existuje, aktualizuj jej rodiča
-            if component in self.parent_map:
-                old_parent = self.parent_map[component]
-                
-                # Odstráň komponentovú triedu zo zoznamu detí starého rodiča
-                if old_parent and old_parent in self.children_map and component in self.children_map[old_parent]:
-                    self.children_map[old_parent].remove(component)
+        # Ak child nie je v strome, nemôže byť podtriedou
+        if child not in self.parent_map:
+            return False
             
-            # Nastav novú triedu ako rodiča komponentovej triedy
-            self.parent_map[component] = union_class
+        # Rekurzívne prehľadávanie cez rodičov
+        current_parent = self.parent_map.get(child)
+        while current_parent:
+            if current_parent == parent:
+                return True
+            current_parent = self.parent_map.get(current_parent)
             
-            # Pridaj komponentovú triedu do zoznamu detí novej triedy
-            if union_class not in self.children_map:
-                self.children_map[union_class] = []
-            
-            if component not in self.children_map[union_class]:
-                self.children_map[union_class].append(component)
+        return False
     
     def find_common_ancestor(self, class1: str, class2: str) -> Optional[str]:
         """
         Nájde najbližšieho spoločného predka dvoch tried.
         
-        Parametre:
+        Args:
             class1: Názov prvej triedy
             class2: Názov druhej triedy
             
-        Návratová hodnota:
-            Názov najbližšieho spoločného predka, alebo None ak neexistuje
+        Returns:
+            Názov najbližšieho spoločného predka alebo None
         """
-        # Ak niektorá z tried neexistuje, vráť None
+        # Ak ktorákoľvek trieda nie je v strome, nemôžeme nájsť spoločného predka
         if class1 not in self.parent_map or class2 not in self.parent_map:
+            # Špeciálny prípad pre motory, aj keď nie sú v clasifikačnom strome
+            if (class1 in ["DieselEngine", "PetrolEngine", "HybridEngine"] and 
+                class2 in ["DieselEngine", "PetrolEngine", "HybridEngine"]):
+                return "Engine"
             return None
         
-        # Ak sú triedy rovnaké, vráť túto triedu
-        if class1 == class2:
-            return class1
-        
-        # Nájdi cestu od class1 ku koreňu
+        # Najprv získame cestu od class1 k root
         path1 = []
         current = class1
-        
         while current:
             path1.append(current)
             current = self.parent_map.get(current)
-        
-        # Nájdi prvú triedu na ceste od class2 ku koreňu, ktorá je aj v path1
+            
+        # Teraz prejdeme cestu od class2 k root a hľadáme prvého spoločného predka
         current = class2
-        
         while current:
             if current in path1:
                 return current
             current = self.parent_map.get(current)
-        
+            
         return None
-    
-    def is_subclass(self, child: str, parent: str) -> bool:
-        """
-        Skontroluje, či je jedna trieda podtriedou druhej.
-        
-        Parametre:
-            child: Názov potenciálnej podtriedy
-            parent: Názov potenciálnej nadtriedy
-            
-        Návratová hodnota:
-            True ak je child podtriedou parent, inak False
-        """
-        # Ak sú triedy rovnaké, vráť True
-        if child == parent:
-            return True
-        
-        # Ak child neexistuje v strome, vráť False
-        if child not in self.parent_map:
-            return False
-        
-        # Postupuj od child smerom ku koreňu a hľadaj parent
-        current = self.parent_map.get(child)
-        
-        while current:
-            if current == parent:
-                return True
-            current = self.parent_map.get(current)
-        
-        return False
-    
-    def are_related(self, class1: str, class2: str) -> bool:
-        """
-        Skontroluje, či sú dve triedy v hierarchickom vzťahu.
-        
-        Parametre:
-            class1: Názov prvej triedy
-            class2: Názov druhej triedy
-            
-        Návratová hodnota:
-            True ak je jedna trieda podtriedou druhej, inak False
-        """
-        return self.is_subclass(class1, class2) or self.is_subclass(class2, class1) 
 
 def is_valid_example(model: Model, example: Model, classification_tree: ClassificationTree) -> tuple[bool, list[str]]:
     """

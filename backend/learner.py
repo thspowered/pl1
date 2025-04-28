@@ -35,7 +35,7 @@ class WinstonLearner:
         # Vždy vypisujeme logovanie, bez ohľadu na debug_enabled
         print(f"[WinstonLearner] {message}")
 
-    def update_model(self, model: Model, example: Model, example_type: str) -> Model:
+    def update_model(self, model: Model, example: Model, example_type: str = None) -> Model:
         """
         Aktualizuje model podľa striktne Winstonovho algoritmu.
         
@@ -101,7 +101,7 @@ class WinstonLearner:
             self._debug_log(f"Aplikované heuristiky: {', '.join(self.applied_heuristics)}")
         else:
             self._debug_log("Žiadna heuristika nebola aplikovaná")
-        
+            
         # Výpis modelu pre diagnostiku
         print("Model objekty a atribúty:")
         for obj in updated_model.objects:
@@ -224,6 +224,19 @@ class WinstonLearner:
             
         return updated_model
 
+    def _is_class_in_classification_tree(self, class_name: str) -> bool:
+        """
+        Kontroluje, či je daná trieda súčasťou klasifikačného stromu.
+        
+        Args:
+            class_name: Názov triedy na kontrolu
+            
+        Returns:
+            True ak trieda existuje v klasifikačnom strome, inak False
+        """
+        # Trieda je v klasifikačnom strome, ak má rodiča alebo má deti
+        return class_name in self.classification_tree.parent_map or class_name in self.classification_tree.children_map
+
     def _apply_enlarge_set(self, model: Model, good: Model) -> Model:
         """
         Implementuje enlarge-set heuristiku pre vytvorenie množín povolených hodnôt.
@@ -232,6 +245,9 @@ class WinstonLearner:
         "The enlarge-set heuristic is used when a model has a constraint on a 
         component that does not match a constraint in an example. The constraint is 
         broadened to include the example's constraint."
+        
+        V našej implementácii sa enlarge-set neaplikuje na prvky, ktoré sú 
+        v klasifikačnom strome - pre tie sa používa climb-tree heuristika.
         
         Args:
             model: Aktuálny model
@@ -297,6 +313,28 @@ class WinstonLearner:
                 if parent_class in model_components:
                     existing_must_components = set(model_components[parent_class])
                     
+                    # Kontrolujeme, či nový komponent aj existujúce komponenty sú v klasifikačnom strome
+                    component_in_tree = self._is_class_in_classification_tree(component_class)
+                    
+                    # Ak je komponent v klasifikačnom strome, preskočíme ho - pre tie sa používa climb-tree
+                    if component_in_tree:
+                        print(f"[ENLARGE_SET] Preskakujem komponent {component_class}, pretože je v klasifikačnom strome - použite climb-tree heuristiku")
+                        continue
+                    
+                    # Skontrolujeme, či existuje konflikt medzi komponentami v klasifikačnom strome
+                    existing_component_in_tree = False
+                    for existing_component in existing_must_components:
+                        if self._is_class_in_classification_tree(existing_component):
+                            print(f"[ENLARGE_SET] Existujúci komponent {existing_component} je v klasifikačnom strome")
+                            existing_component_in_tree = True
+                    
+                    # Ak existujúci komponent je v klasifikačnom strome, preskočíme 
+                    # pridávanie alternatívneho komponentu, keďže by to vytváralo disjunkciu 
+                    # namiesto použitia climb-tree
+                    if existing_component_in_tree:
+                        print(f"[ENLARGE_SET] Preskakujem pridanie alternatívy {component_class}, pretože existujúci komponent je v klasifikačnom strome - použite climb-tree heuristiku")
+                        continue
+                    
                     # Zistíme, či komponent z príkladu je už povolený
                     component_already_allowed = False
                     for existing_component in existing_must_components:
@@ -352,12 +390,20 @@ class WinstonLearner:
                     for example_link in example.links:
                         if example_link.source == source_obj.name:
                             target_obj = next((obj for obj in example.objects if obj.name == example_link.target), None)
-                            if target_obj and (target_obj.class_name == link.target or 
-                                               self.classification_tree.is_subclass(target_obj.class_name, link.target)):
-                                has_target = True
-                                break
+                            if target_obj:
+                                # Kontrola: 
+                                # 1. Je objekt priamo danej triedy?
+                                # 2. Je objekt podtriedou danej triedy?
+                                # 3. Je objekt jednou zo známych podtried generalizovanej triedy?
+                                if (target_obj.class_name == link.target or 
+                                    self.classification_tree.is_subclass(target_obj.class_name, link.target) or
+                                    (link.target in model.known_subclasses and 
+                                     target_obj.class_name in model.known_subclasses[link.target])):
+                                    has_target = True
+                                    break
                     
                     if not has_target:
+                        print(f"[VALIDATE] Objekt {source_obj.name} ({source_obj.class_name}) nemá požadovaný komponent {link.target}")
                         return False
         
         # Kontrola, zda příklad neobsahuje zakázané MUST_NOT vazby
@@ -369,9 +415,14 @@ class WinstonLearner:
                     for example_link in example.links:
                         if example_link.source == source_obj.name:
                             target_obj = next((obj for obj in example.objects if obj.name == example_link.target), None)
-                            if target_obj and (target_obj.class_name == link.target or 
-                                               self.classification_tree.is_subclass(target_obj.class_name, link.target)):
-                                return False
+                            if target_obj:
+                                # Podobne ako pri MUST, kontrolujeme všetky možnosti
+                                if (target_obj.class_name == link.target or 
+                                    self.classification_tree.is_subclass(target_obj.class_name, link.target) or
+                                    (link.target in model.known_subclasses and 
+                                     target_obj.class_name in model.known_subclasses[link.target])):
+                                    print(f"[VALIDATE] Objekt {source_obj.name} ({source_obj.class_name}) má zakázaný komponent {target_obj.name} ({target_obj.class_name})")
+                                    return False
         
         # Kontrola atributů - pro každý objekt v modelu s definovanými atributy
         for model_obj in model.objects:
@@ -380,7 +431,16 @@ class WinstonLearner:
                 
             # Najdeme odpovídající objekty ve příkladu
             for example_obj in example.objects:
-                if example_obj.class_name == model_obj.class_name:
+                # Kontrolujeme:
+                # 1. Či je objekt rovnakej triedy
+                # 2. Či je objekt podtriedou modelovej triedy
+                # 3. Či je objekt jednou zo známych podtried generalizovanej triedy
+                matches_class = (example_obj.class_name == model_obj.class_name or
+                                self.classification_tree.is_subclass(example_obj.class_name, model_obj.class_name) or
+                                (model_obj.class_name in model.known_subclasses and 
+                                 example_obj.class_name in model.known_subclasses[model_obj.class_name]))
+                
+                if matches_class:
                     # Kontrola numerických intervalů
                     for attr_name, model_value in model_obj.attributes.items():
                         if isinstance(model_value, tuple) and len(model_value) == 2:
@@ -391,6 +451,7 @@ class WinstonLearner:
                             if example_obj.attributes and attr_name in example_obj.attributes:
                                 example_value = example_obj.attributes[attr_name]
                                 if isinstance(example_value, (int, float)) and (example_value < min_val or example_value > max_val):
+                                    print(f"[VALIDATE] Atribút {attr_name} objektu {example_obj.name} ({example_obj.class_name}) má hodnotu {example_value}, čo je mimo interval [{min_val}, {max_val}]")
                                     return False
                         
                         # Kontrola množin hodnot
@@ -399,9 +460,11 @@ class WinstonLearner:
                             if example_obj.attributes and attr_name in example_obj.attributes:
                                 example_value = example_obj.attributes[attr_name]
                                 if example_value not in model_value:
+                                    print(f"[VALIDATE] Atribút {attr_name} objektu {example_obj.name} ({example_obj.class_name}) má hodnotu {example_value}, čo nie je v množine povolených hodnôt {model_value}")
                                     return False
         
         # Pokud všechny kontroly prošly, příklad je platný
+        print("[VALIDATE] Príklad je platný podľa aktuálneho modelu")
         return True
 
     def _check_consistency(self, model: Model, good: Model) -> Model:
@@ -868,7 +931,10 @@ class WinstonLearner:
         # DEBUG: Vypíš obsah parent_map, aby sme videli, či hierarchia tried je správne načítaná
         print(f"[CLIMB_TREE] DEBUG - Obsah parent_map: {self.classification_tree.parent_map}")
         
-        # Špeciálny prípad: ak model má DieselEngine a príklad má PetrolEngine, skús priamo Engine
+        # Sledovanie tried, ktoré boli generalizované (na aktualizáciu MUST pravidiel neskôr)
+        generalized_classes = {}  # slovník {pôvodná_trieda: nová_trieda}
+        
+        # Prejdeme všetky objekty v modeli a hľadáme zodpovedajúce objekty v príklade
         for model_obj in updated_model.objects:
             matching_example_objs = [obj for obj in good.objects if obj.name == model_obj.name]
             
@@ -886,49 +952,55 @@ class WinstonLearner:
             if model_obj.class_name != matching_example_obj.class_name:
                 print(f"[CLIMB_TREE] Objekt {model_obj.name} má rôzne triedy v modeli a príklade")
                 
-                # Špeciálny prípad pre motory
-                if model_obj.class_name == "DieselEngine" and matching_example_obj.class_name == "PetrolEngine":
-                    common_ancestor = "Engine"
-                    print(f"[CLIMB_TREE] ŠPECIÁLNY PRÍPAD: Našiel som spoločného predka 'Engine' pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
-                elif model_obj.class_name == "PetrolEngine" and matching_example_obj.class_name == "DieselEngine":
-                    common_ancestor = "Engine"
-                    print(f"[CLIMB_TREE] ŠPECIÁLNY PRÍPAD: Našiel som spoločného predka 'Engine' pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
+                # Hľadáme spoločného predka v klasifikačnom strome
+                common_ancestor = None
+                
+                # 1. Kontrola, či jedna trieda nie je podtriedou druhej
+                if self.classification_tree.is_subclass(model_obj.class_name, matching_example_obj.class_name):
+                    common_ancestor = matching_example_obj.class_name
+                    print(f"[CLIMB_TREE] {model_obj.class_name} je podtriedou {matching_example_obj.class_name}, používam {common_ancestor} ako spoločného predka")
+                elif self.classification_tree.is_subclass(matching_example_obj.class_name, model_obj.class_name):
+                    common_ancestor = model_obj.class_name
+                    print(f"[CLIMB_TREE] {matching_example_obj.class_name} je podtriedou {model_obj.class_name}, používam {common_ancestor} ako spoločného predka")
                 else:
-                    print(f"[CLIMB_TREE] Hľadám spoločného predka pre {model_obj.class_name} a {matching_example_obj.class_name}")
+                    # 2. Hľadáme spoločného predka
+                    common_ancestor = self.classification_tree.find_common_ancestor(
+                        model_obj.class_name, 
+                        matching_example_obj.class_name
+                    )
                     
-                    # Kontrola, či jedna trieda nie je priamo predkom druhej
-                    if self.classification_tree.is_subclass(model_obj.class_name, matching_example_obj.class_name):
-                        common_ancestor = matching_example_obj.class_name
-                        print(f"[CLIMB_TREE] {model_obj.class_name} je podtriedou {matching_example_obj.class_name}, používam {common_ancestor} ako spoločného predka")
-                    elif self.classification_tree.is_subclass(matching_example_obj.class_name, model_obj.class_name):
-                        common_ancestor = model_obj.class_name
-                        print(f"[CLIMB_TREE] {matching_example_obj.class_name} je podtriedou {model_obj.class_name}, používam {common_ancestor} ako spoločného predka")
-                    else:
-                        # Nájdeme spoločného predka v klasifikačnom strome
-                        common_ancestor = self.classification_tree.find_common_ancestor(
-                            model_obj.class_name, 
-                            matching_example_obj.class_name
-                        )
+                    # 3. Ak metóda find_common_ancestor nenašla predka, skúsime to vlastnou logikou
+                    if not common_ancestor:
+                        model_parents = []
+                        example_parents = []
                         
-                        # Ak nenájdeme spoločného predka, skúsime hľadať predka každej z tried
-                        if not common_ancestor:
-                            model_parent = self.classification_tree.get_parent(model_obj.class_name)
-                            example_parent = self.classification_tree.get_parent(matching_example_obj.class_name)
-                            
-                            print(f"[CLIMB_TREE] Skúšam rodičovské triedy: {model_parent} a {example_parent}")
-                            
-                            if model_parent and model_parent == example_parent:
+                        # Získame všetkých predkov modelu
+                        parent = self.classification_tree.get_parent(model_obj.class_name)
+                        while parent:
+                            model_parents.append(parent)
+                            parent = self.classification_tree.get_parent(parent)
+                        
+                        # Získame všetkých predkov príkladu
+                        parent = self.classification_tree.get_parent(matching_example_obj.class_name)
+                        while parent:
+                            example_parents.append(parent)
+                            parent = self.classification_tree.get_parent(parent)
+                        
+                        # Hľadáme spoločného predka v zoznamoch predkov
+                        for model_parent in model_parents:
+                            if model_parent in example_parents:
                                 common_ancestor = model_parent
-                                print(f"[CLIMB_TREE] Našiel som spoločného rodiča: {common_ancestor}")
-                            elif model_parent and example_parent:
-                                common_ancestor = self.classification_tree.find_common_ancestor(model_parent, example_parent)
-                                print(f"[CLIMB_TREE] Našiel som spoločného predka rodičov: {common_ancestor}")
+                                print(f"[CLIMB_TREE] Našiel som spoločného predka cez predkov: {common_ancestor}")
+                                break
                 
                 if common_ancestor:
                     self._debug_log(f"Nájdený spoločný predok: {common_ancestor} pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
                     
                     # Pôvodná trieda objektu
                     original_class = model_obj.class_name
+                    
+                    # Pridáme informáciu o generalizácii triedy pre neskoršie použitie
+                    generalized_classes[original_class] = common_ancestor
                     
                     # Aktualizujeme triedu objektu na spoločného predka
                     model_obj.class_name = common_ancestor
@@ -939,6 +1011,15 @@ class WinstonLearner:
                             link.target = common_ancestor
                             self._debug_log(f"Aktualizované MUST_BE_A spojenie: {link.source} -> {common_ancestor}")
                     
+                    # Zaznamenáme podtriedu do known_subclasses
+                    if common_ancestor not in updated_model.known_subclasses:
+                        updated_model.known_subclasses[common_ancestor] = set()
+                    
+                    # Pridaj obe triedy ako známe podtriedy
+                    updated_model.known_subclasses[common_ancestor].add(original_class)
+                    updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
+                    print(f"[CLIMB_TREE] Zaznamenávam známe podtriedy pre {common_ancestor}: {updated_model.known_subclasses[common_ancestor]}")
+                    
                     heuristic_applied = True
                     self._debug_log(f"Aplikovaná climb-tree heuristika: objekt {model_obj.name} zmenený z {original_class} na {common_ancestor}")
                 else:
@@ -946,10 +1027,52 @@ class WinstonLearner:
             else:
                 print(f"[CLIMB_TREE] Objekt {model_obj.name} má rovnakú triedu {model_obj.class_name} v oboch modeloch, nič nerobím")
         
+        # Teraz aktualizujeme všetky MUST a MUST_NOT pravidlá pre generalizované triedy
+        if generalized_classes:
+            print("[CLIMB_TREE] Aktualizujem MUST a MUST_NOT pravidlá pre generalizované triedy...")
+            links_to_update = []
+            
+            for link in updated_model.links:
+                if link.link_type in [LinkType.MUST, LinkType.MUST_NOT]:
+                    # Ak zdrojová trieda bola generalizovaná
+                    if link.source in generalized_classes:
+                        original_source = link.source
+                        new_source = generalized_classes[original_source]
+                        links_to_update.append((link, 'source', original_source, new_source))
+                    
+                    # Ak cieľová trieda bola generalizovaná
+                    if link.target in generalized_classes:
+                        original_target = link.target
+                        new_target = generalized_classes[original_target]
+                        links_to_update.append((link, 'target', original_target, new_target))
+            
+            # Aktualizujeme odkazy
+            for link, field, original, new in links_to_update:
+                print(f"[CLIMB_TREE] Aktualizujem pravidlo: {link.source} -> {link.target} ({link.link_type.value})")
+                if field == 'source':
+                    link.source = new
+                else:
+                    link.target = new
+                print(f"[CLIMB_TREE] Pravidlo aktualizované na: {link.source} -> {link.target} ({link.link_type.value})")
+                self._debug_log(f"Aktualizované {link.link_type.value} pravidlo: {original} -> {new}")
+                
+                # Zaznamenáme aj tieto generalizácie do known_subclasses
+                if field == 'source':
+                    if new not in updated_model.known_subclasses:
+                        updated_model.known_subclasses[new] = set()
+                    updated_model.known_subclasses[new].add(original)
+                else:
+                    if new not in updated_model.known_subclasses:
+                        updated_model.known_subclasses[new] = set()
+                    updated_model.known_subclasses[new].add(original)
+                
+                heuristic_applied = True
+        
         if heuristic_applied:
             self.applied_heuristics.append("climb_tree")
             print("[CLIMB_TREE] Heuristika bola úspešne aplikovaná!")
+            print(f"[CLIMB_TREE] Známe podtriedy: {updated_model.known_subclasses}")
         else:
             print("[CLIMB_TREE] Heuristika nebola aplikovaná - nenašli sa vhodné objekty")
-            
+        
         return updated_model 
