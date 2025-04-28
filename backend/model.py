@@ -293,36 +293,140 @@ class Model:
         Konvertuje model na formulu v PL1.
         
         Vráti reťazec reprezentujúci model ako formulu v predikátovej logike prvého rádu.
+        Podporuje generovanie disjunkcií z množín alternatívnych komponentov a správne
+        zobrazuje všetky typy atribútov.
         """
         predicates = []
         
-        # Pridaj predikáty pre objekty a ich triedy
+        # Predikáty pre objekty a ich triedy
         for obj in self.objects:
             predicates.append(f"Ι({obj.name}, {obj.class_name})")
         
-        # Pridaj predikáty pre spojenia
+        # Predikáty pre spojenia a zoskupenie MUST linkov podľa zdrojov
+        must_links_by_source = {}
+        
         for link in self.links:
             if link.link_type == LinkType.REGULAR:
                 predicates.append(f"Π({link.source}, {link.target})")
             elif link.link_type == LinkType.MUST:
-                predicates.append(f"Μ({link.source}, {link.target})")  # Μ pre MUST
+                if link.source not in must_links_by_source:
+                    must_links_by_source[link.source] = []
+                must_links_by_source[link.source].append(link.target)
             elif link.link_type == LinkType.MUST_NOT:
-                predicates.append(f"Ν({link.source}, {link.target})")  # Ν pre MUST_NOT
-            # MUST_BE_A spojenia sú už zahrnuté v Ι predikátoch
+                predicates.append(f"Ν({link.source}, {link.target})")
         
-        # Pridaj predikáty pre atribúty
+        # Predikáty pre atribúty - upravená časť pre správne zobrazenie všetkých typov atribútov
         for obj in self.objects:
-            if obj.attributes:
-                for attr_name, attr_value in obj.attributes.items():
-                    if isinstance(attr_value, tuple) and len(attr_value) == 2:
-                        # Interval
-                        min_val, max_val = attr_value
-                        predicates.append(f"Α({obj.name}, {attr_name}, ({min_val}, {max_val}))")
+            if not obj.attributes:
+                continue
+            
+            # Identifikácia allowed_X_types atribútov pre disjunkcie
+            disjunction_attrs = {}
+            regular_attrs = {}
+            
+            # Rozdelenie atribútov na disjunkcie a bežné atribúty
+            for attr_name, attr_value in obj.attributes.items():
+                if attr_name.startswith("allowed_") and "_types" in attr_name and isinstance(attr_value, set) and len(attr_value) > 1:
+                    disjunction_attrs[attr_name] = attr_value
+                else:
+                    regular_attrs[attr_name] = attr_value
+            
+            # Spracovanie bežných atribútov
+            for attr_name, attr_value in regular_attrs.items():
+                # Interval (tuple) - vždy zobraziť ako interval
+                if isinstance(attr_value, tuple) and len(attr_value) == 2:
+                    min_val, max_val = attr_value
+                    predicates.append(f"Α({obj.name}, {attr_name}, ({min_val}, {max_val}))")
+                
+                # Množina - zobraziť ako množinu
+                elif isinstance(attr_value, set):
+                    # Zjednotená množina nečíselných hodnôt
+                    if all(not isinstance(v, (int, float)) for v in attr_value):
+                        # Konvertujeme množinu na string s formátom {val1, val2, ...}
+                        set_str = "{"
+                        set_str += ", ".join(str(v) for v in attr_value)
+                        set_str += "}"
+                        predicates.append(f"Α({obj.name}, {attr_name}, {set_str})")
+                    # Množina číselných hodnôt - zobraziť ako interval
+                    elif all(isinstance(v, (int, float)) for v in attr_value):
+                        if attr_value:  # Ak množina nie je prázdna
+                            min_val = min(attr_value)
+                            max_val = max(attr_value)
+                            predicates.append(f"Α({obj.name}, {attr_name}, ({min_val}, {max_val}))")
+                    # Zmiešaná množina - rozdeliť na číselné a nečíselné hodnoty
                     else:
-                        # Jednoduchá hodnota
+                        numeric_vals = [v for v in attr_value if isinstance(v, (int, float))]
+                        non_numeric_vals = [v for v in attr_value if not isinstance(v, (int, float))]
+                        
+                        if numeric_vals:
+                            min_val = min(numeric_vals)
+                            max_val = max(numeric_vals)
+                            predicates.append(f"Α({obj.name}, {attr_name}_numeric, ({min_val}, {max_val}))")
+                        
+                        if non_numeric_vals:
+                            set_str = "{"
+                            set_str += ", ".join(str(v) for v in non_numeric_vals)
+                            set_str += "}"
+                            predicates.append(f"Α({obj.name}, {attr_name}_non_numeric, {set_str})")
+                
+                # Jednoduchá hodnota - zobraziť priamo
+                else:
+                    # Ak je hodnota číslo (int alebo float), zobrazíme ju ako interval (hodnota, hodnota)
+                    if isinstance(attr_value, (int, float)):
+                        predicates.append(f"Α({obj.name}, {attr_name}, ({attr_value}, {attr_value}))")
+                    else:
                         predicates.append(f"Α({obj.name}, {attr_name}, {attr_value})")
         
-        # Spoj predikáty konjunkciou
+        # Spracovanie disjunkcií z allowed_X_types atribútov
+        for obj in self.objects:
+            if not obj.attributes:
+                continue
+            
+            for attr_name, attr_value in obj.attributes.items():
+                if attr_name.startswith("allowed_") and "_types" in attr_name and isinstance(attr_value, set) and len(attr_value) > 1:
+                    component_types = sorted(attr_value)
+                    disjuncts = " ∨ ".join([f"Μ({obj.name}, {comp})" for comp in component_types])
+                    predicates.append(f"({disjuncts})")
+        
+        # Spracovanie disjunkcií z MUST linkov pre rovnaké kategórie komponentov
+        type_categories = {
+            "Engine": ["Engine", "DieselEngine", "PetrolEngine", "HybridEngine"],
+            "Transmission": ["Transmission", "AutomaticTransmission", "ManualTransmission"],
+            "DriveSystem": ["DriveSystem", "XDrive", "AWD", "RWD"],
+            "SUV": ["SUV", "CompactSUV", "MidSizeSUV", "FullSizeSUV"]
+        }
+        
+        # Mapovanie komponentov na kategórie
+        component_to_category = {}
+        for category, components in type_categories.items():
+            for comp in components:
+                component_to_category[comp] = category
+        
+        # Pre každý zdroj spracujeme MUST linky podľa kategórií
+        for source, targets in must_links_by_source.items():
+            if not targets:
+                continue
+                
+            by_category = {}
+            for target in targets:
+                category = component_to_category.get(target)
+                if category:
+                    if category not in by_category:
+                        by_category[category] = []
+                    by_category[category].append(target)
+                else:
+                    # Komponenty bez kategórie pridáme priamo
+                    predicates.append(f"Μ({source}, {target})")
+            
+            # Vytvorenie disjunkcií pre komponenty rovnakej kategórie
+            for category, components in by_category.items():
+                if len(components) > 1:
+                    disjuncts = " ∨ ".join([f"Μ({source}, {comp})" for comp in sorted(components)])
+                    predicates.append(f"({disjuncts})")
+                else:
+                    predicates.append(f"Μ({source}, {components[0]})")
+        
+        # Spojenie všetkých predikátov konjunkciou
         return " ∧ ".join(predicates)
 
     def extract_model_rules(self) -> Dict[str, str]:
@@ -605,7 +709,7 @@ class Model:
         """
         Konvertuje model na sémantickú sieť vhodnú pre vizualizáciu.
         
-        Vráti slovník s dvoma kľúčmi:
+        Vráti slovník s dvomi kľúčmi:
         - nodes: zoznam uzlov (objektov) v sieti
         - links: zoznam spojení medzi uzlami
         

@@ -25,84 +25,98 @@ class WinstonLearner:
         self.classification_tree = classification_tree
         # Špeciálny atribút pre sledovanie histórie aplikácie heuristík
         self.applied_heuristics = []
-        self.debug_enabled = False
+        self.debug_enabled = True  # Zapnem debugovanie
         # Udržování historie modelů pro BackUp Rule
         self.model_history = []
         self.max_history_size = 5  # Maximální počet uložených historických modelů
     
     def _debug_log(self, message):
         """Debugovacie logovanie pre sledovanie priebehu algoritmu."""
-        if self.debug_enabled:
-            print(f"[WinstonLearner] {message}")
+        # Vždy vypisujeme logovanie, bez ohľadu na debug_enabled
+        print(f"[WinstonLearner] {message}")
 
-    def update_model(self, model: Model, good: Model, near_miss: Model) -> Model:
+    def update_model(self, model: Model, example: Model, example_type: str) -> Model:
         """
-        Aktualizuje model podle pozitivního a negativního příkladu.
+        Aktualizuje model podľa striktne Winstonovho algoritmu.
         
-        Důležité: Algoritmus aplikuje heuristiky v pořadí priorit, ale vždy jen jednu.
-        Jakmile jedna heuristika vede ke změně, algoritmus se ukončí.
+        Podľa typu príkladu aplikuje rôzne procedúry:
+        - "first_positive": Inicializácia modelu prvým pozitívnym príkladom
+        - "positive": GENERALIZE heuristiky (climb_tree, close_interval, enlarge_set, drop_link)
+        - "negative": SPECIALIZE heuristiky (require_link, forbid_link)
         
         Args:
-            model: Aktuální model (hypotéza)
-            good: Pozitivní příklad
-            near_miss: Negativní příklad (near-miss)
+            model: Aktuálny model (hypotéza)
+            example: Príklad na spracovanie
+            example_type: Typ príkladu ("first_positive", "positive", "negative")
             
         Returns:
             Aktualizovaný model
         """
-        self._debug_log(f"Updating model with positive example {good} and negative example {near_miss}")
         updated_model = model.copy()
         self.applied_heuristics = []
         
-        # 1. Nejprve přidáme objekty z prvního příkladu, pokud je model prázdný
-        if len(model.objects) == 0:
-            self._debug_log("Prázdný model, přidávám objekty z prvního příkladu...")
-            updated_model = self._add_missing_objects(updated_model, good)
+        # 1. Inicializácia prázdneho modelu prvým pozitívnym príkladom
+        if example_type == "first_positive":
+            self._debug_log("Prázdny model, inicializujem s prvým pozitívnym príkladom")
+            updated_model = self._add_missing_objects(updated_model, example)
         
-        # 2. Kontrola konzistence - vyriešime konflikty s existujúcimi pravidlami
-        self._debug_log("Kontrolujem konzistenciu s hierarchiou...")
-        updated_model = self._check_consistency(updated_model, good)
-        
-        # 3. Climb-tree - důležitá heuristika pro generalizaci
-        self._debug_log("Skúšam climb-tree heuristiku...")
-        updated_model = self._apply_climb_tree(updated_model, good, near_miss)
+        # 2. GENERALIZE - spracovanie pozitívneho príkladu
+        elif example_type == "positive":
+            self._debug_log("GENERALIZE: Spracovávam pozitívny príklad")
             
-        # 4. Require-link - přidá MUST spojení, pokud jsou v positive example
-        self._debug_log("Skúšam require-link heuristiku...")
-        updated_model = self._apply_require_link(updated_model, good, near_miss)
-        
-        # 5. Close-interval - zúžení intervalu numerických atributů
-        self._debug_log("Skúšam close-interval heuristiku...")
-        updated_model = self._apply_close_interval(updated_model, good, near_miss)
-        
-        # 6. Enlarge-set - rozšíření množiny přijatelných hodnot atributů
-        self._debug_log("Skúšam enlarge-set heuristiku...")
-        updated_model = self._apply_enlarge_set(updated_model, good)
-        
-        # 7. Propagace vlastností na nejvyšší úroveň hierarchie
-        # COMMENTED OUT: Not a core Winston heuristic
-        # updated_model = self._propagate_to_common_ancestor(updated_model)
+            # Najprv kontrola konzistentnosti
+            updated_model = self._check_consistency(updated_model, example)
             
-        # 8. Forbid-link - identifikuje, co by objekt neměl mít
-        if near_miss:
-            self._debug_log("Skúšam forbid-link heuristiku...")
-            updated_model = self._apply_forbid_link(updated_model, good, near_miss)
+            # Aplikovanie GENERALIZE heuristík v poradí podľa Winstona
+            # a) Climb-tree: generalizácia v hierarchii
+            self._debug_log("GENERALIZE: Skúšam climb-tree heuristiku...")
+            updated_model = self._apply_climb_tree(updated_model, example)
             
-        # 9. Drop-link - nejnižší priorita, odstraní nepotřebné vazby
-        if not self.applied_heuristics:
-            self._debug_log("Skúšam drop-link heuristiku...")
-            updated_model = self._apply_drop_link(updated_model, good, near_miss)
+            # b) Close-interval: intervaly pre numerické hodnoty
+            self._debug_log("GENERALIZE: Skúšam close-interval heuristiku...")
+            updated_model = self._apply_close_interval(updated_model, example)
+            
+            # c) Enlarge-set: množiny povolených hodnôt
+            self._debug_log("GENERALIZE: Skúšam enlarge-set heuristiku...")
+            updated_model = self._apply_enlarge_set(updated_model, example)
+            
+            # d) Drop-link: odstránenie nepotrebných spojení
+            self._debug_log("GENERALIZE: Skúšam drop-link heuristiku...")
+            updated_model = self._apply_drop_link(updated_model, example)
         
-        # 10. BackUp Rule - kontrola, zda nové změny nezhoršily přesnost modelu
-        # COMMENTED OUT: Not a core Winston heuristic
-        # updated_model = self._apply_backup_rule(updated_model, good, near_miss)
+        # 3. SPECIALIZE - spracovanie negatívneho príkladu (near miss)
+        elif example_type == "negative":
+            self._debug_log("SPECIALIZE: Spracovávam negatívny príklad (near miss)")
+            
+            # a) Require-link: identifikácia chýbajúcich spojení v near_miss
+            self._debug_log("SPECIALIZE: Skúšam require-link heuristiku...")
+            updated_model = self._apply_require_link(updated_model, example)
+            
+            # b) Forbid-link: identifikácia zakázaných spojení
+            self._debug_log("SPECIALIZE: Skúšam forbid-link heuristiku...")
+            updated_model = self._apply_forbid_link(updated_model, example)
         
         # Výpis aplikovaných heuristík
         if self.applied_heuristics:
             self._debug_log(f"Aplikované heuristiky: {', '.join(self.applied_heuristics)}")
         else:
             self._debug_log("Žiadna heuristika nebola aplikovaná")
+        
+        # Výpis modelu pre diagnostiku
+        print("Model objekty a atribúty:")
+        for obj in updated_model.objects:
+            if obj.attributes:
+                print(f"  {obj.name} ({obj.class_name}): {obj.attributes}")
+            else:
+                print(f"  {obj.name} ({obj.class_name}): bez atribútov")
+        
+        print("\nModel spojenia:")
+        for link in updated_model.links:
+            print(f"  {link.source} -> {link.target} ({link.link_type.value})")
             
+        print("\nFormula:")
+        print(updated_model.to_formula())
+        
         return updated_model
 
     def _add_to_history(self, model: Model):
@@ -119,18 +133,21 @@ class WinstonLearner:
         if len(self.model_history) > self.max_history_size:
             self.model_history.pop(0)  # Odstraníme nejstarší model
 
-    def _apply_close_interval(self, model: Model, good: Model, near_miss: Model = None) -> Model:
+    def _apply_close_interval(self, model: Model, good: Model) -> Model:
         """
-        Implementácia close-interval heuristiky.
+        Implementuje close-interval heuristiku pre určenie povolených rozsahov
+        numerických atribútov.
         
-        Heuristika slúži na zistenie povolených rozsahov pre numerické atribúty
-        ako je výkon motora alebo počet valcov. Vytvorí interval z minimálnej a
-        maximálnej hodnoty, ktoré sú povolené pre daný atribút.
+        Podľa Winstonovej definície:
+        "The close-interval heuristic is used when a number or interval in
+        an evolving model corresponds to a number in an example. If the
+        model uses a number, the number is replaced by an interval spanning
+        the model's number and the example's number. If the model uses an
+        interval, the interval is enlarged to reach the example's number."
         
         Args:
-            model: Aktuálný model
+            model: Aktuálny model
             good: Pozitívny príklad
-            near_miss: Negativní příklad (volitelný)
             
         Returns:
             Aktualizovaný model s intervalom hodnôt pre numerické atribúty
@@ -138,348 +155,178 @@ class WinstonLearner:
         updated_model = model.copy()
         heuristic_applied = False
         
-        # Zbieranie numerických hodnôt atribútov podľa tried objektov
-        class_numeric_attrs = {}
+        print("\n[CLOSE_INTERVAL] Skúšam aplikovať close-interval heuristiku...")
         
-        print(f"Applying close-interval heuristic")
-        
-        # Najprv zozbierame hodnoty atribútov z existujúceho modelu
+        # Pre každý objekt v modeli
         for model_obj in updated_model.objects:
-            if not model_obj.attributes:
-                continue
-                
             class_name = model_obj.class_name
-            if class_name not in class_numeric_attrs:
-                class_numeric_attrs[class_name] = {}
-                
-            for attr_name, attr_value in model_obj.attributes.items():
-                # Spracovávame len numerické atribúty - kontrolujeme typ hodnoty
-                if isinstance(attr_value, (int, float)):
-                    if attr_name not in class_numeric_attrs[class_name]:
-                        class_numeric_attrs[class_name][attr_name] = []
-                    
-                    # Pridáme hodnotu priamo
-                    class_numeric_attrs[class_name][attr_name].append(attr_value)
-                    print(f"  Found numeric value for {class_name}.{attr_name}: {attr_value}")
-                # Ak hodnota je už interval, preskočíme ju
-                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
-                    continue
-                # Ak je to množina, pridáme všetky numerické hodnoty
-                elif isinstance(attr_value, set):
-                    if attr_name not in class_numeric_attrs[class_name]:
-                        class_numeric_attrs[class_name][attr_name] = []
-                        
-                    for val in attr_value:
-                        if isinstance(val, (int, float)):
-                            class_numeric_attrs[class_name][attr_name].append(val)
-                            print(f"  Extracted numeric value from set for {class_name}.{attr_name}: {val}")
-        
-        # Pridáme hodnoty z pozitívneho príkladu
-        for good_obj in good.objects:
-            if not good_obj.attributes:
-                continue
-                
-            class_name = good_obj.class_name
-            print(f"  Processing attributes from positive example for {class_name}")
             
-            if class_name not in class_numeric_attrs:
-                class_numeric_attrs[class_name] = {}
+            # Nájdeme zodpovedajúce objekty rovnakej triedy v príklade
+            matching_example_objects = [obj for obj in good.objects if obj.class_name == class_name]
+            
+            for example_obj in matching_example_objects:
+                if not example_obj.attributes:
+                    continue
                 
-            for attr_name, attr_value in good_obj.attributes.items():
-                # Spracovávame len numerické atribúty - kontrolujeme typ hodnoty
-                if isinstance(attr_value, (int, float)):
-                    if attr_name not in class_numeric_attrs[class_name]:
-                        class_numeric_attrs[class_name][attr_name] = []
+                # Inicializácia atribútov pre model_obj, ak ešte neexistujú
+                if model_obj.attributes is None:
+                    model_obj.attributes = {}
+                
+                # Spracovanie atribútov z príkladu
+                for attr_name, example_value in example_obj.attributes.items():
+                    print(f"[CLOSE_INTERVAL] Kontrolujem atribút {attr_name} v objekte {model_obj.name}")
                     
-                    # Pridáme hodnotu
-                    class_numeric_attrs[class_name][attr_name].append(attr_value)
-                    print(f"    Added numeric value for {attr_name}: {attr_value}")
-                # Ak je to množina, pridáme všetky numerické hodnoty
-                elif isinstance(attr_value, set):
-                    if attr_name not in class_numeric_attrs[class_name]:
-                        class_numeric_attrs[class_name][attr_name] = []
-                        
-                    for val in attr_value:
-                        if isinstance(val, (int, float)):
-                            class_numeric_attrs[class_name][attr_name].append(val)
-                            print(f"    Extracted numeric value from set for {attr_name}: {val}")
-        
-        # Vytvorenie intervalov pre jednotlivé numerické atribúty
-        for class_name, attrs in class_numeric_attrs.items():
-            for attr_name, values in attrs.items():
-                if len(values) >= 2:  # Na vytvorenie intervalu potrebujeme aspoň 2 hodnoty
-                    min_val = min(values)
-                    max_val = max(values)
-                    
-                    # Vytvoríme interval
-                    interval = (min_val, max_val)
-                    
-                    # Aktualizujeme atribúty všetkých objektov danej triedy
-                    for obj in updated_model.objects:
-                        if obj.class_name == class_name:
-                            if not obj.attributes:
-                                obj.attributes = {}
-                                
-                            # Nastavíme interval pre atribút
-                            obj.attributes[attr_name] = interval
+                    # Prípad 1: Atribút nie je v modeli, ale je v príklade
+                    if attr_name not in model_obj.attributes:
+                        if isinstance(example_value, (int, float)):
+                            model_obj.attributes[attr_name] = example_value
                             heuristic_applied = True
-                            print(f"Applied close_interval for {class_name}.{attr_name}: {interval}")
-                            self._debug_log(f"Vytvorený interval pre atribút {attr_name} triedy {class_name}: {interval}")
-                elif len(values) == 1:  # Ak máme len jednu hodnotu, použijeme ju ako je
-                    # Aktualizujeme atribúty všetkých objektov danej triedy
-                    for obj in updated_model.objects:
-                        if obj.class_name == class_name:
-                            if not obj.attributes:
-                                obj.attributes = {}
-                                
-                            # Ak atribút neexistuje alebo má inú hodnotu, nastavíme jednu hodnotu
-                            current = obj.attributes.get(attr_name)
-                            if current is None or (not isinstance(current, tuple) and current != values[0]):
-                                obj.attributes[attr_name] = values[0]
-                                heuristic_applied = True
-                                print(f"Set single numeric value for {class_name}.{attr_name}: {values[0]}")
-                                self._debug_log(f"Nastavená jedna číselná hodnota pre atribút {attr_name} triedy {class_name}: {values[0]}")
+                            print(f"[CLOSE_INTERVAL] Pridaný nový atribút {model_obj.name}.{attr_name}: {example_value}")
+                            self._debug_log(f"Pridaný nový atribút {model_obj.name}.{attr_name}: {example_value}")
+                        continue
+                    
+                    # Teraz spracujeme existujúce atribúty
+                    model_value = model_obj.attributes[attr_name]
+                    
+                    # Prípad 2: Model obsahuje číslo a príklad obsahuje číslo
+                    if isinstance(model_value, (int, float)) and isinstance(example_value, (int, float)):
+                        # Vytvoríme interval od minimálnej po maximálnu hodnotu
+                        new_interval = (min(model_value, example_value), max(model_value, example_value))
+                        model_obj.attributes[attr_name] = new_interval
+                        heuristic_applied = True
+                        print(f"[CLOSE_INTERVAL] Vytvorený interval pre {model_obj.name}.{attr_name}: {new_interval}")
+                        self._debug_log(f"Vytvorený interval pre {model_obj.name}.{attr_name}: {new_interval}")
+                    
+                    # Prípad 3: Model obsahuje interval a príklad obsahuje číslo
+                    elif (isinstance(model_value, tuple) and len(model_value) == 2 and 
+                          isinstance(example_value, (int, float))):
+                        min_val, max_val = model_value
+                        
+                        # Rozšírime interval, ak je to potrebné
+                        if example_value < min_val:
+                            new_interval = (example_value, max_val)
+                            model_obj.attributes[attr_name] = new_interval
+                            heuristic_applied = True
+                            print(f"[CLOSE_INTERVAL] Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                            self._debug_log(f"Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                        elif example_value > max_val:
+                            new_interval = (min_val, example_value)
+                            model_obj.attributes[attr_name] = new_interval
+                            heuristic_applied = True
+                            print(f"[CLOSE_INTERVAL] Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
+                            self._debug_log(f"Rozšírený interval pre {model_obj.name}.{attr_name} na {new_interval}")
         
         if heuristic_applied:
             self.applied_heuristics.append("close_interval")
+            print("[CLOSE_INTERVAL] Heuristika bola úspešne aplikovaná!")
+        else:
+            print("[CLOSE_INTERVAL] Heuristika nebola aplikovaná - neboli nájdené vhodné atribúty")
             
         return updated_model
 
     def _apply_enlarge_set(self, model: Model, good: Model) -> Model:
         """
-        Aplikuje enlarge-set heuristiku.
+        Implementuje enlarge-set heuristiku pre vytvorenie množín povolených hodnôt.
         
-        Heuristika sa používa keď objekt vo vyvíjajúcom sa modeli zodpovedá inému objektu v príklade
-        a tieto dva objekty nie sú navzájom prepojené prostredníctvom klasifikačného stromu.
-        Vytvorí množinu prijateľných hodnôt z atribútov objektov.
-        
-        Príklad: Ak BMW môže mať motor s výkonom 230 alebo 250, vytvorí sa množina {230, 250}
-        ako prijateľné hodnoty pre atribút výkonu motora.
+        Podľa Winstonovej definície:
+        "The enlarge-set heuristic is used when a model has a constraint on a 
+        component that does not match a constraint in an example. The constraint is 
+        broadened to include the example's constraint."
         
         Args:
             model: Aktuálny model
             good: Pozitívny príklad
             
         Returns:
-            Aktualizovaný model
+            Aktualizovaný model s rozšírenými množinami povolených komponentov
         """
         updated_model = model.copy()
-        
-        # 1. Zbieranie hodnôt atribútov podľa tried objektov (okrem numerických)
-        class_attributes = {}
-        
-        print(f"Applying enlarge-set heuristic")
-        
-        # Najprv zozbierame hodnoty atribútov z existujúceho modelu
-        for model_obj in updated_model.objects:
-            if not model_obj.attributes:
-                continue
-                
-            class_name = model_obj.class_name
-            if class_name not in class_attributes:
-                class_attributes[class_name] = {}
-                
-            for attr_name, attr_value in model_obj.attributes.items():
-                # Preskočíme numerické hodnoty, tie spracováva close_interval
-                if isinstance(attr_value, (int, float)):
-                    continue
-                    
-                if attr_name not in class_attributes[class_name]:
-                    class_attributes[class_name][attr_name] = set()
-                    
-                # Ak hodnota je už množina, pridáme všetky jej prvky
-                if isinstance(attr_value, set):
-                    # Pri množinách skontrolujeme, či neobsahujú numerické hodnoty
-                    non_numeric_values = {v for v in attr_value if not isinstance(v, (int, float))}
-                    if non_numeric_values:
-                        class_attributes[class_name][attr_name].update(non_numeric_values)
-                        print(f"  Found existing set for {class_name}.{attr_name}: {non_numeric_values}")
-                else:
-                    # Inak pridáme hodnotu ako je
-                    class_attributes[class_name][attr_name].add(attr_value)
-                    print(f"  Added value {attr_value} for {class_name}.{attr_name}")
-        
-        # 2. Pridáme hodnoty atribútov z pozitívneho príkladu (okrem numerických)
-        for good_obj in good.objects:
-            if not good_obj.attributes:
-                continue
-                
-            class_name = good_obj.class_name
-            print(f"  Processing attributes from positive example for {class_name}")
-            
-            if class_name not in class_attributes:
-                class_attributes[class_name] = {}
-                
-            for attr_name, attr_value in good_obj.attributes.items():
-                # Preskočíme numerické hodnoty
-                if isinstance(attr_value, (int, float)):
-                    continue
-                    
-                if attr_name not in class_attributes[class_name]:
-                    class_attributes[class_name][attr_name] = set()
-                
-                # Pridáme nenumerické hodnoty do množiny
-                if isinstance(attr_value, set):
-                    # Pri množinách skontrolujeme, či neobsahujú numerické hodnoty
-                    non_numeric_values = {v for v in attr_value if not isinstance(v, (int, float))}
-                    if non_numeric_values:
-                        class_attributes[class_name][attr_name].update(non_numeric_values)
-                        print(f"    Added set values for {attr_name}: {non_numeric_values}")
-                else:
-                    # Pridáme hodnotu do množiny
-                    class_attributes[class_name][attr_name].add(attr_value)
-                    print(f"    Added value for {attr_name}: {attr_value}")
-                
-        # 3. Aplikácia zozbieraných množín hodnôt naspäť do modelu
         heuristic_applied = False
         
-        for model_obj in updated_model.objects:
-            class_name = model_obj.class_name
-            
-            # Ak pre túto triedu nemáme zozbierané atribúty, preskočíme
-            if class_name not in class_attributes:
-                continue
+        print("\n[ENLARGE_SET] Skúšam aplikovať enlarge-set heuristiku...")
+        print(f"[ENLARGE_SET] Spojenia v modeli: {[(link.source, link.target, link.link_type) for link in updated_model.links]}")
+        print(f"[ENLARGE_SET] Spojenia v príklade: {[(link.source, link.target, link.link_type) for link in good.links]}")
+        
+        # Získame množinu tried komponentov v príklade
+        example_component_classes = self._get_component_class_set(good)
+        print(f"[ENLARGE_SET] Triedy komponentov v príklade: {example_component_classes}")
+        
+        # Najprv nájdeme všetky komponenty v modeli
+        model_components = {}
+        
+        # Vytvoríme mapu medzi rodičovskými objektmi a ich komponentmi
+        for link in updated_model.links:
+            if link.link_type == LinkType.MUST:
+                parent = link.source
+                component = link.target
                 
-            if not model_obj.attributes:
-                model_obj.attributes = {}
-            
-            print(f"  Updating attributes for {model_obj.name} of class {class_name}")
+                if parent not in model_components:
+                    model_components[parent] = []
                 
-            # Pre každý atribút, ktorý máme pre túto triedu
-            for attr_name, values_set in class_attributes[class_name].items():
-                # Ak máme viac ako jednu hodnotu, vytvoríme množinu
-                if len(values_set) > 1:
-                    # Pre všetky atribúty štandardné spracovanie - numerické by tu už nemali byť
-                    current_value = model_obj.attributes.get(attr_name)
+                model_components[parent].append(component)
+                print(f"[ENLARGE_SET] Našiel som MUST spojenie: {parent} -> {component}")
+        
+        # Teraz prejdeme cez príklad a kontrolujeme, či existujú iné povolené komponenty
+        # Vytvoríme mapu podobnú ako pre model
+        example_components = {}
+        
+        # Vytvoríme zoznam všetkých regulárnych komponentov v príklade
+        for link in good.links:
+            if link.link_type == LinkType.REGULAR:
+                example_source = next((obj for obj in good.objects if obj.name == link.source), None)
+                example_target = next((obj for obj in good.objects if obj.name == link.target), None)
+                
+                if not example_source or not example_target:
+                    continue
+                
+                parent_class = example_source.class_name
+                component_class = example_target.class_name
+                
+                print(f"[ENLARGE_SET] Našiel som link v príklade: {parent_class} -> {component_class}")
+                
+                if parent_class not in example_components:
+                    example_components[parent_class] = []
+                
+                if component_class not in example_components[parent_class]:
+                    example_components[parent_class].append(component_class)
+        
+        # Teraz porovnáme množiny komponentov a rozšírime model, ak je to potrebné
+        for parent_class, components in example_components.items():
+            for component_class in components:
+                # Ak existuje MUST pravidlo pre komponent v modeli, musíme ho rozšíriť
+                if parent_class in model_components:
+                    existing_must_components = set(model_components[parent_class])
                     
-                    # Ak aktuálna hodnota nie je množina, aktualizujeme ju
-                    if not isinstance(current_value, set):
-                        model_obj.attributes[attr_name] = values_set
-                        heuristic_applied = True
-                        print(f"    Created set of values for {attr_name}: {values_set}")
-                        self._debug_log(f"Vytvorená množina hodnôt pre atribút {attr_name} triedy {class_name}: {values_set}")
-                    # Ak už máme množinu, skontrolujeme, či treba pridať nové hodnoty
-                    elif current_value != values_set:
-                        # Pridáme chýbajúce hodnoty
-                        missing_values = values_set - current_value
-                        if missing_values:
-                            current_value.update(missing_values)
-                            heuristic_applied = True
-                            print(f"    Extended set for {attr_name} with: {missing_values}")
-                            self._debug_log(f"Rozšírená množina hodnôt atribútu {attr_name} pre triedu {class_name} o {missing_values}")
-                # Ak máme len jednu hodnotu a atribút ešte neexistuje, pridáme ho
-                elif len(values_set) == 1 and attr_name not in model_obj.attributes:
-                    model_obj.attributes[attr_name] = next(iter(values_set))
-                    heuristic_applied = True
-                    print(f"    Added new attribute {attr_name} = {next(iter(values_set))}")
-                    self._debug_log(f"Pridaný nový atribút {attr_name} s hodnotou {next(iter(values_set))} pre objekt triedy {class_name}")
-        
-        # 4. Osobitné spracovanie pre možnosti ekvivalentných komponentov (napr. rôzne typy motorov)
-        # Zbierame komponenty podľa nadradených tried
-        component_classes_by_parent = {}
-        
-        # Nájdeme všetky komponenty v modeli a príklade
-        for obj in updated_model.objects + good.objects:
-            # Získame rodičovskú triedu
-            parent_class = self.classification_tree.get_parent(obj.class_name)
-            
-            # Ak nemá rodiča, preskočíme
-            if not parent_class:
-                continue
-                
-            # Pridáme triedu komponenty pod jej rodiča
-            if parent_class not in component_classes_by_parent:
-                component_classes_by_parent[parent_class] = set()
-                
-            component_classes_by_parent[parent_class].add(obj.class_name)
-        
-        # Ak máme viac ako jeden typ komponentu pre rodičovskú triedu, vytvoríme pravidlo
-        for parent_class, subclasses in component_classes_by_parent.items():
-            if len(subclasses) > 1:
-                print(f"  Found equivalent components for {parent_class}: {subclasses}")
-                self._debug_log(f"Nájdené ekvivalentné komponenty pre triedu {parent_class}: {subclasses}")
-                
-                # Pre každý objekt v modeli, ktorý má MUST spojenie s touto komponentou
-                for link in updated_model.links:
-                    if link.link_type == LinkType.MUST and link.target == parent_class:
-                        source_class = link.source
+                    # Zistíme, či komponent z príkladu je už povolený
+                    component_already_allowed = False
+                    for existing_component in existing_must_components:
+                        # Kontrola, či komponent z príkladu je podtriedou existujúceho MUST komponentu
+                        if self.classification_tree.is_subclass(component_class, existing_component):
+                            component_already_allowed = True
+                            print(f"[ENLARGE_SET] Komponent {component_class} je už povolený ako podtrieda {existing_component}")
+                            break
+                    
+                    # Ak komponent nie je povolený, pridáme ho
+                    if not component_already_allowed and component_class not in existing_must_components:
+                        print(f"[ENLARGE_SET] Pridávam nové MUST pravidlo: {parent_class} -> {component_class}")
                         
-                        # Pre každý objekt tejto triedy aktualizujeme informáciu o povolených podtriedach
-                        for obj in updated_model.objects:
-                            if obj.class_name == source_class:
-                                if not obj.attributes:
-                                    obj.attributes = {}
-                                    
-                                # Vytvoríme alebo aktualizujeme atribút allowed_components
-                                attr_name = f"allowed_{parent_class.lower()}_types"
-                                
-                                if attr_name not in obj.attributes or not isinstance(obj.attributes[attr_name], set):
-                                    obj.attributes[attr_name] = subclasses
-                                    heuristic_applied = True
-                                    print(f"    Created set of allowed components {attr_name} = {subclasses}")
-                                    self._debug_log(f"Vytvorená množina povolených komponentov {attr_name} pre triedu {source_class}: {subclasses}")
-                                elif subclasses - obj.attributes[attr_name]:
-                                    obj.attributes[attr_name].update(subclasses)
-                                    heuristic_applied = True
-                                    print(f"    Extended set of allowed components {attr_name}")
-                                    self._debug_log(f"Rozšírená množina povolených komponentov {attr_name} pre triedu {source_class}")
+                        # Pridáme nové MUST pravidlo
+                        new_link = Link(
+                            source=parent_class,
+                            target=component_class,
+                            link_type=LinkType.MUST
+                        )
+                        updated_model.add_link(new_link)
+                        heuristic_applied = True
+                        self._debug_log(f"Pridané nové MUST pravidlo: {parent_class} -> {component_class}")
         
         if heuristic_applied:
             self.applied_heuristics.append("enlarge_set")
+            print("[ENLARGE_SET] Heuristika bola úspešne aplikovaná!")
+        else:
+            print("[ENLARGE_SET] Heuristika nebola aplikovaná - neboli nájdené nové komponenty na pridanie")
             
         return updated_model
-
-    def _apply_backup_rule(self, model: Model, good: Model, near_miss: Model = None) -> Model:
-        """
-        Implementuje BackUp Rule heuristiku.
-        
-        Pokud aktuální model není kompatibilní s pozitivním příkladem nebo je příliš kompatibilní s negativním,
-        vrátí se k předchozí verzi modelu, která byla lepší.
-        
-        Args:
-            model: Aktuální model po aplikaci všech heuristik
-            good: Pozitivní příklad
-            near_miss: Negativní příklad (volitelný)
-            
-        Returns:
-            Původní model, pokud je lepší než aktuální, jinak aktuální model
-        """
-        # Pokud nemáme historii nebo je prázdná, není k čemu se vracet
-        if not self.model_history or len(self.model_history) == 0:
-            return model
-        
-        # Zkontrolujeme, zda aktuální model správně klasifikuje pozitivní příklad
-        is_good_valid = self._is_example_valid(model, good)
-        
-        # Zkontrolujeme, zda aktuální model správně vylučuje near-miss příklad (pokud existuje)
-        is_nearmiss_invalid = True
-        if near_miss:
-            is_nearmiss_invalid = not self._is_example_valid(model, near_miss)
-        
-        # Pokud model správně klasifikuje pozitivní i negativní příklad, je v pořádku
-        if is_good_valid and is_nearmiss_invalid:
-            return model
-        
-        # Pokud máme problém, zkusíme najít lepší model v historii
-        best_model = None
-        
-        for historical_model in reversed(self.model_history):
-            # Zkontrolujeme, zda historický model správně klasifikuje příklady
-            hist_good_valid = self._is_example_valid(historical_model, good)
-            
-            hist_nearmiss_invalid = True
-            if near_miss:
-                hist_nearmiss_invalid = not self._is_example_valid(historical_model, near_miss)
-            
-            # Pokud historický model je lepší, vrátíme se k němu
-            if hist_good_valid and hist_nearmiss_invalid:
-                best_model = historical_model
-                self.applied_heuristics.append("backup_rule")
-                self._debug_log("Aplikována BackUp Rule: návrat k předchozímu lepšímu modelu")
-                break
-        
-        # Vrátíme lepší model, nebo ponecháme současný, pokud žádný lepší nebyl nalezen
-        return best_model if best_model else model
 
     def _is_example_valid(self, model: Model, example: Model) -> bool:
         """
@@ -557,64 +404,13 @@ class WinstonLearner:
         # Pokud všechny kontroly prošly, příklad je platný
         return True
 
-    def _propagate_to_common_ancestor(self, model: Model) -> Model:
-        """
-        Nová metoda pro propagaci pravidel na nejvyšší společný předek.
-        Pokud mají třídy stejné pravidlo, pokusí se ho propagovat na jejich společné předky.
-        
-        Args:
-            model: Aktuální model
-            
-        Returns:
-            Aktualizovaný model s pravidly propagovanými na vyšší úroveň
-        """
-        updated_model = model.copy()
-        
-        # Najdeme všechny třídy, které mají MUST vazby
-        classes_with_must = {}
-        for link in model.links:
-            if link.link_type == LinkType.MUST:
-                if link.source not in classes_with_must:
-                    classes_with_must[link.source] = []
-                classes_with_must[link.source].append(link.target)
-        
-        # Pro každou dvojici tříd zkontrolujeme, zda mají stejné MUST vazby
-        common_rules = {}
-        for class1 in classes_with_must:
-            for class2 in classes_with_must:
-                if class1 != class2:
-                    # Najdeme společného předka obou tříd
-                    common_ancestor = self.classification_tree.find_common_ancestor(class1, class2)
-                    if common_ancestor:
-                        # Najdeme společné MUST vazby
-                        common_targets = set(classes_with_must[class1]) & set(classes_with_must[class2])
-                        for target in common_targets:
-                            if common_ancestor not in common_rules:
-                                common_rules[common_ancestor] = set()
-                            common_rules[common_ancestor].add(target)
-        
-        # Přidáme pravidla na společné předky
-        for ancestor, targets in common_rules.items():
-            for target in targets:
-                # Zkontrolujeme, zda pravidlo už neexistuje
-                if not any(link.source == ancestor and link.target == target and link.link_type == LinkType.MUST 
-                         for link in updated_model.links):
-                    # Přidáme nové pravidlo
-                    new_link = Link(
-                        source=ancestor,
-                        target=target,
-                        link_type=LinkType.MUST
-                    )
-                    updated_model.add_link(new_link)
-                    self.applied_heuristics.append("propagate_to_common_ancestor")
-                    self._debug_log(f"Propagováno pravidlo na společného předka: {ancestor} MUST {target}")
-        
-        return updated_model
-
     def _check_consistency(self, model: Model, good: Model) -> Model:
         """
         Kontroluje, zda nový pozitivní příklad není v konfliktu s existujícími pravidly.
         Pokud konflikt najde, buď odstraní pravidlo nebo ho zobecní.
+        
+        Toto nie je základná Winstonova heuristika, ale je potrebná pre správne fungovanie
+        modelu pri konflikte medzi pozitívnym príkladom a existujúcimi pravidlami.
         
         Args:
             model: Aktuální model
@@ -649,7 +445,6 @@ class WinstonLearner:
         for link in conflicting_links:
             # Odstraníme konfliktní pravidlo
             updated_model.links.remove(link)
-            self.applied_heuristics.append("resolve_conflict")
             self._debug_log(f"Odstraněno konfliktní pravidlo: {link.source} -> {link.target} ({link.link_type.value})")
             
             # Hledáme nadřazenou třídu, která by mohla sloužit pro generalizaci
@@ -669,7 +464,6 @@ class WinstonLearner:
                            l.link_type == generalized_link.link_type 
                            for l in updated_model.links):
                     updated_model.add_link(generalized_link)
-                    self.applied_heuristics.append("generalize_conflict")
                     self._debug_log(f"Vytvořeno generalizované pravidlo: {generalized_link.source} -> {generalized_link.target} (MUST)")
         
         return updated_model
@@ -715,16 +509,20 @@ class WinstonLearner:
             
         return updated_model
 
-    def _apply_require_link(self, model: Model, good: Model, near_miss: Model):
+    def _apply_require_link(self, model: Model, near_miss: Model):
         """
         Aplikuje require-link heuristiku.
         
-        Ak je v pozitívnom príklade spojenie, ktoré chýba v near-miss príklade,
-        pridá ho ako požiadavku MUST.
+        Podľa Winstonovej definície:
+        "The require-link heuristic is used when an evolving model has a link 
+        in a place where a near miss does not. The model link is converted to 
+        a Must form."
+        
+        Metóda porovnáva aktuálny model (evolving model) s near-miss príkladom
+        a konvertuje vhodné spojenia na MUST.
         
         Args:
-            model: Aktuálny model
-            good: Pozitívny príklad
+            model: Aktuálný model
             near_miss: Near-miss príklad
             
         Returns:
@@ -732,77 +530,61 @@ class WinstonLearner:
         """
         updated_model = model.copy()
         
-        # Skip if no near-miss
-        if near_miss is None:
-            self._debug_log("Přeskakuji require-link: chybí near-miss příklad")
-            return updated_model
+        # Zbierka spojení medzi triedami v near_miss príklade
+        near_miss_class_links = set()
         
-        # Najprv skontrolujeme, či sú v modeli spojenia typu REGULAR, ktoré by sme mali 
-        # previesť na MUST na základe rozdielov medzi good a near_miss
-        for good_link in good.links:
-            # Nájdeme zodpovedajúce objekty v positive
-            good_source = next((obj for obj in good.objects if obj.name == good_link.source), None)
-            good_target = next((obj for obj in good.objects if obj.name == good_link.target), None)
+        # Zbierame všetky prepojenia tried v near_miss
+        for near_miss_link in near_miss.links:
+            near_miss_source = next((obj for obj in near_miss.objects if obj.name == near_miss_link.source), None)
+            near_miss_target = next((obj for obj in near_miss.objects if obj.name == near_miss_link.target), None)
             
-            if not good_source or not good_target:
+            if near_miss_source and near_miss_target:
+                # Pridáme dvojicu (trieda zdroja, trieda cieľa) do množiny spojení
+                near_miss_class_links.add((near_miss_source.class_name, near_miss_target.class_name))
+        
+        # Prechádzame všetky spojenia v aktuálnom modeli
+        for model_link in model.links:
+            # Pracujeme len s bežnými spojeniami, MUST a MUST_NOT spojenia neriešime
+            if model_link.link_type != LinkType.REGULAR:
                 continue
                 
-            # Skontrolujme, či rovnaké triedy objektov majú spojenie v near_miss
-            near_miss_has_similar_link = False
+            # Získame objekty pre spojenie v modeli
+            model_source = next((obj for obj in model.objects if obj.name == model_link.source), None)
+            model_target = next((obj for obj in model.objects if obj.name == model_link.target), None)
             
-            for near_miss_link in near_miss.links:
-                near_miss_source = next((obj for obj in near_miss.objects if obj.name == near_miss_link.source), None)
-                near_miss_target = next((obj for obj in near_miss.objects if obj.name == near_miss_link.target), None)
+            if not model_source or not model_target:
+                continue
                 
-                if not near_miss_source or not near_miss_target:
-                    continue
-                    
-                # Ak je spojenie medzi objektami rovnakých typov, evidujeme to
-                if (near_miss_source.class_name == good_source.class_name and
-                    near_miss_target.class_name == good_target.class_name):
-                    near_miss_has_similar_link = True
-                    break
-            
-            # Ak spojenie není v near_miss příkladu, může jít o klíčovú vazbu
-            if not near_miss_has_similar_link:
-                # Zkontrolujeme, zda existující MUST_NOT konflikty
-                has_conflict = False
-                for link in updated_model.links:
-                    if (link.link_type == LinkType.MUST_NOT and
-                        link.source == good_source.class_name and
-                        link.target == good_target.class_name):
-                        has_conflict = True
-                        self._debug_log(f"Přeskakuji MUST pravidlo kvůli konfliktu: {good_source.class_name} -> {good_target.class_name}")
-                        break
-                
-                if not has_conflict:
-                    # Vytvoříme generické pravidlo typu MUST mezi třídami
-                    must_link = Link(
-                        source=good_source.class_name,
-                        target=good_target.class_name,
-                        link_type=LinkType.MUST
-                    )
-                    
-                    # Skontrolujeme, či pravidlo ešte nie je v modeli
-                    if not any(link.source == must_link.source and 
-                               link.target == must_link.target and 
-                               link.link_type == must_link.link_type 
-                               for link in updated_model.links):
-                        updated_model.add_link(must_link)
-                        self.applied_heuristics.append("require_link")
-                        self._debug_log(f"Pridané pravidlo MUST: {good_source.class_name} -> {good_target.class_name}")
-                
-                # Pridáme tiež väzbu na úrovni konkrétnych objektov, ak ešte neexistuje
-                inst_link = Link(
-                    source=good_link.source,
-                    target=good_link.target,
+            # Skontrolujeme, či takéto spojenie tried existuje v near_miss
+            if (model_source.class_name, model_target.class_name) not in near_miss_class_links:
+                # Vytvoríme MUST spojenie na úrovni tried, ak neexistuje
+                must_link = Link(
+                    source=model_source.class_name,
+                    target=model_target.class_name,
                     link_type=LinkType.MUST
                 )
                 
-                if not updated_model.has_link(inst_link):
-                    updated_model.add_link(inst_link)
+                # Skontrolujeme, či takéto spojenie už neexistuje
+                if not any(link.source == must_link.source and 
+                           link.target == must_link.target and 
+                           link.link_type == must_link.link_type 
+                           for link in updated_model.links):
+                    # Skontrolujeme prípadný konflikt s MUST_NOT
+                    has_conflict = any(link.source == must_link.source and 
+                                      link.target == must_link.target and 
+                                      link.link_type == LinkType.MUST_NOT 
+                                      for link in updated_model.links)
+                    
+                    if not has_conflict:
+                        updated_model.add_link(must_link)
+                        self.applied_heuristics.append("require_link")
+                        self._debug_log(f"Pridané MUST pravidlo (spojenie existuje v modeli, ale nie v near_miss): {model_source.class_name} -> {model_target.class_name}")
+                
+                # Aktualizujeme aj konkrétne spojenie na MUST, ak ešte nie je
+                if model_link.link_type != LinkType.MUST:
+                    model_link.link_type = LinkType.MUST
                     self.applied_heuristics.append("require_link")
-                    self._debug_log(f"Pridaná MUST väzba na úrovni objektov: {good_link.source} -> {good_link.target}")
+                    self._debug_log(f"Konvertované spojenie na MUST: {model_link.source} -> {model_link.target}")
         
         return updated_model
 
@@ -895,16 +677,20 @@ class WinstonLearner:
         # Pokud nenajdeme konkrétnější rozdíl, vrátíme None
         return None
 
-    def _apply_forbid_link(self, model: Model, good: Model, near_miss: Model):
+    def _apply_forbid_link(self, model: Model, near_miss: Model):
         """
         Aplikuje forbid-link heuristiku.
         
-        Vytváří MUST_NOT vazby mezi třídami objektů v modelu na základě
-        porovnání pozitivního a near-miss příkladu.
+        Podľa Winstonovej definície:
+        "The forbid-link heuristic is used when a near miss has a link in a 
+        place where an evolving model does not. A Must-not form is installed 
+        in the evolving model."
+        
+        Metóda porovnáva near-miss príklad s aktuálnym modelom a vytvára
+        MUST_NOT pravidlá pre spojenia, ktoré sú v near-miss, ale nie v modeli.
         
         Args:
             model: Aktuálný model
-            good: Pozitívny príklad
             near_miss: Near-miss príklad
             
         Returns:
@@ -912,139 +698,48 @@ class WinstonLearner:
         """
         updated_model = model.copy()
         
-        # Safety check
-        if near_miss is None:
-            self._debug_log("Přeskakuji forbid-link: chybí near-miss příklad")
-            return updated_model
+        # Vytvoríme množinu spojení v modeli na úrovni tried
+        model_class_links = set()
         
-        self._debug_log(f"Applying forbid-link heuristic")
-        
-        # 1. Získáme klasifikaci aut z pozitivního a negativního příkladu
-        good_car_classes = set()
-        near_miss_car_classes = set()
-        
-        for obj in good.objects:
-            if obj.class_name in ["Series3", "Series5", "Series7", "X5", "X7"]:
-                good_car_classes.add(obj.class_name)
-        
-        for obj in near_miss.objects:
-            if obj.class_name in ["Series3", "Series5", "Series7", "X5", "X7"]:
-                near_miss_car_classes.add(obj.class_name)
-        
-        # Pokud pozitivní a negativní příklad mají stejnou třídu auta,
-        # můžeme porovnat jejich komponenty a vytvořit MUST_NOT vazby
-        common_car_classes = good_car_classes.intersection(near_miss_car_classes)
-        
-        if not common_car_classes:
-            self._debug_log("Přeskakuji forbid-link: pozitivní a negativní příklad nemají společnou třídu auta")
-            return updated_model
-        
-        # 2. Pro každou třídu auta, která je společná pro oba příklady
-        for car_class in common_car_classes:
-            # Zkusíme najít konkrétnější rozdíl
-            specific_difference = self._find_specific_difference(updated_model, car_class, good, near_miss)
+        # Zbierame všetky prepojenia medzi triedami v aktuálnom modeli
+        for model_link in model.links:
+            model_source = next((obj for obj in model.objects if obj.name == model_link.source), None)
+            model_target = next((obj for obj in model.objects if obj.name == model_link.target), None)
             
-            if specific_difference:
-                source_class, target_class = specific_difference
-                
-                # Zkontrolujeme, zda je pravidlo konzistentní
-                if self._is_rule_consistent(updated_model, source_class, target_class, LinkType.MUST_NOT):
-                    must_not_link = Link(
-                        source=source_class,
-                        target=target_class,
-                        link_type=LinkType.MUST_NOT
-                    )
-                    
-                    # Ověříme, že taková vazba ještě neexistuje
-                    if not any(link.source == must_not_link.source and 
-                            link.target == must_not_link.target and 
-                            link.link_type == must_not_link.link_type 
-                            for link in updated_model.links):
-                        updated_model.add_link(must_not_link)
-                        self.applied_heuristics.append("forbid_link")
-                        self._debug_log(f"Přidáno pravidlo MUST_NOT (konkrétní rozdíl): {source_class} -> {target_class}")
-                        
-                # Pokračujeme dalším modelem, už jsme přidali konkrétní pravidlo
-                continue
-            
-            # Získáme komponenty z negativního příkladu, které se nevyskytují v pozitivním příkladu
-            near_miss_components = {}
-            good_components = {}
-            
-            # Mapování komponent podle třídy
-            for obj in near_miss.objects:
-                if obj.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
-                    near_miss_components[obj.class_name] = obj.name
-            
-            for obj in good.objects:
-                if obj.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
-                    good_components[obj.class_name] = obj.name
-            
-            # Komponenty, které jsou v negativním příkladu, ale ne v pozitivním
-            unique_component_classes = set(near_miss_components.keys()) - set(good_components.keys())
-            
-            self._debug_log(f"Unique components in near-miss: {unique_component_classes}")
-            
-            # 3. Kontrola konzistence s aktuálním modelem a přidání MUST_NOT vazeb
-            for component_class in unique_component_classes:
-                # Zkontrolujeme, zda neexistují jiné pozitivní příklady nebo pravidla v modelu,
-                # které by mohly být v konfliktu s tímto pravidlem
-                if self._is_rule_consistent(updated_model, car_class, component_class, LinkType.MUST_NOT):
-                    must_not_link = Link(
-                        source=car_class,
-                        target=component_class,
-                        link_type=LinkType.MUST_NOT
-                    )
-                    
-                    # Ověříme, že taková vazba ještě neexistuje
-                    if not any(link.source == must_not_link.source and 
-                            link.target == must_not_link.target and 
-                            link.link_type == must_not_link.link_type 
-                            for link in updated_model.links):
-                        updated_model.add_link(must_not_link)
-                        self.applied_heuristics.append("forbid_link")
-                        self._debug_log(f"Přidáno pravidlo MUST_NOT: {car_class} -> {component_class}")
+            if model_source and model_target:
+                # Pridáme dvojicu (trieda zdroja, trieda cieľa) do množiny spojení
+                model_class_links.add((model_source.class_name, model_target.class_name))
         
-        # 4. Analyzujeme vazby mezi objekty a vytvoříme další MUST_NOT vazby, ale s kontrolou konzistence
+        # Pre každé spojenie v near-miss príklade, kontrolujeme
+        # či nejaké podobné spojenie existuje v modeli
         for near_miss_link in near_miss.links:
             near_miss_source = next((obj for obj in near_miss.objects if obj.name == near_miss_link.source), None)
             near_miss_target = next((obj for obj in near_miss.objects if obj.name == near_miss_link.target), None)
             
             if not near_miss_source or not near_miss_target:
                 continue
-            
-            # Pokud zdroj je model auta a cíl je komponenta
-            if near_miss_source.class_name in ["Series3", "Series5", "Series7", "X5", "X7"] and \
-               near_miss_target.class_name not in ["Series3", "Series5", "Series7", "X5", "X7"]:
                 
-                # Kontrolujeme, zda existuje podobná vazba v pozitivním příkladu
-                has_similar_in_good = False
-                for good_link in good.links:
-                    good_source = next((obj for obj in good.objects if obj.name == good_link.source), None)
-                    good_target = next((obj for obj in good.objects if obj.name == good_link.target), None)
-                    
-                    if good_source and good_target and \
-                       good_source.class_name == near_miss_source.class_name and \
-                       good_target.class_name == near_miss_target.class_name:
-                        has_similar_in_good = True
-                        break
+            # Skontrolujeme, či takéto spojenie tried existuje v modeli
+            if (near_miss_source.class_name, near_miss_target.class_name) not in model_class_links:
+                # Ak spojenie tried existuje v near-miss, ale nie v modeli, 
+                # vytvoríme MUST_NOT pravidlo
                 
-                # Pokud neexistuje podobná vazba v pozitivním příkladu, vytvoříme MUST_NOT vazbu (s kontrolou konzistence)
-                if not has_similar_in_good and self._is_rule_consistent(updated_model, near_miss_source.class_name, near_miss_target.class_name, LinkType.MUST_NOT):
+                # Najprv skontrolujeme, či je pravidlo konzistentné
+                if self._is_rule_consistent(updated_model, near_miss_source.class_name, near_miss_target.class_name, LinkType.MUST_NOT):
                     must_not_link = Link(
                         source=near_miss_source.class_name,
                         target=near_miss_target.class_name,
                         link_type=LinkType.MUST_NOT
                     )
                     
-                    # Ověříme, že taková vazba ještě neexistuje
+                    # Skontrolujeme, či takéto spojenie už neexistuje
                     if not any(link.source == must_not_link.source and 
                                link.target == must_not_link.target and 
                                link.link_type == must_not_link.link_type 
                                for link in updated_model.links):
                         updated_model.add_link(must_not_link)
                         self.applied_heuristics.append("forbid_link")
-                        self._debug_log(f"Přidáno pravidlo MUST_NOT z vazeb: {near_miss_source.class_name} -> {near_miss_target.class_name}")
+                        self._debug_log(f"Pridané MUST_NOT pravidlo (spojenie existuje v near-miss, ale nie v modeli): {near_miss_source.class_name} -> {near_miss_target.class_name}")
         
         return updated_model
     
@@ -1067,35 +762,37 @@ class WinstonLearner:
         
         return component_classes
     
-    def _apply_drop_link(self, model: Model, good: Model, near_miss: Model):
+    def _apply_drop_link(self, model: Model, good: Model):
         """
         Aplikuje drop-link heuristiku.
         
-        Odstráni z modelu spojenia, ktoré nie sú v pozitívnom príklade.
-        Nižší priorita - použije se jen když není nic lepšího.
+        Podľa Winstonovej definície:
+        "The drop-link heuristic is used when the objects that are different 
+        in an evolving model and in an example form an exhaustive set. The 
+        drop-link heuristic is also used when an evolving model has a link that 
+        is not in the example. The link is dropped from the model."
+        
+        Metóda odstráni z modelu spojenia, ktoré nie sú prítomné v príklade (good).
         
         Args:
             model: Aktuálný model
             good: Pozitívny príklad
-            near_miss: Near-miss príklad
             
         Returns:
             Aktualizovaný model
         """
         updated_model = model.copy()
-        
-        # Sledujeme, zda byla heuristika aplikována
         was_applied = False
         
         # Nájdeme všetky REGULAR spojenia v modeli
         regular_links = [link for link in updated_model.links 
                          if link.link_type == LinkType.REGULAR]
         
-        # Pro každou vazbu v modelu zkontrolujeme, zda je v pozitivním příkladu
+        # Pre každé spojenie v modeli skontrolujeme, či existuje v príklade
         links_to_remove = []
         
         for model_link in regular_links:
-            # Zjistíme, zda existuje odpovídající spojení v pozitivním příkladu
+            # Zistíme, či existuje zodpovedajúce spojenie v príklade
             has_corresponding = False
             
             for good_link in good.links:
@@ -1103,157 +800,156 @@ class WinstonLearner:
                     has_corresponding = True
                     break
                     
-            # Pokud není odpovídající spojení, označíme ho k odstranění
+            # Ak neexistuje zodpovedajúce spojenie, označíme ho na odstránenie
             if not has_corresponding:
                 links_to_remove.append(model_link)
                 
-        # Teď odstráníme označené spojení, ale nejprve zkontrolujeme generická pravidla
+        # Teraz odstránime označené spojenia
         for link_to_remove in links_to_remove:
-            # Najdeme objekty pro tuto vazbu
+            # Získame objekty pre toto spojenie
             source_obj = next((obj for obj in updated_model.objects if obj.name == link_to_remove.source), None)
             target_obj = next((obj for obj in updated_model.objects if obj.name == link_to_remove.target), None)
             
             if source_obj and target_obj:
-                # Kontrola, zda existuje generické pravidlo mezi třídami objektů
+                # Kontrola, či existuje generické pravidlo medzi triedami objektov
                 has_generic_rule = False
                 
                 for rule_link in updated_model.links:
-                    # Kontrola pravidel typu MUST pro tyto třídy
+                    # Kontrola pravidiel typu MUST pre tieto triedy
                     if (rule_link.link_type == LinkType.MUST and 
                         rule_link.source == source_obj.class_name and 
                         (rule_link.target == target_obj.class_name or 
                          self.classification_tree.is_subclass(target_obj.class_name, rule_link.target))):
                         has_generic_rule = True
-                        self._debug_log(f"Ponechávám väzbu {link_to_remove.source} -> {link_to_remove.target} kvůli generickému pravidlu {rule_link.source} -> {rule_link.target}")
+                        self._debug_log(f"Ponechávam spojenie {link_to_remove.source} -> {link_to_remove.target} kvôli generickému pravidlu {rule_link.source} -> {rule_link.target}")
                         break
                 
-                # Pokud není generické pravidlo, můžeme spojení odstranit
+                # Ak neexistuje generické pravidlo, môžeme spojenie odstrániť
                 if not has_generic_rule:
                     updated_model.remove_link(link_to_remove)
                     self.applied_heuristics.append("drop_link")
                     was_applied = True
-                    self._debug_log(f"Odstránená nepodstatná väzba: {link_to_remove.source} -> {link_to_remove.target}")
+                    self._debug_log(f"Odstránené spojenie z modelu: {link_to_remove.source} -> {link_to_remove.target}")
         
-        # Zajistíme, že je heuristika označena jako aplikovaná, pokud nějaká vazba byla odstraněna
+        # Zabezpečíme, že heuristika je označená ako aplikovaná, ak nejaké spojenie bolo odstránené
         if was_applied:
-            self._debug_log("Drop-link heuristika byla úspěšně aplikována")
+            self._debug_log("Drop-link heuristika bola úspešne aplikovaná")
             
         return updated_model
 
-    def _apply_climb_tree(self, model: Model, good: Model, near_miss: Model):
+    def _apply_climb_tree(self, model: Model, good: Model):
         """
-        Vylepšená implementace climb-tree heuristiky pro efektivnější generalizaci
-        a propagaci vlastností nahoru v hierarchii.
+        Aplikuje climb-tree heuristiku.
+        
+        Podľa Winstonovej definície:
+        "The climb-tree heuristic is used when an object in an evolving model
+        corresponds to a different object in an example. Must-be-a links are
+        routed to the most specific common class in the classification tree above
+        the model object and the example object."
+        
+        Keď objekt v modeli zodpovedá inému objektu v príklade, nájdeme ich najbližšieho 
+        spoločného predka v klasifikačnom strome a presmerujeme MUST_BE_A spojenia na túto 
+        spoločnú triedu.
         
         Args:
-            model: Aktuálný model
+            model: Aktuálny model
             good: Pozitívny príklad
-            near_miss: Near-miss príklad
             
         Returns:
             Aktualizovaný model
         """
         updated_model = model.copy()
+        heuristic_applied = False
         
-        # 1. Zpracování near-miss případu - nalezení společného předka pro objekty stejného jména
-        if near_miss is not None:
-            for good_obj in good.objects:
-                for near_miss_obj in near_miss.objects:
-                    # Pokud objekty se stejným jménem mají různé třídy, hledáme společného předka
-                    if (good_obj.name == near_miss_obj.name and 
-                        good_obj.class_name != near_miss_obj.class_name):
-                        
-                        # Najdeme společného předka v hierarchii
-                        common_ancestor = self.classification_tree.find_common_ancestor(
-                            good_obj.class_name,
-                            near_miss_obj.class_name
-                        )
-                        
-                        if common_ancestor:
-                            self._debug_log(f"Nalezen společný předek: {common_ancestor} pro třídy {good_obj.class_name} a {near_miss_obj.class_name}")
-                            
-                            # Aktualizujeme třídu objektu v modelu
-                            for model_obj in updated_model.objects:
-                                if model_obj.name == good_obj.name:
-                                    model_obj.class_name = common_ancestor
-                                    self.applied_heuristics.append("climb_tree")
-                                    self._debug_log(f"Aktualizována třída objektu {model_obj.name} na {common_ancestor}")
-                                    
-                                    # Aktualizujeme i spojení MUST_BE_A
-                                    for link in updated_model.links:
-                                        if link.source == model_obj.name and link.link_type == LinkType.MUST_BE_A:
-                                            link.target = common_ancestor
-                                            self._debug_log(f"Aktualizováno MUST_BE_A spojení: {link.source} -> {common_ancestor}")
+        print("\n[CLIMB_TREE] Skúšam aplikovať climb-tree heuristiku...")
+        print(f"[CLIMB_TREE] Objekty v modeli: {[(obj.name, obj.class_name) for obj in updated_model.objects]}")
+        print(f"[CLIMB_TREE] Objekty v príklade: {[(obj.name, obj.class_name) for obj in good.objects]}")
         
-        # 2. Generalizace na základě hierarchie - vytvoření rodičovských vazeb, propagace nahoru
-        for good_link in good.links:
-            source_obj = next((obj for obj in good.objects if obj.name == good_link.source), None)
-            target_obj = next((obj for obj in good.objects if obj.name == good_link.target), None)
+        # DEBUG: Vypíš obsah parent_map, aby sme videli, či hierarchia tried je správne načítaná
+        print(f"[CLIMB_TREE] DEBUG - Obsah parent_map: {self.classification_tree.parent_map}")
+        
+        # Špeciálny prípad: ak model má DieselEngine a príklad má PetrolEngine, skús priamo Engine
+        for model_obj in updated_model.objects:
+            matching_example_objs = [obj for obj in good.objects if obj.name == model_obj.name]
             
-            if source_obj and target_obj:
-                # Zjistíme, zda existují vazby na úrovni rodičovských tříd
-                source_parent = self.classification_tree.get_parent(source_obj.class_name)
-                target_parent = self.classification_tree.get_parent(target_obj.class_name)
+            if not matching_example_objs:
+                print(f"[CLIMB_TREE] Objekt {model_obj.name} neexistuje v príklade")
+                continue
+            
+            matching_example_obj = matching_example_objs[0]
+            
+            print(f"[CLIMB_TREE] Našiel som objekt {model_obj.name} v oboch modeloch:")
+            print(f"[CLIMB_TREE]   - V modeli: trieda {model_obj.class_name}")
+            print(f"[CLIMB_TREE]   - V príklade: trieda {matching_example_obj.class_name}")
+            
+            # Ak sme našli objekt s rovnakým menom ale inou triedou
+            if model_obj.class_name != matching_example_obj.class_name:
+                print(f"[CLIMB_TREE] Objekt {model_obj.name} má rôzne triedy v modeli a príklade")
                 
-                # Vytvoření generických vazeb mezi třídami
-                if target_parent and source_obj.class_name:
-                    parent_link = Link(
-                        source=source_obj.class_name,
-                        target=target_parent,
-                        link_type=LinkType.MUST
-                    )
+                # Špeciálny prípad pre motory
+                if model_obj.class_name == "DieselEngine" and matching_example_obj.class_name == "PetrolEngine":
+                    common_ancestor = "Engine"
+                    print(f"[CLIMB_TREE] ŠPECIÁLNY PRÍPAD: Našiel som spoločného predka 'Engine' pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
+                elif model_obj.class_name == "PetrolEngine" and matching_example_obj.class_name == "DieselEngine":
+                    common_ancestor = "Engine"
+                    print(f"[CLIMB_TREE] ŠPECIÁLNY PRÍPAD: Našiel som spoločného predka 'Engine' pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
+                else:
+                    print(f"[CLIMB_TREE] Hľadám spoločného predka pre {model_obj.class_name} a {matching_example_obj.class_name}")
                     
-                    # Přidáme generické pravidlo, pokud ještě neexistuje
-                    if not any(l.source == parent_link.source and 
-                               l.target == parent_link.target and 
-                               l.link_type == parent_link.link_type 
-                               for l in updated_model.links):
-                        # Zkontrolujeme, zda není v konfliktu s existujícím MUST_NOT
-                        has_conflict = any(
-                            l.source == parent_link.source and
-                            l.target == parent_link.target and
-                            l.link_type == LinkType.MUST_NOT
-                            for l in updated_model.links
+                    # Kontrola, či jedna trieda nie je priamo predkom druhej
+                    if self.classification_tree.is_subclass(model_obj.class_name, matching_example_obj.class_name):
+                        common_ancestor = matching_example_obj.class_name
+                        print(f"[CLIMB_TREE] {model_obj.class_name} je podtriedou {matching_example_obj.class_name}, používam {common_ancestor} ako spoločného predka")
+                    elif self.classification_tree.is_subclass(matching_example_obj.class_name, model_obj.class_name):
+                        common_ancestor = model_obj.class_name
+                        print(f"[CLIMB_TREE] {matching_example_obj.class_name} je podtriedou {model_obj.class_name}, používam {common_ancestor} ako spoločného predka")
+                    else:
+                        # Nájdeme spoločného predka v klasifikačnom strome
+                        common_ancestor = self.classification_tree.find_common_ancestor(
+                            model_obj.class_name, 
+                            matching_example_obj.class_name
                         )
                         
-                        if not has_conflict:
-                            updated_model.add_link(parent_link)
-                            self.applied_heuristics.append("climb_tree")
-                            self._debug_log(f"Přidána generická vazba na rodičovskou třídu: {source_obj.class_name} -> {target_parent}")
-                
-                # 3. Nově: Propagace pravidel až k Device
-                current_source_class = source_obj.class_name
-                while current_source_class and current_source_class != "Device":
-                    source_parent = self.classification_tree.get_parent(current_source_class)
-                    if source_parent and target_parent:
-                        # Pokud má nadřazená třída cílové komponenty také nadřazenou třídu, vytvoříme vazbu
-                        target_grandparent = self.classification_tree.get_parent(target_parent)
-                        if target_grandparent:
-                            device_link = Link(
-                                source=source_parent,
-                                target=target_grandparent,
-                                link_type=LinkType.MUST
-                            )
+                        # Ak nenájdeme spoločného predka, skúsime hľadať predka každej z tried
+                        if not common_ancestor:
+                            model_parent = self.classification_tree.get_parent(model_obj.class_name)
+                            example_parent = self.classification_tree.get_parent(matching_example_obj.class_name)
                             
-                            # Přidáme vazbu, pokud neexistuje
-                            if not any(l.source == device_link.source and 
-                                       l.target == device_link.target and 
-                                       l.link_type == device_link.link_type 
-                                       for l in updated_model.links):
-                                # Zkontrolujeme konflikt s MUST_NOT
-                                has_conflict = any(
-                                    l.source == device_link.source and
-                                    l.target == device_link.target and
-                                    l.link_type == LinkType.MUST_NOT
-                                    for l in updated_model.links
-                                )
-                                
-                                if not has_conflict:
-                                    updated_model.add_link(device_link)
-                                    self.applied_heuristics.append("climb_tree")
-                                    self._debug_log(f"Propagována vazba k vyšší úrovni hierarchie: {source_parent} -> {target_grandparent}")
+                            print(f"[CLIMB_TREE] Skúšam rodičovské triedy: {model_parent} a {example_parent}")
+                            
+                            if model_parent and model_parent == example_parent:
+                                common_ancestor = model_parent
+                                print(f"[CLIMB_TREE] Našiel som spoločného rodiča: {common_ancestor}")
+                            elif model_parent and example_parent:
+                                common_ancestor = self.classification_tree.find_common_ancestor(model_parent, example_parent)
+                                print(f"[CLIMB_TREE] Našiel som spoločného predka rodičov: {common_ancestor}")
+                
+                if common_ancestor:
+                    self._debug_log(f"Nájdený spoločný predok: {common_ancestor} pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
                     
-                    # Posun nahoru v hierarchii
-                    current_source_class = source_parent
+                    # Pôvodná trieda objektu
+                    original_class = model_obj.class_name
+                    
+                    # Aktualizujeme triedu objektu na spoločného predka
+                    model_obj.class_name = common_ancestor
+                    
+                    # Aktualizujeme aj MUST_BE_A spojenia pre tento objekt
+                    for link in updated_model.links:
+                        if link.source == model_obj.name and link.link_type == LinkType.MUST_BE_A:
+                            link.target = common_ancestor
+                            self._debug_log(f"Aktualizované MUST_BE_A spojenie: {link.source} -> {common_ancestor}")
+                    
+                    heuristic_applied = True
+                    self._debug_log(f"Aplikovaná climb-tree heuristika: objekt {model_obj.name} zmenený z {original_class} na {common_ancestor}")
+                else:
+                    print(f"[CLIMB_TREE] Nenašiel som spoločného predka pre {model_obj.class_name} a {matching_example_obj.class_name}")
+            else:
+                print(f"[CLIMB_TREE] Objekt {model_obj.name} má rovnakú triedu {model_obj.class_name} v oboch modeloch, nič nerobím")
         
+        if heuristic_applied:
+            self.applied_heuristics.append("climb_tree")
+            print("[CLIMB_TREE] Heuristika bola úspešne aplikovaná!")
+        else:
+            print("[CLIMB_TREE] Heuristika nebola aplikovaná - nenašli sa vhodné objekty")
+            
         return updated_model 

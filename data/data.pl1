@@ -1,105 +1,192 @@
-#---------- PÁR 1: X5 s benzínovým motorom a manuálnou prevodovkou ----------
-# Pozitívny príklad: BMW X5 s benzínovým motorom a manuálnou prevodovkou
-Ι(c₁, X5) ∧ 
-Π(c₁, e₁) ∧ Ι(e₁, PetrolEngine) ∧ 
-Π(c₁, t₁) ∧ Ι(t₁, ManualTransmission) ∧ 
-Π(c₁, d₁) ∧ Ι(d₁, XDrive) ∧ 
-Π(e₁, t₁) ∧ 
-Α(c₁, color, blue) ∧ 
-Α(e₁, power, 250) ∧ 
-Α(e₁, cylinders, 6)
+# Pozitívny príklad 1 (add-missing-objects): Základný model X5
+Ι(x, X5) ∧ 
+Ι(e, Engine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 250)
 
-#---------- PÁR 2: X5 s naftovým motorom a automatickou prevodovkou ----------
-# Pozitívny príklad: BMW X5 s naftovým motorom a automatickou prevodovkou
-Ι(c₂, X5) ∧ 
-Π(c₂, e₂) ∧ Ι(e₂, DieselEngine) ∧ 
-Π(c₂, t₂) ∧ Ι(t₂, AutomaticTransmission) ∧ 
-Π(c₂, d₂) ∧ Ι(d₂, XDrive) ∧ 
-Π(e₂, t₂) ∧ 
-Α(c₂, color, black) ∧ 
-Α(e₂, power, 280) ∧ 
-Α(e₂, cylinders, 6)
+# Pozitívny príklad 2 (climb-tree): X5 je SUV, ktorý je Car
+Ι(x, X5) ∧
+Ι(s, SUV) ∧
+Ι(c, Car) ∧
+Π(x, s) ∧
+Π(s, c) ∧
+Ι(e, Engine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 250)
 
-#---------- PÁR 3: X7 s hybridným motorom a automatickou prevodovkou ----------
-# Pozitívny príklad: BMW X7 s hybridným motorom a automatickou prevodovkou
-Ι(c₃, X7) ∧ 
-Π(c₃, e₃) ∧ Ι(e₃, HybridEngine) ∧ 
-Π(c₃, t₃) ∧ Ι(t₃, AutomaticTransmission) ∧ 
-Π(c₃, d₃) ∧ Ι(d₃, XDrive) ∧ 
-Π(e₃, t₃) ∧ 
-Α(c₃, color, silver) ∧ 
-Α(e₃, power, 320) ∧ 
-Α(e₃, cylinders, 6)
+# Negatívny príklad 1 (require-link): X5 bez motora
+Ι(x, X5)
 
-#---------- PÁR 4: Series5 s benzínovým motorom a automatickou prevodovkou ----------
-# Pozitívny príklad: BMW Series5 s benzínovým motorom a automatickou prevodovkou
-Ι(c₄, Series5) ∧ Π(c₄, e₄) ∧ Ι(e₄, PetrolEngine) ∧ 
-Π(c₄, t₄) ∧ Ι(t₄, AutomaticTransmission) ∧ 
-Π(c₄, d₄) ∧ Ι(d₄, RWD) ∧ 
-Π(e₄, t₄) ∧ 
-Α(c₄, color, red) ∧ 
-Α(e₄, power, 230) ∧ 
-Α(e₄, cylinders, 4)
+# Pozitívny príklad 3 (enlarge-set): X5 s diesel motorom
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 265)
 
-#---------- PÁR 5: Series7 s veľkým benzínovým motorom a automatickou prevodovkou ----------
-# Pozitívny príklad: BMW Series7 s veľkým benzínovým motorom a automatickou prevodovkou
-Ι(c₅, Series7) ∧ 
-Π(c₅, e₅) ∧ Ι(e₅, PetrolEngine) ∧ 
-Π(c₅, t₅) ∧ Ι(t₅, AutomaticTransmission) ∧ 
-Π(c₅, d₅) ∧ Ι(d₅, AWD) ∧ 
-Π(e₅, t₅) ∧ 
-Α(c₅, color, black) ∧ 
-Α(e₅, power, 400) ∧ 
-Α(e₅, cylinders, 8)
+# Pozitívny príklad 4 (enlarge-set): X5 s benzínovým motorom
+Ι(x, X5) ∧ 
+Ι(e, PetrolEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 340)
 
+# Pozitívny príklad 5 (close-interval): X5 s diesel motorom a väčším výkonom
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 290) ∧
+Α(e, cylinders, 6)
 
-# Negatívny príklad: BMW X5 s benzínovým motorom a automatickou prevodovkou
-Ι(c₆, X5) ∧ 
-Π(c₆, e₆) ∧ Ι(e₆, PetrolEngine) ∧ 
-Π(c₆, t₆) ∧ Ι(t₆, AutomaticTransmission) ∧ 
-Π(c₆, d₆) ∧ Ι(d₆, XDrive) ∧ 
-Π(e₆, t₆) ∧ 
-Α(c₆, color, white) ∧ 
-Α(e₆, power, 260) ∧ 
-Α(e₆, cylinders, 6) ∧
-Ν(PetrolEngine, AutomaticTransmission)
+# Pozitívny príklad 6 (close-interval): X5 s benzínovým motorom a väčším výkonom
+Ι(x, X5) ∧ 
+Ι(e, PetrolEngine) ∧ 
+Π(x, e) ∧ 
+Α(e, power, 390) ∧
+Α(e, cylinders, 8) ∧
+Α(e, torque, 530)
 
+# Negatívny príklad 2 (forbid-link): X5 s manuálnou prevodovkou
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, ManualTransmission) ∧ 
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(e, t) ∧ 
+Α(e, power, 265)
 
-# Negatívny príklad: BMW X5 bez motora
-Ι(c₇, X5) ∧ 
-Π(c₇, t₇) ∧ Ι(t₇, ManualTransmission) ∧ 
-Π(c₇, d₇) ∧ Ι(d₇, XDrive) ∧ 
-Α(c₇, color, green)
+# Pozitívny príklad 7 (require-link): X5 s automatickou prevodovkou
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(e, t) ∧ 
+Α(e, power, 265) ∧
+Α(t, gears, 8)
 
+# Negatívny príklad 3 (forbid-link): X5 bez XDrive (s RWD)
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, RWD) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(e, t) ∧ 
+Α(e, power, 265)
 
-# Negatívny príklad: BMW X7 s naftovým motorom a manuálnou prevodovkou
-Ι(c₈, X7) ∧ 
-Π(c₈, e₈) ∧ Ι(e₈, DieselEngine) ∧ 
-Π(c₈, t₈) ∧ Ι(t₈, ManualTransmission) ∧ 
-Π(c₈, d₈) ∧ Ι(d₈, XDrive) ∧ 
-Π(e₈, t₈) ∧ 
-Α(c₈, color, blue) ∧ 
-Α(e₈, power, 300) ∧ 
-Α(e₈, cylinders, 6) ∧
-Ν(X7, ManualTransmission)
+# Pozitívny príklad 8 (require-link): X5 s XDrive
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(e, t) ∧ 
+Α(e, power, 265)
 
+# Pozitívny príklad 9 (enlarge-set): X5 s AWD
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, AWD) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(e, t) ∧ 
+Α(e, power, 265)
 
-# Negatívny príklad: BMW X5 s RWD namiesto XDrive
-Ι(c₉, X5) ∧ 
-Π(c₉, e₉) ∧ Ι(e₉, PetrolEngine) ∧ 
-Π(c₉, t₉) ∧ Ι(t₉, ManualTransmission) ∧ 
-Π(c₉, d₉) ∧ Ι(d₉, RWD) ∧ 
-Π(e₉, t₉) ∧ 
-Α(c₉, color, silver) ∧ 
-Α(e₉, power, 245) ∧ 
-Α(e₉, cylinders, 6) ∧
-Ν(X5, RWD)
+# Negatívny príklad 4 (forbid-link): X5 s malými kolesami (17)
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Π(e, t) ∧ 
+Α(e, power, 265) ∧
+Α(w, size, 17)
 
+# Pozitívny príklad 10 (require-link + close-interval): X5 s kolesami 20
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Π(e, t) ∧ 
+Α(e, power, 265) ∧
+Α(w, size, 20)
 
-# Negatívny príklad: BMW Series 7 s manuálnou prevodovkou
-Ι(c₁₀, Series5) ∧ 
-Π(c₁₀, e₁₀) ∧ Ι(e₁₀, PetrolEngine) ∧ 
-Π(c₁₀, d₁₀) ∧ Ι(d₁₀, RWD) ∧ 
-Α(c₁₀, color, white) ∧ 
-Α(e₁₀, power, 220) ∧ 
-Α(e₁₀, cylinders, 4)
+# Pozitívny príklad 11 (close-interval): X5 s kolesami 22
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(w, Wheels) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, w) ∧
+Π(e, t) ∧ 
+Α(e, power, 265) ∧
+Α(w, size, 22)
+
+# Negatívny príklad 5 (forbid-link): X5 s trojvalcovým motorom
+Ι(x, X5) ∧ 
+Ι(e, PetrolEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(e, t) ∧ 
+Α(e, power, 250) ∧
+Α(e, cylinders, 3)
+
+# Negatívny príklad 6 (forbid-link): X5 s halogénovými svetlami
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(l, Lights) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, l) ∧
+Π(e, t) ∧ 
+Α(e, power, 265) ∧
+Α(l, type, halogen)
+
+# Pozitívny príklad 12 (require-link): X5 s LED svetlami
+Ι(x, X5) ∧ 
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Ι(l, Lights) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(x, l) ∧
+Π(e, t) ∧ 
+Α(e, power, 265) ∧
+Α(l, type, led)
+
+# Negatívny príklad 7 (forbid-link): X5 nemôže byť kompaktný
+Ι(x, X5) ∧ 
+Ι(s, CompactSUV) ∧
+Π(x, s) ∧
+Ι(e, DieselEngine) ∧ 
+Ι(t, AutomaticTransmission) ∧ 
+Ι(d, XDrive) ∧
+Π(x, e) ∧ 
+Π(x, t) ∧ 
+Π(x, d) ∧
+Π(e, t) ∧ 
+Α(e, power, 265)
