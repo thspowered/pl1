@@ -40,9 +40,9 @@ class Link:
                 self.target == other.target and 
                 self.link_type == other.link_type)
 
-# Definujeme typy pre atributy
-AttributeValue = Union[str, int, float, Tuple[float, float]]  # Hodnota atributu moze byt retazec, cislo alebo interval
-Attributes = Dict[str, AttributeValue]  # Slovnik atributov pre objekt
+
+AttributeValue = Union[str, int, float, Tuple[float, float]]  
+Attributes = Dict[str, AttributeValue]  
 
 @dataclass
 class Object:
@@ -123,7 +123,6 @@ class Model:
         Returns:
             Nový model
         """
-        # Vytvorím objekty
         objects = []
         if "objects" in data:
             for obj_data in data["objects"]:
@@ -134,15 +133,13 @@ class Model:
                 )
                 objects.append(obj)
         
-        # Vytvorím spojenia
         links = []
         if "links" in data:
             for link_data in data["links"]:
-                # Konverzia string hodnoty link_type na enum
                 link_type_value = link_data["link_type"]
-                link_type = LinkType.MUST  # default
+                link_type = LinkType.MUST  
                 
-                # Nájdi príslušnú enum hodnotu
+
                 for lt in LinkType:
                     if lt.value == link_type_value:
                         link_type = lt
@@ -155,7 +152,6 @@ class Model:
                 )
                 links.append(link)
         
-        # Načítam known_subclasses
         known_subclasses = {}
         if "known_subclasses" in data:
             for general_class, specific_classes in data["known_subclasses"].items():
@@ -174,7 +170,6 @@ class Model:
             objects=deepcopy(self.objects),
             links=deepcopy(self.links)
         )
-        # Kopírujeme aj known_subclasses
         for general_class, specific_classes in self.known_subclasses.items():
             new_model.known_subclasses[general_class] = set(specific_classes)
         return new_model
@@ -192,11 +187,9 @@ class Model:
         if not isinstance(other, Model):
             return False
             
-        # Porovnaj počet objektov a spojení
         if len(self.objects) != len(other.objects) or len(self.links) != len(other.links):
             return False
             
-        # Porovnaj objekty (nezáleží na poradí)
         self_objects = sorted(self.objects, key=lambda obj: obj.name)
         other_objects = sorted(other.objects, key=lambda obj: obj.name)
         
@@ -204,7 +197,6 @@ class Model:
             if self_obj != other_obj:
                 return False
                 
-        # Porovnaj spojenia (nezáleží na poradí)
         self_links = sorted(self.links, key=lambda link: (link.source, link.target, link.link_type.value))
         other_links = sorted(other.links, key=lambda link: (link.source, link.target, link.link_type.value))
         
@@ -212,7 +204,6 @@ class Model:
             if self_link != other_link:
                 return False
         
-        # Porovnaj known_subclasses
         if set(self.known_subclasses.keys()) != set(other.known_subclasses.keys()):
             return False
             

@@ -1,4 +1,3 @@
-// Types for examples and dataset
 export interface Example {
   id: number;
   name: string;
@@ -12,8 +11,8 @@ export interface TrainingResult {
   success: boolean;
   message: string;
   model_updated: boolean;
-  model_hypothesis?: string; // Textová reprezentácia hypotézy modelu
-  model_rules?: Record<string, string>; // Identifikačné pravidlá pre jednotlivé modely áut
+  model_hypothesis?: string; 
+  model_rules?: Record<string, string>; 
   model_visualization?: {
     nodes: Array<NetworkNode>;
     links: Array<NetworkLink>;
@@ -39,7 +38,7 @@ export interface TrainingResult {
   time_elapsed?: number;
 }
 
-// Types for API responses
+
 export interface ApiExample {
   id: number;
   formula: string;
@@ -52,33 +51,32 @@ export interface ApiDatasetResponse {
   examples: ApiExample[];
 }
 
-// Define types for the SigmaNetwork component
 export interface NetworkNode {
   id: string;
   name: string;
   class: string;
   category: string;
   attributes?: Record<string, any>;
-  status?: 'common' | 'only_in_a' | 'only_in_b' | 'valid' | 'invalid' | 'missing' | 'extra';  // Rozšírený status pre porovnávanie a validáciu
-  value?: any;  // Hodnota atribútu
-  value_display?: string;  // Textová reprezentace hodnoty pro zobrazení
-  displayName?: string;  // Zobrazované meno uzla, môže obsahovať pridané informácie ako hodnotu atribútu
+  status?: 'common' | 'only_in_a' | 'only_in_b' | 'valid' | 'invalid' | 'missing' | 'extra';  
+  value?: any;  
+  value_display?: string;  
+  displayName?: string;  
 }
 
 export interface NetworkLink {
   source: string;
   target: string;
   type: string;
-  status?: 'common' | 'only_in_a' | 'only_in_b' | 'valid' | 'invalid' | 'missing' | 'extra';  // Rozšírený status pre porovnávanie a validáciu
+  status?: 'common' | 'only_in_a' | 'only_in_b' | 'valid' | 'invalid' | 'missing' | 'extra';  
 }
 
 export interface SigmaNetworkProps {
   nodes: NetworkNode[];
   links: NetworkLink[];
-  showDifferences?: boolean;  // Příznak pro zobrazení rozdílů
-  modelA?: string;  // Název prvního modelu
-  modelB?: string;  // Název druhého modelu
-  formula?: string;  // Text PL1 formuly na priame zobrazenie
+  showDifferences?: boolean;  
+  modelA?: string;  
+  modelB?: string;  
+  formula?: string;  
 }
 
 export interface InfoPanelProps {
@@ -92,7 +90,6 @@ export interface ModelHistory {
   total_entries: number;
 }
 
-// Výsledok porovnania príkladu s natrénovaným modelom
 export interface ComparisonResult {
   is_valid: boolean;
   model_type: string;
@@ -128,7 +125,6 @@ export interface ComparisonResult {
   model_formula?: string;
 }
 
-// Typy pro uložené modely a porovnávání hypotéz
 export interface SavedModel {
   id: number;
   name: string;

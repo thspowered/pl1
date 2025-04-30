@@ -75,7 +75,6 @@ class Predicate:
         Returns:
             Hash hodnota predikátu založená na jeho názve a argumentoch
         """
-        # Vytvoríme tuple z názvu a argumentov, ktorý je hashable
         return hash((self.name, tuple(self.arguments)))
 
 @dataclass
@@ -104,7 +103,6 @@ class Formula:
         if self.operator and self.subformulas:
             return f"({' ' + self.operator + ' '.join([str(f) for f in self.subformulas])})"
         
-        # Ak máme len predikáty bez operátora, spojíme ich konjunkciou
         return " ∧ ".join(str(p) for p in self.predicates)
     
     def get_all_predicates(self) -> List[Predicate]:
@@ -137,12 +135,10 @@ def parse_pl1_formula(text: str) -> Formula:
     if not text or not text.strip():
         raise ValueError("Prázdna formula")
     
-    # Odstranenie komentarov a prazdnych riadkov
     lines = []
     for line in text.split('\n'):
         line = line.strip()
         if line and not line.startswith('%') and not line.startswith('#'):
-            # Odstranenie komentarov za vyrazom
             if '%' in line:
                 line = line.split('%')[0].strip()
             if '#' in line:
@@ -152,31 +148,25 @@ def parse_pl1_formula(text: str) -> Formula:
     if not lines:
         raise ValueError("Formula neobsahuje žiadne platné riadky po odstránení komentárov")
     
-    # Spojenie riadkov a nahradenie viacnasobnych medzier jednou
     text = ' '.join(lines)
     text = re.sub(r'\s+', ' ', text)
     
-    # Nahradenie logickych spojok medzerami pre jednoduchsie parsovanie
     text = text.replace('∧', ' ∧ ')
     text = text.replace('∨', ' ∨ ')
     text = text.replace('¬', ' ¬ ')
     text = text.replace('→', ' → ')
     text = text.replace('↔', ' ↔ ')
     
-    # Rozdelenie textu na tokeny
     tokens = text.split()
     
     if not tokens:
         raise ValueError("Formula neobsahuje žiadne tokeny po spracovaní")
     
-    # Parsovanie predikatov
     predicates = set()
-    
-    # Najprv spojíme tokeny, ktoré môžu byť rozdelené
+
     i = 0
     while i < len(tokens):
         if '(' in tokens[i] and ')' not in tokens[i] and i + 1 < len(tokens):
-            # Spojíme tokeny, ktoré patria k jednému predikátu
             j = i + 1
             while j < len(tokens) and ')' not in tokens[j]:
                 tokens[i] += ' ' + tokens[j]
@@ -184,28 +174,22 @@ def parse_pl1_formula(text: str) -> Formula:
             
             if j < len(tokens):
                 tokens[i] += ' ' + tokens[j]
-                # Odstránime spojené tokeny
                 tokens = tokens[:i+1] + tokens[j+1:]
         i += 1
-    
-    # Teraz spracujeme predikáty
+
     predicate_pattern = r'([^\s(]+)\s*\(\s*([^)]*)\s*\)'
     
     for token in tokens:
-        # Preskočíme logické spojky
         if token in ['∧', '∨', '¬', '→', '↔']:
             continue
         
-        # Hľadáme predikáty v tokene
         matches = re.findall(predicate_pattern, token)
         
         for match in matches:
             pred_name = match[0].strip()
             args_str = match[1].strip()
             
-            # Rozdelenie argumentov
             if args_str:
-                # Odstránime úvodzovky z argumentov, ak existujú
                 args = []
                 for arg in args_str.split(','):
                     arg = arg.strip()
@@ -218,14 +202,12 @@ def parse_pl1_formula(text: str) -> Formula:
                 args = []
             
             try:
-                # Vytvorenie predikátu
                 pred = Predicate(pred_name, args)
                 predicates.add(pred)
             except Exception as e:
                 print(f"Chyba pri vytváraní predikátu {pred_name}({args_str}): {str(e)}")
     
     if not predicates:
-        # Skúsime alternatívny prístup - hľadáme všetky predikáty v celom texte
         all_matches = re.findall(r'([^\s(]+)\s*\(\s*([^)]*)\s*\)', text)
         
         for match in all_matches:
@@ -246,7 +228,6 @@ def parse_pl1_formula(text: str) -> Formula:
     if not predicates:
         raise ValueError("Neboli nájdené žiadne platné predikáty vo formule")
     
-    # Vytvorenie formuly
     return Formula(predicates=predicates)
 
 def parse_pl1_dataset(text: str) -> List[Formula]:
@@ -259,10 +240,8 @@ def parse_pl1_dataset(text: str) -> List[Formula]:
     Returns:
         Zoznam formul
     """
-    # Rozdelenie textu na jednotlive formuly
     formula_texts = re.split(r'\n\s*\n', text)
     
-    # Parsovanie kazdej formuly
     formulas = []
     for formula_text in formula_texts:
         if formula_text.strip():

@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { 
-  Example, 
-  ApiExample, 
   ApiDatasetResponse, 
   TrainingResult 
 } from '../types';
@@ -13,7 +11,6 @@ export const useApi = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch model status from the API
   const fetchModelStatus = async (force = false) => {
     try {
       setIsLoading(true);
@@ -22,8 +19,7 @@ export const useApi = () => {
       const response = await fetch(`${API_BASE_URL}/api/model-status`);
       if (response.ok) {
         const data = await response.json();
-        
-        // Return the formatted data
+
         return {
           success: true,
           data: {
@@ -49,7 +45,6 @@ export const useApi = () => {
     }
   };
 
-  // Fetch dataset from the API
   const fetchDataset = async (force = false) => {
     try {
       setIsLoading(true);
@@ -72,7 +67,6 @@ export const useApi = () => {
     }
   };
 
-  // Upload dataset to the API
   const uploadDataset = async (examples: { formula: string, is_positive: boolean, name: string }[]) => {
     try {
       setIsLoading(true);
@@ -118,7 +112,6 @@ export const useApi = () => {
     }
   };
 
-  // Train model via API
   const trainModel = async (exampleIds: number[], retrainAll: boolean) => {
     try {
       setIsLoading(true);
@@ -151,8 +144,7 @@ export const useApi = () => {
       }
       
       const data = await response.json();
-      
-      // Process the training result
+  
       const trainingResult: TrainingResult = {
         success: data.success || false,
         message: data.message || 'Model bol natrénovaný.',
@@ -179,7 +171,6 @@ export const useApi = () => {
     }
   };
 
-  // Reset model via API
   const resetModel = async () => {
     try {
       setIsLoading(true);
@@ -197,7 +188,6 @@ export const useApi = () => {
     }
   };
 
-  // Model history control functions
   const stepBack = async () => {
     try {
       setIsLoading(true);
@@ -232,7 +222,6 @@ export const useApi = () => {
     }
   };
 
-  // Porovná príklad s natrénovaným modelom
   const compareExample = async (formula: string, validateAttributes: boolean = true) => {
     try {
       setIsLoading(true);
@@ -242,7 +231,7 @@ export const useApi = () => {
       
       const response = await axios.post(`${API_BASE_URL}/api/compare`, {
         formula: formula,
-        is_positive: true, // pre porovnanie nie je dôležité, či je príklad pozitívny alebo negatívny
+        is_positive: true, 
         name: "Porovnávaný príklad",
         validate_attributes: validateAttributes
       });
@@ -253,7 +242,6 @@ export const useApi = () => {
       console.error("Error in compareExample:", error);
       const errorMessage = error instanceof Error ? error.message : 'Neznáma chyba';
       setError(`Chyba pri porovnávaní príkladu: ${errorMessage}`);
-      // Return an error object instead of throwing
       return { 
         is_valid: false, 
         violations: [`Chyba pri validácii príkladu: ${errorMessage}`], 
@@ -265,7 +253,6 @@ export const useApi = () => {
     }
   };
 
-  // Fetch heuristics history
   const fetchHeuristicsHistory = async () => {
     try {
       setIsLoading(true);

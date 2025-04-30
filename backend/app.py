@@ -1152,7 +1152,7 @@ async def get_model_history():
 @app.post("/api/model/history/step_back")
 async def step_back_in_history():
     """Krok zpět v historii modelu."""
-    global current_model, model_history, current_history_index, dataset_examples
+    global current_model, model_history, current_history_index, dataset_examples, tracker
     
     # Kontrola, zda můžeme jít zpět
     if current_history_index <= 0 or len(model_history) == 0:
@@ -1177,6 +1177,12 @@ async def step_back_in_history():
     for example in dataset_examples:
         example["used_in_training"] = example["id"] in used_example_ids
     
+    # Obnovenie logov heuristík z histórie
+    heuristics_updated = False
+    if history_entry.get("heuristic_logs") is not None and tracker is not None:
+        tracker.heuristics = history_entry.get("heuristic_logs", [])
+        heuristics_updated = True
+    
     # Získání vizualizace pro frontend
     visualization = generate_model_visualization(current_model)
     
@@ -1196,13 +1202,16 @@ async def step_back_in_history():
         "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
         "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
         "model_rules": model_rules,  # Pridané extrahované pravidlá 
+        "heuristic_logs": history_entry.get("heuristic_logs", []),  # Pridané logy heuristík
+        "heuristics_updated": heuristics_updated,  # Signalizácia, že heuristiky boli aktualizované
+        "heuristics_timestamp": datetime.now().isoformat(),  # Časová značka pre aktualizáciu heuristík
         "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 
 @app.post("/api/model/history/step_forward")
 async def step_forward_in_history():
     """Krok vpřed v historii modelu."""
-    global current_model, model_history, current_history_index, dataset_examples
+    global current_model, model_history, current_history_index, dataset_examples, tracker
     
     # Kontrola, zda můžeme jít vpřed
     if current_history_index >= len(model_history) - 1:
@@ -1227,6 +1236,12 @@ async def step_forward_in_history():
     for example in dataset_examples:
         example["used_in_training"] = example["id"] in used_example_ids
     
+    # Obnovenie logov heuristík z histórie
+    heuristics_updated = False
+    if history_entry.get("heuristic_logs") is not None and tracker is not None:
+        tracker.heuristics = history_entry.get("heuristic_logs", [])
+        heuristics_updated = True
+    
     # Získání vizualizace pro frontend
     visualization = generate_model_visualization(current_model)
     
@@ -1246,6 +1261,9 @@ async def step_forward_in_history():
         "used_example_ids": used_example_ids,  # Pridaný zoznam ID použitých príkladov
         "model_hypothesis": model_hypothesis,  # Pridaná natrénovaná formula
         "model_rules": model_rules,  # Pridané extrahované pravidlá 
+        "heuristic_logs": history_entry.get("heuristic_logs", []),  # Pridané logy heuristík
+        "heuristics_updated": heuristics_updated,  # Signalizácia, že heuristiky boli aktualizované
+        "heuristics_timestamp": datetime.now().isoformat(),  # Časová značka pre aktualizáciu heuristík
         "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 
@@ -1432,7 +1450,7 @@ def save_model_to_history(model_state, visualization=None, steps=None, examples_
         steps: Kroky trénovania (popis akcií)
         examples_count: Počet spracovaných príkladov
     """
-    global model_history, current_history_index, dataset_examples, MAX_HISTORY_SIZE
+    global model_history, current_history_index, dataset_examples, MAX_HISTORY_SIZE, tracker
     
     # Pokud jsme se vrátili zpět a pak děláme novou změnu, odstraníme historii vpřed
     if current_history_index < len(model_history) - 1:
@@ -1463,6 +1481,9 @@ def save_model_to_history(model_state, visualization=None, steps=None, examples_
         elif hasattr(model_state, 'to_formula'):
             hypothesis = model_state.to_formula()
     
+    # Získanie aktuálnych logov heuristík
+    heuristic_logs = tracker.heuristics if tracker else []
+    
     print(f"Ukladám model do histórie: {len(model_state_dict.get('objects', []))} objektov, {len(model_state_dict.get('links', []))} spojení")
     if hypothesis:
         print(f"Hypotéza: {hypothesis}")
@@ -1475,7 +1496,8 @@ def save_model_to_history(model_state, visualization=None, steps=None, examples_
         "used_examples_count": examples_count,
         "used_example_ids": used_example_ids,  # Ukládáme i ID použitých příkladů
         "timestamp": datetime.now().isoformat(),
-        "hypothesis": hypothesis  # Pridáme aj hypotézu
+        "hypothesis": hypothesis,  # Pridáme aj hypotézu
+        "heuristic_logs": heuristic_logs  # Pridáme logy heuristík
     })
     
     # Obmedzíme veľkosť histórie
@@ -1815,35 +1837,37 @@ async def get_heuristics_history():
         # Nájdeme príklad
         example = next((e for e in dataset_examples if e["id"] == example_id), None)
         if example:
-            # Inicializujeme záznam pre príklad
-            example_heuristics[example_id] = {
-                "id": example_id,
-                "name": example.get("name", f"Príklad {example_id}"),
-                "is_positive": example.get("is_positive", True),
-                "heuristics": []
-            }
-            
-            # Ak je to prvý príklad (inicializácia), pridáme špeciálnu heuristiku "initialization"
-            if example_id == first_example_id:
-                example_heuristics[example_id]["heuristics"].append({
-                    "name": "initialization",
-                    "description": "Inicializácia modelu prvým pozitívnym príkladom",
-                    "details": {}
-                })
-            
-            # Pridáme všetky heuristiky pre príklad, okrem ADD-LINK a ADD-OBJECT
-            for heuristic in heuristics:
-                heuristic_name = heuristic["name"]
-                # Preskočiť ADD-LINK a ADD-OBJECT heuristiky
-                if heuristic_name in ["add_link", "add_object"]:
-                    continue
-                    
-                # Pridáme heuristiku (vrátane duplicít)
-                example_heuristics[example_id]["heuristics"].append({
-                    "name": heuristic_name,
-                    "description": heuristic["description"],
-                    "details": heuristic.get("details", {})
-                })
+            # Len ak je príklad označený ako použitý v tréningu, pridáme ho do odpovede
+            if example.get("used_in_training", False):
+                # Inicializujeme záznam pre príklad
+                example_heuristics[example_id] = {
+                    "id": example_id,
+                    "name": example.get("name", f"Príklad {example_id}"),
+                    "is_positive": example.get("is_positive", True),
+                    "heuristics": []
+                }
+                
+                # Ak je to prvý príklad (inicializácia), pridáme špeciálnu heuristiku "initialization"
+                if example_id == first_example_id:
+                    example_heuristics[example_id]["heuristics"].append({
+                        "name": "initialization",
+                        "description": "Inicializácia modelu prvým pozitívnym príkladom",
+                        "details": {}
+                    })
+                
+                # Pridáme všetky heuristiky pre príklad, okrem ADD-LINK a ADD-OBJECT
+                for heuristic in heuristics:
+                    heuristic_name = heuristic["name"]
+                    # Preskočiť ADD-LINK a ADD-OBJECT heuristiky
+                    if heuristic_name in ["add_link", "add_object"]:
+                        continue
+                        
+                    # Pridáme heuristiku (vrátane duplicít)
+                    example_heuristics[example_id]["heuristics"].append({
+                        "name": heuristic_name,
+                        "description": heuristic["description"],
+                        "details": heuristic.get("details", {})
+                    })
     
     # Teraz pridáme aj trénované príklady, ktoré možno nemajú heuristiky
     for example in dataset_examples:
@@ -1870,7 +1894,8 @@ async def get_heuristics_history():
     result = list(example_heuristics.values())
     result.sort(key=lambda x: x["id"])
     
-    return {"examples": result}
+    # Pridáme timestamp do odpovede, aby frontend vedel, že sa dáta zmenili
+    return {"examples": result, "timestamp": datetime.now().isoformat()}
 
 # Spustenie aplikácie (pre lokálny vývoj)
 if __name__ == "__main__":

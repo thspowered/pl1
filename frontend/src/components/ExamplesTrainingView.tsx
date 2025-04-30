@@ -8,15 +8,9 @@ import {
   Checkbox,
   FormControlLabel,
   Grid,
-  Card,
-  CardContent,
-  CardActionArea,
-  Alert,
   Container,
-  IconButton,
-  Tooltip
 } from '@mui/material';
-import { NetworkNode, NetworkLink, Example, TrainingResult } from "../types";
+import { Example, TrainingResult } from "../types";
 import TrainingPanel from "./TrainingPanel";
 import TrainingResultDisplay from "./TrainingResult";
 import { ModelControls } from "./ModelControls";

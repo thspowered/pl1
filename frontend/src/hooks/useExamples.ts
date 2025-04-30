@@ -5,37 +5,32 @@ export const useExamples = () => {
   const [examples, setExamples] = useState<Example[]>([]);
   const [showExamples, setShowExamples] = useState<boolean>(false);
 
-  // Process file content into examples
+
   const processExamples = (fileContent: string): Example[] => {
     const exampleBlocks = fileContent.split(/\n\s*\n/);
     const parsedExamples: Example[] = [];
     
     exampleBlocks.forEach((block, index) => {
-      if (!block.trim()) return; // Preskočiť prázdne bloky
+      if (!block.trim()) return; 
       
-      // Extrakcia názvu príkladu z komentára
       const nameMatch = block.match(/#\s*(.*?)(?:\n|$)/);
       const name = nameMatch ? nameMatch[1].trim() : `Príklad ${index + 1}`;
       
-      // Určenie, či je príklad pozitívny alebo negatívny
       const isPositive = name.toLowerCase().includes('pozitívny') || 
                         !name.toLowerCase().includes('negatívny');
       
-      // Odstránenie riadku s komentárom z formuly
       const formulaLines = block.trim().split('\n');
       const cleanedFormula = formulaLines.filter(line => !line.trim().startsWith('#')).join('\n');
-      
-      // Ensure the formula is properly formatted
+     
       const formattedFormula = cleanedFormula
-        .replace(/\s+/g, ' ')  // Replace multiple spaces with a single space
-        .trim();               // Trim whitespace from the beginning and end
+        .replace(/\s+/g, ' ')  
+        .trim();              
       
-      // Normalize special characters
       const normalizedFormula = formattedFormula
-        .replace(/\(/g, '(')   // Normalize opening parentheses
-        .replace(/\)/g, ')')   // Normalize closing parentheses
-        .replace(/,/g, ', ')   // Add space after commas
-        .replace(/\s+/g, ' ')  // Clean up any double spaces
+        .replace(/\(/g, '(')   
+        .replace(/\)/g, ')')   
+        .replace(/,/g, ', ')   
+        .replace(/\s+/g, ' ')  
         .trim();
       
       if (normalizedFormula) {
@@ -53,15 +48,13 @@ export const useExamples = () => {
     return parsedExamples;
   };
 
-  // Update examples from API response
+
   const updateExamplesFromApi = (apiExamples: ApiExample[]) => {
     setExamples(prevExamples => {
-      // If we have no examples, return
       if (!prevExamples || prevExamples.length === 0) {
         return prevExamples;
       }
       
-      // Create map for fast lookups
       const apiExamplesMap = new Map<string, ApiExample>();
       apiExamples.forEach(apiExample => {
         const key = `${apiExample.name}|${apiExample.formula}|${apiExample.is_positive}`;
@@ -87,16 +80,13 @@ export const useExamples = () => {
     });
   };
 
-  // Toggle example selection
   const toggleExampleSelection = (id: number, selected?: boolean) => {
     setExamples(prevExamples => 
       prevExamples.map(example => {
         if (example.id === id) {
-          // Ak je príklad už použitý v trénovaní, nemôžeme ho odznačiť
           if (example.usedInTraining && selected === false) {
             return example;
           }
-          // Použijeme explicitne zadanú hodnotu alebo negáciu existujúcej
           return { ...example, selected: selected !== undefined ? selected : !example.selected };
         }
         return example;
@@ -106,10 +96,8 @@ export const useExamples = () => {
     return true;
   };
 
-  // Select or deselect all examples
   const selectAll = (selected: boolean) => {
     setExamples(examples.map(example => {
-      // If example was already used in training, keep it selected
       if (example.usedInTraining) {
         return { ...example, selected: true };
       }
@@ -117,7 +105,6 @@ export const useExamples = () => {
     }));
   };
 
-  // Reset all examples (used when clearing the model)
   const resetExamples = () => {
     setExamples(prevExamples => 
       prevExamples.map(example => ({
@@ -128,7 +115,6 @@ export const useExamples = () => {
     );
   };
 
-  // Mark examples as used in training
   const markExamplesAsUsed = (selectedExamples: Example[]) => {
     setExamples(prevExamples => {
       return prevExamples.map(example => {
@@ -148,7 +134,7 @@ export const useExamples = () => {
     });
   };
 
-  // Get counts of selected examples
+
   const getSelectedCounts = () => {
     const selectedCount = examples.filter(ex => ex.selected).length;
     const newSelectedCount = examples.filter(ex => ex.selected && !ex.usedInTraining).length;

@@ -23,7 +23,6 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
   const canStepBack = historyIndex > 0;
   const canStepForward = historyIndex < historyLength - 1;
   
-  // Vypočítame aktuálnu pozíciu a celkový počet krokov
   const currentPosition = historyLength > 0 ? historyIndex + 1 : 0;
   const totalSteps = historyLength || 0;
 

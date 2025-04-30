@@ -15,66 +15,49 @@ interface TrainingResultProps {
   onRefreshGraph?: () => void;
 }
 
-// Nová funkcia pre formátovanie pravidla ako React element
-// Nahrádza množinový zápis disjunkciou a zvýrazňuje všetky logické operátory
+
 const formatRuleWithColorsAsReact = (rule: string): ReactNode => {
   if (!rule) return null;
   
-  // Najprv nahradíme množiny disjunkciami v reťazci
   let processedRule = rule;
-  // Regulárny výraz na detekciu množiny {a, b, c}
+
   const setRegex = /∈\s*\{([^}]+)\}/g;
   
-  // Nahradíme množiny disjunkciou hodnôt
   processedRule = processedRule.replace(setRegex, (match, valuesStr) => {
-    // Rozdelíme hodnoty podľa čiarky
     const values = valuesStr.split(',').map((v: string) => v.trim());
     
-    // Ak je len jedna hodnota, vrátime ju
     if (values.length === 1) {
       return `= ${values[0]}`;
     }
     
-    // Inak vytvoríme disjunkciu
     return `= ${values.join(' ∨ ')}`;
   });
   
-  // Ďalšie nahradenie pre formát {250, 340}
   const numericSetRegex = /\{(\d+),\s*(\d+)\}/g;
   processedRule = processedRule.replace(numericSetRegex, (match, val1, val2) => {
     return `${val1} ∨ ${val2}`;
   });
   
-  // Nové nahradenie pre Α(e, power, 250 ∨ 340) -> Α(e, power, 250) ∨ Α(e, power, 340)
-  // Regex na vyhľadanie atribútov s disjunkciou v hodnotách - rozšírené pre akékoľvek hodnoty
   const attrDisjunctionRegex = /(Α|A)\s*\(\s*([^,]+),\s*([^,]+),\s*([^∨)]+)\s*∨\s*([^)]+)\s*\)/g;
   
-  // Funkcia na transformáciu atribútu s disjunkciou
   const transformAttributeDisjunction = (rule: string): string => {
-    // Najprv hľadáme disjunkcie v atribútoch s dvomi hodnotami
     let result = rule.replace(attrDisjunctionRegex, (match, attrSymbol, obj, attr, val1, val2) => {
       return `${attrSymbol}(${obj}, ${attr}, ${val1.trim()}) ∨ ${attrSymbol}(${obj}, ${attr}, ${val2.trim()})`;
     });
-    
-    // Skontrolujeme, či sa niečo zmenilo
+
     if (result !== rule) {
-      // Ak áno, rekurzívne pokračujeme v spracovaní ďalších výskytov
       return transformAttributeDisjunction(result);
     }
     
-    // Ak sa už nič nezmenilo, vrátime výsledok
     return result;
   };
   
-  // Aplikujeme transformáciu
   processedRule = transformAttributeDisjunction(processedRule);
   
-  // Teraz pokračujeme so štandardným formátovaním
   const parts: ReactNode[] = [];
   let currentText = '';
   let index = 0;
-  
-  // Funkcia na pridanie aktuálneho textu do zoznamu častí
+
   const addCurrentText = () => {
     if (currentText) {
       parts.push(<span key={`text-${index}`}>{currentText}</span>);
@@ -83,12 +66,10 @@ const formatRuleWithColorsAsReact = (rule: string): ReactNode => {
     }
   };
 
-  // Funkcia na spracovanie pravidla znak po znaku
   const processRule = () => {
     for (let i = 0; i < processedRule.length; i++) {
       const char = processedRule[i];
       
-      // Zvýrazňujeme všetky logické operátory
       if (char === '∧') {
         addCurrentText();
         parts.push(<span key={`and-${index}`} style={{ color: '#64b5f6', fontWeight: 'bold' }}>∧</span>);
@@ -109,13 +90,11 @@ const formatRuleWithColorsAsReact = (rule: string): ReactNode => {
         parts.push(<span key={`impl-${index}`} style={{ color: '#ba68c8', fontWeight: 'bold' }}>→</span>);
         index++;
       }
-      // Všetok ostatný text sa pridáva do currentText
       else {
         currentText += char;
       }
     }
     
-    // Pridáme zvyšok textu
     addCurrentText();
   };
   
@@ -125,7 +104,6 @@ const formatRuleWithColorsAsReact = (rule: string): ReactNode => {
 };
 
 const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) => {
-  // Vypíšeme hypothesis pre debugging
   useEffect(() => {
     if (result?.model_hypothesis) {
       console.log("Model hypothesis:", result.model_hypothesis);
@@ -161,7 +139,6 @@ const TrainingResultDisplay = ({ result, onRefreshGraph }: TrainingResultProps) 
     );
   }
 
-  // Handling success or error cases
   return (
     <Box sx={{ width: '100%' }}>
       {result.success ? (

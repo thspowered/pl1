@@ -22,7 +22,6 @@ import CompareModels from './components/CompareModels';
 import { NetworkNode, NetworkLink, ApiExample, Example, ModelHistory, TrainingResult as TrainingResultType } from './types';
 import axios from "axios";
 
-// Vytvorenie tmavého motívu
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
@@ -96,10 +95,8 @@ function App() {
   const [modelHistory, setModelHistory] = useState<ModelHistory>({ current_index: -1, total_entries: 0 });
   const [graphUpdateKey, setGraphUpdateKey] = useState(0);
   
-  // Nový stav pre aktívnu podstránku
   const [activeView, setActiveView] = useState<string>("training");
   
-  // State for model visualization
   const [nodes, setNodes] = useState<NetworkNode[]>([]);
   const [links, setLinks] = useState<NetworkLink[]>([]);
   const [trainingSteps, setTrainingSteps] = useState<any[]>([]);
@@ -152,16 +149,13 @@ function App() {
     }
   }, [showExamples, fetchExamples, fetchModelInfo]);
 
-  // Načítaj príklady pri prvom otvorení
   useEffect(() => {
     const checkForExamples = async () => {
       try {
-        // Len kontrola, či existujú príklady na serveri
         const response = await axios.get<{ examples: ApiExample[] }>("/api/examples");
         const apiExamples = response.data.examples || [];
         
         if (apiExamples.length > 0) {
-          // Ak existujú príklady, nastav showExamples na true a načítaj ich
           setShowExamples(true);
         }
       } catch (error) {
@@ -172,37 +166,29 @@ function App() {
     checkForExamples();
   }, []);
 
-  // Handle file upload
   const handleFileUpload = (content: string, fileName?: string) => {
     setFileContent(content);
     setFile(new File([content], fileName || "dataset.txt"));
     showSuccess('Súbor bol úspešne nahraný.');
-    
-    // Skúsime hneď spracovať príklady pre lepšiu odozvu
+
     if (content) {
       processDataset();
     }
   };
 
-  // Handle file removal
   const handleRemoveFile = () => {
     setFile(null);
     setFileContent('');
     showInfo('Súbor bol odstránený.');
   };
 
-  // Process dataset
   const processDataset = async () => {
     if (!fileContent) {
-      // Odstránenie zobrazenia varovania, keďže súbor je už spracovaný, len nebolo vidieť UI potvrdenie
-      // showWarning('Najprv nahrajte súbor s datasetom.');
-      // return;
     }
     
     setIsProcessing(true);
     
     try {
-      // Process the file content to extract examples
       const parsedExamples = processExamples(fileContent || '');
       
       if (parsedExamples.length === 0) {
@@ -216,7 +202,6 @@ function App() {
       
       showInfo(`Dataset bol úspešne spracovaný. Nájdených ${parsedExamples.length} príkladov. Získavam informácie o modeli...`);
       
-      // Update model status and dataset
       setIsUpdatingModel(true);
       
       try {
@@ -249,7 +234,6 @@ function App() {
     }
   };
 
-  // Update model after training
   const updateModelAfterTraining = async () => {
     try {
       const datasetResult = await fetchDataset();
@@ -266,7 +250,6 @@ function App() {
     }
   };
 
-  // Train model
   const handleTrainModel = async (retrainAll: boolean) => {
     const selectedExamples = examples.filter(example => example.selected);
     
@@ -275,7 +258,6 @@ function App() {
       return;
     }
     
-    // Check if we have at least one new example (not used in training)
     if (!retrainAll) {
       const newExamples = selectedExamples.filter(ex => !ex.usedInTraining);
       if (newExamples.length === 0) {
@@ -284,11 +266,9 @@ function App() {
       }
     }
     
-    // Check if we have at least one positive and one negative example
     const hasPositive = selectedExamples.some(ex => ex.isPositive);
     const hasNegative = selectedExamples.some(ex => !ex.isPositive);
     
-    // If model hasn't been initialized, check if we have at least one positive example
     if (!modelStatus?.model_initialized && !hasPositive) {
       showWarning('Pre inicializáciu modelu je potrebný aspoň jeden pozitívny príklad.');
       return;
@@ -297,10 +277,8 @@ function App() {
     setIsTraining(true);
     
     try {
-      // STEP 1: Upload dataset
       showInfo("1/4 Nahrávam dataset na server...");
       
-      // Prepare data for API
       const apiExamples = selectedExamples.map(example => ({
         formula: example.formula,
         is_positive: example.isPositive,
@@ -312,10 +290,8 @@ function App() {
         throw new Error(uploadResult.error || 'Chyba pri nahrávaní datasetu');
       }
       
-      // STEP 2: Get dataset for example IDs
       showInfo("2/4 Získavam ID príkladov...");
       
-      // Wait a moment for the server to process the dataset
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const datasetResult = await fetchDataset();
@@ -323,7 +299,6 @@ function App() {
         throw new Error('Chyba pri získavaní datasetu zo servera');
       }
       
-      // Get IDs of selected examples
       const selectedIds = selectedExamples.map(ex => {
         const apiExample = datasetResult.data.examples.find(e => 
           e.name === ex.name && e.formula === ex.formula && e.is_positive === ex.isPositive
@@ -335,7 +310,6 @@ function App() {
         throw new Error('Nepodarilo sa nájsť ID vybraných príkladov v datasete');
       }
       
-      // STEP 3: Train model
       const trainingMode = retrainAll ? 'úplné pretrénovanie' : 'inkrementálne dotrénovanie';
       showInfo(`3/4 Trénujem model s ${selectedIds.length} príkladmi (${trainingMode})...`);
       
@@ -346,13 +320,10 @@ function App() {
       
       setTrainingResult(trainingResults.data);
       
-      // STEP 4: Update local state
       showSuccess("4/4 Trénovanie dokončené! Aktualizujem rozhranie...");
       
-      // Mark examples as used in training
       markExamplesAsUsed(selectedExamples);
       
-      // STEP 5: Update model status and dataset
       setIsUpdatingModel(true);
       await new Promise(resolve => setTimeout(resolve, 1000));
       
@@ -364,14 +335,12 @@ function App() {
         setIsUpdatingModel(false);
       }
       
-      // Add current model to history
       const newModelState = {
         model_visualization: trainingResults.data.model_visualization,
         training_steps: trainingResults.data.training_steps,
         used_examples_count: trainingResults.data.used_examples_count
       };
       
-      // Update model history via API will handle history changes
       await fetchModelInfo();
       
       showSuccess(trainingResults.data.message || 'Model bol úspešne natrénovaný.');
@@ -396,35 +365,26 @@ function App() {
   const handleReset = async () => {
     try {
       setIsUpdatingModel(true);
-      
-      // Informujeme používateľa, že začíname resetovať model
+
       showInfo("Prebieha resetovanie modelu a histórie...");
       
-      // Resetujeme model na serveri
       await axios.post("/api/model/reset");
       await fetchModelInfo();
       setGraphUpdateKey(prev => prev + 1);
       
-      // Reset visualization
       setNodes([]);
       setLinks([]);
       
-      // Reset history
       setModelHistory({ current_index: -1, total_entries: 0 });
       
-      // Reset training steps
       setTrainingSteps([]);
       
-      // Reset training result
     setTrainingResult(null);
       
-      // Reset all examples - set usedInTraining to false
       resetExamples();
       
-      // Update model status
       await fetchModelStatus(true);
-      
-      // Zobrazíme úspešnú notifikáciu s kompletnou informáciou
+
       showSuccess("Model a história boli úspešne vymazané. Príklady boli resetované a môžu byť znova použité na trénovanie.");
     } catch (error) {
       console.error("Chyba pri resetovaní modelu:", error);
@@ -434,16 +394,13 @@ function App() {
     }
   };
 
-  // Step back in model history
   const handleStepBack = async () => {
     if (modelHistory.current_index > 0 || modelHistory.total_entries === 0) {
       try {
         setIsUpdatingModel(true);
         const response = await axios.post("/api/model/history/step_back");
         
-        // Aktualizujeme stav použitých príkladov
         if (response.data.success && response.data.used_example_ids) {
-          // Vytvoríme nový stav príkladov s aktualizovaným príznakom usedInTraining
           const updatedExamples = examples.map(example => ({
             ...example,
             usedInTraining: response.data.used_example_ids.includes(example.id)
@@ -451,7 +408,6 @@ function App() {
           setExamples(updatedExamples);
           showInfo(`Model obnovený na stav z histórie (krok ${response.data.current_index + 1}/${modelHistory.total_entries})`);
           
-          // Aktualizujeme trénovací výsledok
           if (response.data.model_hypothesis) {
             setTrainingResult(prevResult => ({
               ...prevResult || {},
@@ -467,19 +423,16 @@ function App() {
             console.log('Model rules from step back:', response.data.model_rules);
           }
           
-          // Aktualizujeme vizualizáciu modelu
           if (response.data.model_visualization) {
             setNodes(response.data.model_visualization.nodes || []);
             setLinks(response.data.model_visualization.links || []);
           }
           
-          // Aktualizujeme kroky trénovania
           if (response.data.training_steps) {
             setTrainingSteps(response.data.training_steps);
           }
         }
         
-        // Aktualizujeme informácie o modeli a histórii
         await fetchModelInfo();
         setGraphUpdateKey(prev => prev + 1);
       } catch (error) {
@@ -498,9 +451,7 @@ function App() {
         setIsUpdatingModel(true);
         const response = await axios.post("/api/model/history/step_forward");
         
-        // Aktualizujeme stav použitých príkladov
         if (response.data.success && response.data.used_example_ids) {
-          // Vytvoríme nový stav príkladov s aktualizovaným príznakom usedInTraining
           const updatedExamples = examples.map(example => ({
             ...example,
             usedInTraining: response.data.used_example_ids.includes(example.id)
@@ -508,7 +459,6 @@ function App() {
           setExamples(updatedExamples);
           showInfo(`Model posunutý na stav z histórie (krok ${response.data.current_index + 1}/${modelHistory.total_entries})`);
           
-          // Aktualizujeme trénovací výsledok
           if (response.data.model_hypothesis) {
             setTrainingResult(prevResult => ({
               ...prevResult || {},
@@ -524,19 +474,16 @@ function App() {
             console.log('Model rules from step forward:', response.data.model_rules);
           }
           
-          // Aktualizujeme vizualizáciu modelu
           if (response.data.model_visualization) {
             setNodes(response.data.model_visualization.nodes || []);
             setLinks(response.data.model_visualization.links || []);
           }
           
-          // Aktualizujeme kroky trénovania
           if (response.data.training_steps) {
             setTrainingSteps(response.data.training_steps);
           }
         }
         
-        // Aktualizujeme informácie o modeli a histórii
         await fetchModelInfo();
         setGraphUpdateKey(prev => prev + 1);
       } catch (error) {
@@ -548,7 +495,6 @@ function App() {
     }
   };
 
-  // Return to upload screen
   const goToUploadScreen = () => {
     setFile(null);
     setFileContent('');
@@ -558,12 +504,10 @@ function App() {
     setModelStatus(null);
   };
 
-  // Refresh graph
   const handleRefreshGraph = () => {
     setGraphUpdateKey(prev => prev + 1);
   };
   
-  // Additional loading state for UI operations
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   return (
@@ -716,13 +660,11 @@ function App() {
                 onFileUpload={goToUploadScreen}
               />
             ) : activeView === "compare" ? (
-              // Zobrazenie stránky pre porovnanie príkladu
               <CompareExample 
                 onCompare={compareExample}
                 isLoading={apiLoading}
               />
             ) : (
-              // Zobrazenie stránky pre porovnanie modelov
               <CompareModels
                 isLoading={apiLoading}
               />

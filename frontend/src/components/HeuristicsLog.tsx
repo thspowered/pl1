@@ -5,14 +5,13 @@ import {
   Paper,
   List,
   ListItem,
-  ListItemText,
   Divider,
   Chip,
   Tooltip,
   alpha
 } from '@mui/material';
 
-// Define prop types for the component
+
 interface Heuristic {
   name: string;
   description: string;
@@ -36,7 +35,6 @@ interface HeuristicsLogProps {
   }>;
 }
 
-// Map heuristic names to colors
 const heuristicColors: Record<string, string> = {
   'require_link': '#4caf50', // Green
   'forbid_link': '#f44336', // Red
@@ -49,9 +47,8 @@ const heuristicColors: Record<string, string> = {
   'initialization': '#64b5f6' // Light Blue
 };
 
-// Component for displaying heuristics log
 const HeuristicsLog: React.FC<HeuristicsLogProps> = ({ examples, trainedExamples }) => {
-  // Debugging
+
   console.log('HeuristicsLog - examples:', examples);
   console.log('HeuristicsLog - trainedExamples:', trainedExamples);
   
@@ -85,7 +82,7 @@ const HeuristicsLog: React.FC<HeuristicsLogProps> = ({ examples, trainedExamples
         <Box sx={{ overflowY: 'auto', maxHeight: '430px', pr: 1 }}>
           <List disablePadding>
             {trainedExamples.map((trainedExample, index) => {
-              // Find the full example details
+
               const example = examples.find(e => e.id === trainedExample.id);
               
               return (

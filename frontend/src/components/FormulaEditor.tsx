@@ -38,7 +38,7 @@ interface FormulaEditorProps {
   subtitle?: string;
 }
 
-// Symbols used in PL1 formulas
+
 const SYMBOLS = {
   IS_A: 'Ι',
   HAS_PART: 'Π',
@@ -53,7 +53,7 @@ const SYMBOLS = {
   EQUALS: '='
 };
 
-// Example templates that can be inserted
+
 const EXAMPLES = [
   {
     name: 'BMW X5 s diesel motorom',
@@ -69,7 +69,6 @@ const EXAMPLES = [
   }
 ];
 
-// Suggestions for auto-completion
 const SUGGESTIONS = [
   { text: 'Ι(x, X5)', description: 'x je model X5' },
   { text: 'Π(c, e)', description: 'c má komponent e' },
@@ -82,7 +81,7 @@ const SUGGESTIONS = [
   { text: 'Α(e, cylinders, 6)', description: 'e má 6 valcov' },
 ];
 
-// Helper components
+
 const SymbolButton: React.FC<{
   symbol: string;
   label: string;
@@ -110,7 +109,7 @@ const SymbolButton: React.FC<{
   </Tooltip>
 );
 
-// Main component
+
 const FormulaEditor: React.FC<FormulaEditorProps> = ({
   value,
   onChange,
@@ -129,7 +128,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // Insert a symbol at the current cursor position
+
   const insertSymbol = useCallback((symbol: string) => {
     if (inputRef.current) {
       const input = inputRef.current;
@@ -139,7 +138,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
       const newValue = value.substring(0, start) + symbol + value.substring(end);
       onChange(newValue);
       
-      // Set the cursor position after the inserted symbol
+
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -149,24 +148,23 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
     }
   }, [value, onChange]);
   
-  // Insert an example formula
+
   const insertExample = useCallback((formula: string) => {
     onChange(formula);
     setShowSuggestions(false);
   }, [onChange]);
-  
-  // Insert a suggestion
+
   const insertSuggestion = useCallback((suggestion: string) => {
     insertSymbol(suggestion);
     setShowSuggestions(false);
   }, [insertSymbol]);
   
-  // Handle the change in the text field
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
   };
   
-  // Handle key down events in the text field
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setShowSuggestions(false);
@@ -179,7 +177,6 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
     }
   };
   
-  // Show suggestions button click handler
   const handleShowSuggestions = () => {
     if (inputRef.current) {
       setAnchorEl(inputRef.current);
@@ -187,7 +184,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
     }
   };
   
-  // Format the formula with syntax highlighting
+
   const getFormattedFormula = () => {
     if (!value) return null;
     
@@ -195,7 +192,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
     let currentText = '';
     let index = 0;
     
-    // Helper function to add the current text to parts
+
     const addCurrentText = () => {
       if (currentText) {
         parts.push(<span key={`text-${index}`}>{currentText}</span>);
@@ -204,7 +201,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
       }
     };
     
-    // Process the formula character by character
+
     for (let i = 0; i < value.length; i++) {
       const char = value[i];
       
@@ -245,7 +242,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
       }
     }
     
-    // Add any remaining text
+
     addCurrentText();
     
     return <>{parts}</>;

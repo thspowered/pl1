@@ -12,9 +12,6 @@ import {
   CardContent,
   CircularProgress,
   Container,
-  FormControlLabel,
-  Switch,
-  Tooltip,
   Tabs,
   Tab,
   AppBar,
@@ -30,7 +27,6 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import { ComparisonResult, NetworkNode, NetworkLink } from '../types';
 import NetworkGraph from './NetworkGraph';
-import ExampleNetworkGraph from './ExampleNetworkGraph';
 
 interface CompareExampleProps {
   isLoading: boolean;
