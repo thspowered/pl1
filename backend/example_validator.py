@@ -959,6 +959,7 @@ class ExampleValidator:
     def _generate_highlighted_formula(self, example: Model, model_type: str, model_formula: str) -> Dict[str, Any]:
         """
         Generuje zvýrazněnou verzi formule modelu s označením, které části jsou splněny a které porušeny v příkladu.
+        Taktiež identifikuje prvky, ktoré sú v príklade navyše a nie sú v modeli.
         
         Args:
             example: Příklad k validaci
@@ -979,7 +980,7 @@ class ExampleValidator:
             print(f"Chyba při parsování formule: {e}")
             return {"highlighted_formula": model_formula, "tokens": []}
         
-        # Zpracujeme příklad do seznamu trojic (predikát, objekt1, objekt2/hodnota)
+        # Zpracujeme príklad do seznamu trojic (predikát, objekt1, objekt2/hodnota)
         example_predicates = []
         for obj in example.objects:
             # IS_A vztahy
@@ -997,10 +998,32 @@ class ExampleValidator:
                 for attr_name, attr_value in obj.attributes.items():
                     example_predicates.append(("Α", obj.name, attr_name, attr_value))
         
+        # Identifikujeme prvky v príklade, ktoré nie sú v modeli (extra components)
+        extra_predicates = []
+        model_classes = set()
+        model_objects = set()
+        
+        # Najskôr zozbierame všetky triedy a objekty z modelu
+        for obj in self.model.objects:
+            model_classes.add(obj.class_name)
+            model_objects.add(obj.name)
+        
+        # Teraz hľadáme v príklade prvky, ktoré nie sú v modeli
+        for pred in example_predicates:
+            if pred[0] == "Ι":  # IS_A
+                _, obj_name, class_name = pred
+                if class_name not in model_classes:
+                    extra_predicates.append(pred)
+            elif pred[0] == "Π":  # HAS_PART
+                _, parent, child = pred
+                if parent not in model_objects or child not in model_objects:
+                    extra_predicates.append(pred)
+        
         # Vytvoříme tokeny pro zvýraznění
         tokens = []
         matched_components = set()
         unmatched_components = set()
+        extra_components = set()
         
         if not model_predicates:
             return {"highlighted_formula": model_formula, "tokens": []}
@@ -1061,6 +1084,12 @@ class ExampleValidator:
                     "type": "connector"
                 })
         
+        # Pridáme identifikované extra prvky
+        for pred in extra_predicates:
+            if pred[0] == "Ι":  # IS_A
+                _, _, class_name = pred
+                extra_components.add(class_name)
+        
         # Vytvoříme zvýrazněnou formuli
         highlighted_formula = "".join([token["text"] for token in tokens])
         
@@ -1068,6 +1097,7 @@ class ExampleValidator:
         stats = {
             "matched_components": list(matched_components),
             "unmatched_components": list(unmatched_components),
+            "extra_components": list(extra_components),
             "total_predicates": len(model_predicates),
             "satisfied_predicates": sum(1 for token in tokens if token.get("is_satisfied") == True)
         }
@@ -1080,45 +1110,572 @@ class ExampleValidator:
 
 def compare_example(model: Model, example_formula: str, validate_attributes: bool = True) -> Dict[str, Any]:
     """
-    Validuje príklad voči aktuálnemu modelu a vráti výsledok.
+    Zjednodušená validácia príkladu voči hypotéze modelu.
     
     Args:
-        model: Aktuálny model
+        model: Aktuálny model (hypotéza)
         example_formula: Formula príkladu na validáciu
-        validate_attributes: Či sa majú kontrolovať aj hodnoty atribútov
+        validate_attributes: Parameter zachovaný pre spätnú kompatibilitu, vždy True
         
     Returns:
-        Výsledok validácie s vysvetlením
+        Výsledok porovnania
     """
     try:
         # Parsujeme formulu a vytvoríme z nej model
         from backend.pl1_parser import parse_pl1_formula
         from backend.model import formula_to_model
         
+        # Získame klasifikačný strom z globálneho scope
+        import sys
+        classification_tree = None
+        
+        # Pokúsime sa získať klasifikačný strom z globálnych premenných
+        try:
+            from backend.app import classification_tree as global_tree
+            classification_tree = global_tree
+            print("Získaný klasifikačný strom z app.py")
+        except (ImportError, AttributeError):
+            print("Nepodarilo sa získať klasifikačný strom z app.py")
+            
+            # Záložný postup: Vytvoríme jednoduchý klasifikačný strom s bežnými vzťahmi
+            from backend.model import ClassificationTree
+            classification_tree = ClassificationTree()
+            
+            # Pridáme základné vzťahy pre autá
+            classification_tree.add_relationship("Motor", None)
+            classification_tree.add_relationship("DieselovyMotor", "Motor")
+            classification_tree.add_relationship("BenzinovyMotor", "Motor")
+            classification_tree.add_relationship("HybridnyMotor", "Motor")
+            
+            classification_tree.add_relationship("Prevodovka", None)
+            classification_tree.add_relationship("AutomatickaPrevodovka", "Prevodovka")
+            classification_tree.add_relationship("ManualnaPrevodovka", "Prevodovka")
+            
+            classification_tree.add_relationship("Pohon", None)
+            classification_tree.add_relationship("RWD", "Pohon")
+            classification_tree.add_relationship("AWD", "Pohon")
+            classification_tree.add_relationship("XDrive", "AWD")
+            
+            classification_tree.add_relationship("Vybava", None)
+            classification_tree.add_relationship("Basic", "Vybava")
+            classification_tree.add_relationship("Sport", "Vybava")
+            classification_tree.add_relationship("Lux", "Vybava")
+            
+            print("Vytvorený záložný klasifikačný strom")
+        
+        # Sparsujeme príklad a vytvoríme model (len raz!)
         formula = parse_pl1_formula(example_formula)
         example_model = formula_to_model(formula)
         
-        # Vytvoríme validátor a validujeme príklad
-        validator = ExampleValidator(model)
-        validation_result = validator.validate_example(example_model, validate_attributes)
+        # Jednoduchá implementácia porovnania s využitím klasifikačného stromu
+        matched_predicates, unmatched_predicates, extra_predicates = compare_models_directly(model, example_model, classification_tree)
         
-        # Pridáme pôvodnú formulu
-        validation_result["formula"] = example_formula
-        validation_result["validate_attributes"] = validate_attributes
+        # Určíme platnosť: príklad je platný, ak nie sú žiadne nesplnené predikáty
+        is_valid = len(unmatched_predicates) == 0
         
-        return validation_result
+        # Pripravíme zrozumiteľné správy
+        violations = []
+        satisfied_rules = []
+        
+        # Pridáme informácie o nesplnených predikátoch
+        for pred in unmatched_predicates:
+            violations.append(f"Chýbajúci predikát v príklade: {pred}")
+        
+        # Pridáme informácie o splnených predikátoch
+        for pred in matched_predicates:
+            satisfied_rules.append(f"Splnený predikát: {pred}")
+        
+        # Identifikujeme prvky navyše v príklade s ohľadom na hierarchiu
+        extra_components = []
+        if extra_predicates:
+            for pred in extra_predicates:
+                if pred.startswith("Ι(") and "," in pred:  # IS_A predikáty
+                    # Extrahujeme meno triedy z predikátu
+                    try:
+                        class_name = pred.split(",")[1].strip().rstrip(")")
+                        # Kontrolujeme, či trieda nie je už v hierarchii známych tried
+                        should_add = True
+                        
+                        if classification_tree:
+                            # Ak je trieda podtriedou niektorej splnenej predikcie, nie je nadbytočná
+                            for matched_pred in matched_predicates:
+                                if matched_pred.startswith("Ι("):
+                                    matched_class = matched_pred.split(",")[1].strip().rstrip(")")
+                                    if classification_tree.is_subclass(class_name, matched_class):
+                                        should_add = False
+                                        break
+                        
+                        if should_add and class_name not in extra_components:
+                            extra_components.append(class_name)
+                    except Exception as e:
+                        print(f"Chyba pri spracovaní extra komponentu: {e}")
+        
+        # Vytvoríme kategorizované porušenia
+        categorized_violations = {
+            "must_violations": [],
+            "must_not_violations": [],
+            "component_violations": violations,
+            "attribute_violations": [],
+            "extra_components": [f"Príklad obsahuje nadbytočný komponent: {comp}" for comp in extra_components]
+        }
+        
+        # Vytvoríme zvýraznenú formulu
+        highlighted_formula = highlight_formula(model, example_model, model.to_formula(), classification_tree)
+        
+        # Zostavíme výsledok
+        result = {
+            "is_valid": is_valid,
+            "model_type": "General",  # Všeobecný typ namiesto konkrétneho modelu auta
+            "violations": violations,
+            "satisfied_rules": satisfied_rules,
+            "formula": example_formula,
+            "validate_attributes": True,
+            "categorized_violations": categorized_violations,
+            "highlighted_formula": highlighted_formula,
+            "model_formula": model.to_formula(),
+            "extra_components": extra_components
+        }
+        
+        return result
     except Exception as e:
         print(f"Error in compare_example: {e}")
         traceback.print_exc()
         return {
             "is_valid": False,
-            "model_type": None,
-            "violations": [f"Chyba při validaci příkladu: {str(e)}"],
+            "model_type": "General",
+            "violations": [f"Chyba pri validácii príkladu: {str(e)}"],
             "satisfied_rules": [],
             "formula": example_formula,
-            "validate_attributes": validate_attributes,
+            "validate_attributes": True,
             "highlighted_formula": {
                 "highlighted_formula": "",
                 "tokens": []
+            },
+            "model_formula": model.to_formula() if model else ""
+        }
+
+def compare_models_directly(model: Model, example_model: Model, classification_tree=None) -> Tuple[List[str], List[str], List[str]]:
+    """
+    Priame porovnanie modelu (hypotézy) a príkladu na úrovni predikátov.
+    
+    Args:
+        model: Aktuálny model (hypotéza)
+        example_model: Model príkladu
+        classification_tree: Klasifikačný strom pre hierarchické vzťahy
+        
+    Returns:
+        Trojica zoznamov: (splnené predikáty, nesplnené predikáty, predikáty navyše v príklade)
+    """
+    # Diagnostický výpis - vypíšeme klasifikačný strom
+    if classification_tree:
+        print("\n===== KLASIFIKAČNÝ STROM =====")
+        try:
+            for child, parent in classification_tree.parent_map.items():
+                print(f"Trieda {child} -> rodič {parent or 'NONE'}")
+        except Exception as e:
+            print(f"Chyba pri výpise klasifikačného stromu: {e}")
+    else:
+        print("UPOZORNENIE: Klasifikačný strom nie je dostupný!")
+    
+    # Konvertujeme modely na sady predikátov pre jednoduché porovnanie
+    model_predicates = set()
+    example_predicates = set()
+    
+    # Vytvoríme štruktúry pre špeciálne spracovanie numerických hodnôt a intervalov
+    model_numeric_predicates = {}  # {(obj_name, attr_name): (min, max)}
+    
+    # Vytvoríme štruktúry pre množinové atribúty
+    model_set_predicates = {}  # {(obj_name, attr_name): set(values)}
+    
+    # Vytvoríme štruktúry pre IS-A vzťahy pre kontrolu hierarchie
+    model_is_a_relationships = {}  # {obj_name: class_name}
+    example_is_a_relationships = {}  # {obj_name: class_name}
+    
+    print("\n===== SPRACOVANIE IS-A VZŤAHOV =====")
+    
+    # Spracovanie IS_A vzťahov
+    for obj in model.objects:
+        model_predicates.add(f"Ι({obj.name}, {obj.class_name})")
+        model_is_a_relationships[obj.name] = obj.class_name
+        print(f"Model objekt: {obj.name} je typu {obj.class_name}")
+    
+    for obj in example_model.objects:
+        example_predicates.add(f"Ι({obj.name}, {obj.class_name})")
+        example_is_a_relationships[obj.name] = obj.class_name
+        print(f"Príklad objekt: {obj.name} je typu {obj.class_name}")
+    
+    # Spracovanie HAS_PART vzťahov
+    for link in model.links:
+        if link.link_type.value == "REGULAR":
+            model_predicates.add(f"Π({link.source}, {link.target})")
+    
+    for link in example_model.links:
+        if link.link_type.value == "REGULAR":
+            example_predicates.add(f"Π({link.source}, {link.target})")
+    
+    # Spracovanie atribútov
+    for obj in model.objects:
+        if obj.attributes:
+            for attr_name, attr_value in obj.attributes.items():
+                # Zjednodušenie pre číselné hodnoty a množiny
+                if isinstance(attr_value, (int, float)):
+                    # Pre číselné hodnoty vytvoríme interval s toleranciou 0
+                    model_predicates.add(f"Α({obj.name}, {attr_name}, {attr_value})")
+                    model_numeric_predicates[(obj.name, attr_name)] = (attr_value, attr_value)
+                elif isinstance(attr_value, set):
+                    # Pre množinové hodnoty
+                    values_str = ", ".join(sorted(str(v) for v in attr_value))
+                    model_predicates.add(f"Α({obj.name}, {attr_name}, {{{values_str}}})")
+                    model_set_predicates[(obj.name, attr_name)] = attr_value
+                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
+                    # Pre intervalové hodnoty uložíme celý interval pre neskoršiu kontrolu
+                    min_val, max_val = attr_value
+                    model_predicates.add(f"Α({obj.name}, {attr_name}, [{min_val}-{max_val}])")
+                    model_numeric_predicates[(obj.name, attr_name)] = (min_val, max_val)
+                else:
+                    # Iné typy hodnôt
+                    model_predicates.add(f"Α({obj.name}, {attr_name}, {attr_value})")
+    
+    # Spracovanie atribútov z príkladu
+    example_numeric_attrs = {}  # {(obj_name, attr_name): attr_value}
+    example_set_attrs = {}      # {(obj_name, attr_name): value}
+    
+    for obj in example_model.objects:
+        if obj.attributes:
+            for attr_name, attr_value in obj.attributes.items():
+                if isinstance(attr_value, (int, float)):
+                    example_predicates.add(f"Α({obj.name}, {attr_name}, {attr_value})")
+                    example_numeric_attrs[(obj.name, attr_name)] = attr_value
+                elif isinstance(attr_value, set):
+                    values_str = ", ".join(sorted(str(v) for v in attr_value))
+                    example_predicates.add(f"Α({obj.name}, {attr_name}, {{{values_str}}})")
+                    example_set_attrs[(obj.name, attr_name)] = attr_value
+                elif isinstance(attr_value, tuple) and len(attr_value) == 2:
+                    mid_value = (attr_value[0] + attr_value[1]) / 2
+                    example_predicates.add(f"Α({obj.name}, {attr_name}, [{attr_value[0]}-{attr_value[1]}])")
+                    example_numeric_attrs[(obj.name, attr_name)] = mid_value
+                else:
+                    # Pre jednoduché hodnoty (napr. stringy) v atribúte
+                    example_predicates.add(f"Α({obj.name}, {attr_name}, {attr_value})")
+                    example_set_attrs[(obj.name, attr_name)] = attr_value  # Aj jednoduché hodnoty ukladáme pre porovnanie s množinami
+    
+    # Základné porovnanie pre nenumerické predikáty
+    matched_predicates = []
+    unmatched_predicates = []
+    
+    print("\n===== POROVNANIE IS-A PREDIKÁTOV =====")
+    
+    # Najprv spracujeme predikáty IS-A s ohľadom na hierarchiu tried
+    is_a_predicates_model = set(pred for pred in model_predicates if pred.startswith("Ι("))
+    is_a_predicates_example = set(pred for pred in example_predicates if pred.startswith("Ι("))
+    
+    # Vytvoríme mapu objekt -> predikát pre jednoduchšie vyhľadávanie
+    model_obj_to_pred = {}
+    for pred in is_a_predicates_model:
+        parts = pred.split(",", 1)
+        if len(parts) >= 2:
+            obj_name = parts[0][2:].strip()
+            model_obj_to_pred[obj_name] = pred
+    
+    print(f"IS-A predikáty v modeli: {is_a_predicates_model}")
+    print(f"IS-A predikáty v príklade: {is_a_predicates_example}")
+    
+    # Pre každý objekt v príklade skontrolujeme, či existuje v modeli a akého je typu
+    for obj_name, example_class in example_is_a_relationships.items():
+        print(f"Kontrolujem objekt {obj_name} typu {example_class} z príkladu")
+        
+        # Hľadáme zodpovedajúci objekt v modeli
+        if obj_name in model_is_a_relationships:
+            model_class = model_is_a_relationships[obj_name]
+            print(f"  Našiel som zodpovedajúci objekt v modeli typu {model_class}")
+            
+            # 1. Priama zhoda tried
+            if example_class == model_class:
+                print(f"  Priama zhoda tried: {example_class} == {model_class}")
+                # Pridáme model predikát do zoznamu spárovaných
+                if obj_name in model_obj_to_pred:
+                    matched_predicates.append(model_obj_to_pred[obj_name])
+                    
+            # 2. Hierarchická zhoda - príklad obsahuje podtriedu z modelu
+            elif classification_tree:
+                is_subclass = False
+                
+                # Skúsime získať vzťah z is_subclass metódy
+                try:
+                    if hasattr(classification_tree, 'is_subclass') and callable(getattr(classification_tree, 'is_subclass')):
+                        is_subclass = classification_tree.is_subclass(example_class, model_class)
+                        print(f"  classification_tree.is_subclass({example_class}, {model_class}) = {is_subclass}")
+                except Exception as e:
+                    print(f"  Chyba pri volaní is_subclass: {e}")
+                
+                # Záložná kontrola cez parent_map
+                if not is_subclass and hasattr(classification_tree, 'parent_map'):
+                    # Nájdeme všetkých predkov example_class
+                    current = example_class
+                    while current and current in classification_tree.parent_map:
+                        parent = classification_tree.parent_map.get(current)
+                        print(f"  Hierarchia: {current} -> {parent}")
+                        if parent == model_class:
+                            is_subclass = True
+                            break
+                        current = parent
+                
+                if is_subclass:
+                    print(f"  Hierarchická zhoda: {example_class} je podtriedou {model_class}")
+                    # Pridáme model predikát do zoznamu spárovaných
+                    if obj_name in model_obj_to_pred:
+                        matched_predicates.append(model_obj_to_pred[obj_name])
+                else:
+                    print(f"  Bez zhody: {example_class} nie je podtriedou {model_class}")
+                    if obj_name in model_obj_to_pred:
+                        unmatched_predicates.append(model_obj_to_pred[obj_name])
+            else:
+                print(f"  Bez klasifikačného stromu, nemôžem overiť hierarchiu")
+                if obj_name in model_obj_to_pred:
+                    unmatched_predicates.append(model_obj_to_pred[obj_name])
+        else:
+            print(f"  Objekt {obj_name} neexistuje v modeli")
+    
+    # Pridáme aj chýbajúce predikáty z modelu (objekty, ktoré vôbec nie sú v príklade)
+    for obj_name, pred in model_obj_to_pred.items():
+        if pred not in matched_predicates and pred not in unmatched_predicates:
+            unmatched_predicates.append(pred)
+    
+    # Odstránime IS-A predikáty z množín, lebo sme ich už spracovali
+    model_predicates = model_predicates - is_a_predicates_model
+    example_predicates = example_predicates - is_a_predicates_example
+    
+    print("\n===== POROVNANIE OSTATNÝCH PREDIKÁTOV =====")
+    
+    # Najprv spracujeme všetky bežné predikáty (nie numerické atribúty a nie množiny)
+    numeric_attr_predicates = set()
+    set_attr_predicates = set()
+    
+    for pred in model_predicates:
+        # Preskočíme predikáty, ktoré sa týkajú numerických atribútov alebo množín
+        if pred.startswith("Α(") and "," in pred:
+            parts = pred.split(",", 2)
+            if len(parts) >= 3:
+                obj_name = parts[0][2:].strip()  # Extract object name from Α(obj_name
+                attr_name = parts[1].strip()
+                if (obj_name, attr_name) in model_numeric_predicates:
+                    numeric_attr_predicates.add(pred)
+                    continue
+                if (obj_name, attr_name) in model_set_predicates:
+                    set_attr_predicates.add(pred)
+                    continue
+        
+        # Štandardné porovnanie pre bežné predikáty
+        if pred in example_predicates:
+            matched_predicates.append(pred)
+        else:
+            unmatched_predicates.append(pred)
+    
+    # Teraz spracujeme numerické atribúty s intervalom
+    for obj_name, attr_name in model_numeric_predicates.keys():
+        min_val, max_val = model_numeric_predicates[(obj_name, attr_name)]
+        pred_text = f"Α({obj_name}, {attr_name}, "
+        
+        # Kontrolujeme, či príklad obsahuje hodnotu pre tento atribút
+        if (obj_name, attr_name) in example_numeric_attrs:
+            example_value = example_numeric_attrs[(obj_name, attr_name)]
+            
+            # Kontrola, či hodnota v príklade je v intervale
+            if min_val <= example_value <= max_val:
+                # Hodnota je v intervale - splnený predikát
+                if min_val == max_val:
+                    matched_predicates.append(f"{pred_text}{min_val})")
+                else:
+                    matched_predicates.append(f"{pred_text}[{min_val}-{max_val}])")
+            else:
+                # Hodnota nie je v intervale - nesplnený predikát
+                if min_val == max_val:
+                    unmatched_predicates.append(f"{pred_text}{min_val})")
+                else:
+                    unmatched_predicates.append(f"{pred_text}[{min_val}-{max_val}])")
+        else:
+            # Atribút chýba v príklade - nesplnený predikát
+            if min_val == max_val:
+                unmatched_predicates.append(f"{pred_text}{min_val})")
+            else:
+                unmatched_predicates.append(f"{pred_text}[{min_val}-{max_val}])")
+    
+    # Spracujeme atribúty s množinami
+    for obj_name, attr_name in model_set_predicates.keys():
+        allowed_values = model_set_predicates[(obj_name, attr_name)]
+        values_str = ", ".join(sorted(str(v) for v in allowed_values))
+        pred_text = f"Α({obj_name}, {attr_name}, {{{values_str}}})"
+        
+        # Kontrolujeme, či príklad obsahuje hodnotu pre tento atribút
+        if (obj_name, attr_name) in example_set_attrs:
+            example_value = example_set_attrs[(obj_name, attr_name)]
+            
+            # Ak je hodnota množina, kontrolujeme prienik
+            if isinstance(example_value, (set, list)):
+                if any(val in allowed_values for val in example_value):
+                    matched_predicates.append(pred_text)
+                else:
+                    unmatched_predicates.append(pred_text)
+            # Ak je hodnota jednoduchá, kontrolujeme, či je v množine povolených hodnôt
+            else:
+                if example_value in allowed_values:
+                    matched_predicates.append(pred_text)
+                else:
+                    unmatched_predicates.append(pred_text)
+        else:
+            # Atribút chýba v príklade - nesplnený predikát
+            unmatched_predicates.append(pred_text)
+    
+    # Identifikujeme predikáty navyše v príklade s ohľadom na hierarchiu tried
+    print("\n===== HĽADANIE NADBYTOČNÝCH PREDIKÁTOV =====")
+    extra_predicates = []
+    
+    # Pre IS-A vzťahy z príkladu skontrolujeme, či predstavujú potenciálne nadbytočné prvky
+    for pred in is_a_predicates_example:
+        parts = pred.split(",", 1)
+        if len(parts) >= 2:
+            obj_name = parts[0][2:].strip()
+            example_class = parts[1].strip().rstrip(")")
+            
+            print(f"Kontrolujem nadbytočnosť objektu {obj_name} typu {example_class}")
+            is_extra = True
+            
+            # Kontrola, či objekt existuje v hypotéze
+            if obj_name in model_is_a_relationships:
+                model_class = model_is_a_relationships[obj_name]
+                
+                # Priama zhoda tried - nie je navyše
+                if example_class == model_class:
+                    print(f"  Nie je nadbytočný - priama zhoda tried: {example_class} == {model_class}")
+                    is_extra = False
+                
+                # Hierarchická zhoda - trieda v príklade je podtriedou triedy v hypotéze - nie je navyše
+                elif classification_tree:
+                    is_subclass = False
+                    
+                    # Skúsime získať vzťah z is_subclass metódy
+                    try:
+                        if hasattr(classification_tree, 'is_subclass') and callable(getattr(classification_tree, 'is_subclass')):
+                            is_subclass = classification_tree.is_subclass(example_class, model_class)
+                            print(f"  classification_tree.is_subclass({example_class}, {model_class}) = {is_subclass}")
+                    except Exception as e:
+                        print(f"  Chyba pri volaní is_subclass: {e}")
+                    
+                    # Záložná kontrola cez parent_map
+                    if not is_subclass and hasattr(classification_tree, 'parent_map'):
+                        # Nájdeme všetkých predkov example_class
+                        current = example_class
+                        while current and current in classification_tree.parent_map:
+                            parent = classification_tree.parent_map.get(current)
+                            print(f"  Hierarchia: {current} -> {parent}")
+                            if parent == model_class:
+                                is_subclass = True
+                                break
+                            current = parent
+                    
+                    if is_subclass:
+                        print(f"  Nie je nadbytočný - hierarchická zhoda: {example_class} je podtriedou {model_class}")
+                        is_extra = False
+            
+            if is_extra:
+                print(f"  NADBYTOČNÝ: {pred}")
+                extra_predicates.append(pred)
+    
+    # Pre ostatné predikáty
+    for pred in example_predicates:
+        # Preskočíme kontrolu numerických a množinových predikátov, lebo tie už boli spracované vyššie
+        if pred.startswith("Α(") and "," in pred:
+            parts = pred.split(",", 2)
+            if len(parts) >= 3:
+                obj_name = parts[0][2:].strip()
+                attr_name = parts[1].strip()
+                if (obj_name, attr_name) in model_numeric_predicates or (obj_name, attr_name) in model_set_predicates:
+                    continue
+        
+        # Kontrola, či predikát nie je v modeli
+        if pred not in model_predicates:
+            extra_predicates.append(pred)
+    
+    print(f"\n===== VÝSLEDKY POROVNANIA =====")
+    print(f"Matched: {len(matched_predicates)}")
+    print(f"Unmatched: {len(unmatched_predicates)}")
+    print(f"Extra: {len(extra_predicates)}")
+    
+    return matched_predicates, unmatched_predicates, extra_predicates
+
+def highlight_formula(model: Model, example_model: Model, model_formula: str, classification_tree=None) -> Dict[str, Any]:
+    """
+    Zjednodušená funkcia na zvýraznenie formuly podľa splnených/nesplnených predikátov.
+    
+    Args:
+        model: Aktuálny model (hypotéza)
+        example_model: Model príkladu
+        model_formula: Formula modelu na zvýraznenie
+        classification_tree: Klasifikačný strom pre hierarchické vzťahy
+        
+    Returns:
+        Slovník so zvýraznenou formulou
+    """
+    try:
+        # Získame zoznamy predikátov
+        matched_predicates, unmatched_predicates, extra_predicates = compare_models_directly(model, example_model, classification_tree)
+        
+        # Parsujeme formulu
+        from backend.pl1_parser import parse_pl1_formula
+        parsed_formula = parse_pl1_formula(model_formula)
+        model_predicates = []
+        
+        if hasattr(parsed_formula, 'predicates'):
+            model_predicates = parsed_formula.predicates
+        
+        # Vytvoríme tokeny pre zvýraznenie
+        tokens = []
+        
+        # Spracujeme predikáty v modeli
+        for pred_idx, pred in enumerate(model_predicates):
+            pred_str = str(pred)
+            
+            # Určíme, či je predikát splnený v príklade
+            is_satisfied = any(pred_str in matched for matched in matched_predicates)
+            
+            # Pridáme token
+            tokens.append({
+                "text": pred_str,
+                "is_satisfied": is_satisfied,
+                "type": "predicate"
+            })
+            
+            # Pridáme token pre spojku, ak nie je posledný predikát
+            if pred_idx < len(model_predicates) - 1:
+                tokens.append({
+                    "text": " ∧ ",
+                    "is_satisfied": None,  # Neutrálna farba
+                    "type": "connector"
+                })
+        
+        # Vytvoríme zvýraznenú formulu
+        highlighted_formula = "".join([token["text"] for token in tokens])
+        
+        # Štatistiky
+        stats = {
+            "total_predicates": len(model_predicates),
+            "satisfied_predicates": sum(1 for token in tokens if token.get("is_satisfied") == True),
+            "extra_components": extra_predicates
+        }
+        
+        return {
+            "highlighted_formula": highlighted_formula,
+            "tokens": tokens,
+            "stats": stats
+        }
+    except Exception as e:
+        print(f"Error highlighting formula: {e}")
+        traceback.print_exc()
+        return {
+            "highlighted_formula": model_formula,
+            "tokens": [],
+            "stats": {
+                "total_predicates": 0,
+                "satisfied_predicates": 0
             }
         } 

@@ -1177,88 +1177,135 @@ def formula_to_model(formula: Formula) -> Model:
     return result_model
 
 class ClassificationTree:
-    """Strom klasifikácie tried pre hierarchiu pojmov."""
+    """
+    Reprezentácia klasifikačného stromu pre určenie vzťahov medzi triedami.
+    """
     
     def __init__(self):
-        """Inicializácia prázdneho klasifikačného stromu."""
+        """
+        Inicializácia prázdneho klasifikačného stromu.
+        """
+        # Mapa rodiča pre každú triedu (trieda -> rodič)
         self.parent_map = {}
+        # Mapa detí pre každú triedu (trieda -> zoznam detí)
         self.children_map = {}
     
-    def add_relationship(self, child: str, parent: str):
+    def add_relationship(self, class_name: str, parent: str = None):
         """
-        Pridá vzťah dieťa-rodič do stromu.
+        Pridá novú triedu do klasifikačného stromu.
         
         Args:
-            child: Trieda dieťaťa
-            parent: Trieda rodiča (None pre top-level triedy)
+            class_name: Názov triedy na pridanie
+            parent: Rodičovská trieda (voliteľná)
         """
-        # Pridá vzťah dieťa -> rodič
-        self.parent_map[child] = parent
-        
-        # Pridá vzťah rodič -> deti
+        # Ak trieda už existuje, iba aktualizujeme jej rodičovský vzťah
         if parent:
+            self.parent_map[class_name] = parent
+            
+            # Inicializujeme zoznam detí pre rodiča, ak ešte neexistuje
             if parent not in self.children_map:
                 self.children_map[parent] = []
-            if child not in self.children_map[parent]:
-                self.children_map[parent].append(child)
+                
+            # Pridáme triedu do zoznamu detí rodiča
+            self.children_map[parent].append(class_name)
         
-        # Zabezpečí, že rodič je v parent_map aj keď nemá vlastného rodiča
-        if parent and parent not in self.parent_map:
-            self.parent_map[parent] = None
+        # Zabezpečíme, že trieda existuje v children_map, aj keď nemá deti
+        if class_name not in self.children_map:
+            self.children_map[class_name] = []
     
     def get_parent(self, class_name: str) -> str:
         """
-        Vráti rodiča danej triedy.
+        Vráti rodičovskú triedu pre zadanú triedu.
         
         Args:
             class_name: Názov triedy
             
         Returns:
-            Názov rodičovskej triedy alebo None
+            Názov rodičovskej triedy alebo None, ak trieda nemá rodiča
         """
         return self.parent_map.get(class_name)
     
-    def get_children(self, class_name: str) -> List[str]:
+    def get_all_ancestors(self, class_name: str) -> List[str]:
         """
-        Vráti zoznam detí danej triedy.
+        Vráti zoznam všetkých predkov danej triedy od najbližšieho po najvzdialenejšieho.
         
         Args:
             class_name: Názov triedy
             
         Returns:
-            Zoznam názvov tried detí
+            Zoznam názvov predkov danej triedy
+        """
+        ancestors = []
+        current = class_name
+        
+        # Postupne prechádzame rodičovský strom smerom nahor
+        while current in self.parent_map:
+            parent = self.parent_map[current]
+            ancestors.append(parent)
+            current = parent
+            
+        return ancestors
+    
+    def get_children(self, class_name: str) -> List[str]:
+        """
+        Vráti zoznam priamych potomkov pre zadanú triedu.
+        
+        Args:
+            class_name: Názov triedy
+            
+        Returns:
+            Zoznam názvov priamych potomkov danej triedy
         """
         return self.children_map.get(class_name, [])
     
-    def is_subclass(self, child: str, parent: str) -> bool:
+    def is_subclass(self, class_name: str, parent_class: str) -> bool:
         """
-        Kontroluje, či `child` je podtriedou `parent`.
+        Kontroluje, či je trieda podtriedou zadanej rodičovskej triedy.
         
         Args:
-            child: Názov triedy dieťaťa
-            parent: Názov triedy rodiča
+            class_name: Názov triedy na kontrolu
+            parent_class: Názov potenciálnej rodičovskej triedy
             
         Returns:
-            True ak je `child` podtriedou `parent` (priamou alebo nepriamou)
+            True, ak je class_name podtriedou parent_class, False inak
         """
-        # Priama kontrola
-        if child == parent:
+        # Priama zhoda tried - trieda je podtrieda sama seba
+        if class_name == parent_class:
             return True
-            
-        # Ak child nie je v strome, nemôže byť podtriedou
-        if child not in self.parent_map:
+        
+        # Ak trieda nie je v strome, nemôže byť podtriedou
+        if class_name not in self.parent_map:
             return False
-            
-        # Rekurzívne prehľadávanie cez rodičov
-        current_parent = self.parent_map.get(child)
+        
+        # Rekurzívne kontrolujeme rodičov
+        current_parent = self.parent_map[class_name]
         while current_parent:
-            if current_parent == parent:
+            if current_parent == parent_class:
                 return True
-            current_parent = self.parent_map.get(current_parent)
             
+            # Prechádzame ďalej v hierarchii
+            if current_parent in self.parent_map:
+                current_parent = self.parent_map[current_parent]
+            else:
+                break
+        
         return False
     
-    def find_common_ancestor(self, class1: str, class2: str) -> Optional[str]:
+    def are_related(self, class1: str, class2: str) -> bool:
+        """
+        Kontroluje, či sú dve triedy v hierarchickom vzťahu 
+        (jedna je podtriedou druhej alebo naopak).
+        
+        Args:
+            class1: Názov prvej triedy
+            class2: Názov druhej triedy
+            
+        Returns:
+            True, ak sú triedy v hierarchickom vzťahu, False inak
+        """
+        return self.is_subclass(class1, class2) or self.is_subclass(class2, class1)
+    
+    def find_common_ancestor(self, class1: str, class2: str) -> str:
         """
         Nájde najbližšieho spoločného predka dvoch tried.
         
@@ -1269,28 +1316,19 @@ class ClassificationTree:
         Returns:
             Názov najbližšieho spoločného predka alebo None
         """
-        # Ak ktorákoľvek trieda nie je v strome, nemôžeme nájsť spoločného predka
-        if class1 not in self.parent_map or class2 not in self.parent_map:
-            # Špeciálny prípad pre motory, aj keď nie sú v clasifikačnom strome
-            if (class1 in ["DieselEngine", "PetrolEngine", "HybridEngine"] and 
-                class2 in ["DieselEngine", "PetrolEngine", "HybridEngine"]):
-                return "Engine"
-            return None
+        # Najprv získame všetkých predkov triedy class1
+        ancestors1 = self.get_all_ancestors(class1)
+        ancestors1.insert(0, class1)  # Pridanie samej triedy na začiatok zoznamu
         
-        # Najprv získame cestu od class1 k root
-        path1 = []
-        current = class1
-        while current:
-            path1.append(current)
-            current = self.parent_map.get(current)
-            
-        # Teraz prejdeme cestu od class2 k root a hľadáme prvého spoločného predka
-        current = class2
-        while current:
-            if current in path1:
-                return current
-            current = self.parent_map.get(current)
-            
+        # Potom získame všetkých predkov triedy class2
+        ancestors2 = self.get_all_ancestors(class2)
+        ancestors2.insert(0, class2)  # Pridanie samej triedy na začiatok zoznamu
+        
+        # Hľadáme prvého spoločného predka
+        for ancestor in ancestors1:
+            if ancestor in ancestors2:
+                return ancestor
+                
         return None
 
 def is_valid_example(model: Model, example: Model, classification_tree: ClassificationTree) -> tuple[bool, list[str]]:

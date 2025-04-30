@@ -118,7 +118,65 @@
 Α(v, sedadla, kozene) ∧
 Α(k, velkost, 22)
 
-# 5. Negatívny príklad - Forbid link (MUST_NOT ManualnaPrevodovka)
+# 5. Negatívny príklad - Require link (Must Motor)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 6. Negatívny príklad - Require link (MUST  AutomatickaPrevodovka)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 7. Negatívny príklad - Require link (Must Motor)
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, BenzinovyMotor) ∧ 
@@ -148,35 +206,7 @@
 Α(v, sedadla, kozene) ∧
 Α(k, velkost, 22)
 
-# 6. Negatívny príklad - Require link (MUST  Biela)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, BenzinovyMotor) ∧ 
-Ι(p, ManualnaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Ι(f, farba) ∧
-Ι(v, Vybava) ∧
-Ι(k, Kolesa) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Π(a, f) ∧
-Π(a, v) ∧
-Π(a, k) ∧
-Α(r, oznacenie, X5) ∧
-Α(r, segment, SUV) ∧
-Α(e, vykon, 210) ∧
-Α(e, objem, 3.0) ∧
-Α(e, valce, 6) ∧
-Α(p, rychlosti, 8) ∧
-Α(d, typ, xDrive) ∧
-Α(v, idrive, ano) ∧
-Α(v, navigacia, basic) ∧
-Α(v, sedadla, kozene) ∧
-Α(k, velkost, 22)
-
-# 7. pozitívny príklad - Drop link (oznacenie X5)
+# 8. pozitívny príklad - Drop link (oznacenie X5)
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, BenzinovyMotor) ∧ 

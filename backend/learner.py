@@ -153,7 +153,7 @@ class WinstonLearner:
         interval, the interval is enlarged to reach the example's number."
         
         Args:
-            model: Aktuálny model
+            model: Aktuálný model
             good: Pozitívny príklad
             
         Returns:
@@ -926,6 +926,10 @@ class WinstonLearner:
                 # Pridáme dvojicu (trieda zdroja, trieda cieľa) do množiny spojení
                 model_class_links.add((model_source.class_name, model_target.class_name))
         
+        # Pre debugovacie účely vypíšeme spojenia v modeli
+        self._debug_log(f"Spojenia v modeli (class_links): {model_class_links}")
+        self._debug_log(f"Known subclasses: {updated_model.known_subclasses}")
+        
         # Pre každé spojenie v near-miss príklade, kontrolujeme
         # či nejaké podobné spojenie existuje v modeli
         for near_miss_link in near_miss.links:
@@ -935,27 +939,80 @@ class WinstonLearner:
             if not near_miss_source or not near_miss_target:
                 continue
             
-            # Skontrolujeme, či takéto spojenie tried existuje v modeli
-            if (near_miss_source.class_name, near_miss_target.class_name) not in model_class_links:
-                # Ak spojenie tried existuje v near-miss, ale nie v modeli, 
-                # vytvoríme MUST_NOT pravidlo
+            self._debug_log(f"Kontrolujem spojenie v near_miss: {near_miss_source.class_name} -> {near_miss_target.class_name}")
+            
+            # Skontrolujeme, či takéto spojenie tried existuje v modeli priamo
+            direct_link_exists = (near_miss_source.class_name, near_miss_target.class_name) in model_class_links
+            
+            # Skontrolujeme aj, či spojenie existuje cez hierarchiu tried (cez known_subclasses)
+            hierarchy_link_exists = False
+            
+            # Skontrolujeme každé spojenie v modeli cez hierarchiu tried
+            for model_source_class, model_target_class in model_class_links:
+                # Kontrola zdrojovej triedy: priama zhoda alebo near_miss trieda je podtriedou
+                source_matches = (
+                    model_source_class == near_miss_source.class_name or
+                    self.classification_tree.is_subclass(near_miss_source.class_name, model_source_class) or
+                    (model_source_class in updated_model.known_subclasses and 
+                     near_miss_source.class_name in updated_model.known_subclasses[model_source_class])
+                )
                 
-                # Najprv skontrolujeme, či je pravidlo konzistentné
-                if self._is_rule_consistent(updated_model, near_miss_source.class_name, near_miss_target.class_name, LinkType.MUST_NOT):
-                    must_not_link = Link(
-                        source=near_miss_source.class_name,
-                        target=near_miss_target.class_name,
-                        link_type=LinkType.MUST_NOT
-                    )
-                    
-                    # Skontrolujeme, či takéto spojenie už neexistuje
-                    if not any(link.source == must_not_link.source and 
-                               link.target == must_not_link.target and 
-                               link.link_type == must_not_link.link_type 
-                               for link in updated_model.links):
-                        updated_model.add_link(must_not_link)
-                        self.applied_heuristics.append("forbid_link")
-                        self._debug_log(f"Pridané MUST_NOT pravidlo (spojenie existuje v near-miss, ale nie v modeli): {near_miss_source.class_name} -> {near_miss_target.class_name}")
+                # Kontrola cieľovej triedy: priama zhoda alebo near_miss trieda je podtriedou
+                target_matches = (
+                    model_target_class == near_miss_target.class_name or
+                    self.classification_tree.is_subclass(near_miss_target.class_name, model_target_class) or
+                    (model_target_class in updated_model.known_subclasses and 
+                     near_miss_target.class_name in updated_model.known_subclasses[model_target_class])
+                )
+                
+                if source_matches and target_matches:
+                    hierarchy_link_exists = True
+                    self._debug_log(f"Spojenie {near_miss_source.class_name} -> {near_miss_target.class_name} existuje cez hierarchiu tried: {model_source_class} -> {model_target_class}")
+                    break
+            
+            # Ak spojenie neexistuje v modeli ani priamo ani cez hierarchiu, vytvoríme MUST_NOT pravidlo
+            if not direct_link_exists and not hierarchy_link_exists:
+                # Skontrolujeme, či spojenie nie je konfliktné so známymi podtriedami
+                conflict_with_known_subclasses = False
+                
+                # Skontrolujeme, či v modeli nemáme generalizovanú triedu, ktorá zahŕňa triedy z near_miss
+                for parent_class, subclasses in updated_model.known_subclasses.items():
+                    if (near_miss_source.class_name in subclasses and 
+                        (parent_class, near_miss_target.class_name) in model_class_links):
+                        conflict_with_known_subclasses = True
+                        self._debug_log(f"Konflikt s known_subclasses: {near_miss_source.class_name} je podtriedou {parent_class}, ktorá má spojenie s {near_miss_target.class_name}")
+                        break
+                        
+                    if (near_miss_target.class_name in subclasses and 
+                        (near_miss_source.class_name, parent_class) in model_class_links):
+                        conflict_with_known_subclasses = True
+                        self._debug_log(f"Konflikt s known_subclasses: {near_miss_target.class_name} je podtriedou {parent_class}, ktorá má spojenie s {near_miss_source.class_name}")
+                        break
+                
+                # Ak nie je konflikt s known_subclasses, môžeme vytvoriť MUST_NOT pravidlo
+                if not conflict_with_known_subclasses:
+                    # Najprv skontrolujeme, či je pravidlo konzistentné
+                    if self._is_rule_consistent(updated_model, near_miss_source.class_name, near_miss_target.class_name, LinkType.MUST_NOT):
+                        must_not_link = Link(
+                            source=near_miss_source.class_name,
+                            target=near_miss_target.class_name,
+                            link_type=LinkType.MUST_NOT
+                        )
+                        
+                        # Skontrolujeme, či takéto spojenie už neexistuje
+                        if not any(link.source == must_not_link.source and 
+                                link.target == must_not_link.target and 
+                                link.link_type == must_not_link.link_type 
+                                for link in updated_model.links):
+                            updated_model.add_link(must_not_link)
+                            self.applied_heuristics.append("forbid_link")
+                            self._debug_log(f"Pridané MUST_NOT pravidlo (spojenie existuje v near-miss, ale nie v modeli): {near_miss_source.class_name} -> {near_miss_target.class_name}")
+                    else:
+                        self._debug_log(f"Pravidlo MUST_NOT {near_miss_source.class_name} -> {near_miss_target.class_name} je nekonzistentné s existujúcim modelom")
+                else:
+                    self._debug_log(f"Preskakujem vytvorenie MUST_NOT {near_miss_source.class_name} -> {near_miss_target.class_name} kvôli konfliktu s known_subclasses")
+            else:
+                self._debug_log(f"Spojenie {near_miss_source.class_name} -> {near_miss_target.class_name} existuje v modeli, neaplikujem forbid_link")
         
         return updated_model
     

@@ -73,9 +73,16 @@ function a11yProps(index: number) {
 interface HighlightedFormulaProps {
   highlightedFormula: any;
   modelFormula: string;
+  exampleFormula: string;
+  extraComponents?: string[];
 }
 
-const HighlightedFormula: React.FC<HighlightedFormulaProps> = ({ highlightedFormula, modelFormula }) => {
+const HighlightedFormula: React.FC<HighlightedFormulaProps> = ({ 
+  highlightedFormula, 
+  modelFormula, 
+  exampleFormula,
+  extraComponents = []
+}) => {
   // If no tokens are available, display the raw formula
   if (!highlightedFormula || !highlightedFormula.tokens || highlightedFormula.tokens.length === 0) {
     return (
@@ -86,44 +93,90 @@ const HighlightedFormula: React.FC<HighlightedFormulaProps> = ({ highlightedForm
   }
 
   return (
-    <Box sx={{ my: 2, p: 2, backgroundColor: alpha('#263238', 0.4), borderRadius: 2, fontFamily: 'monospace', maxHeight: '400px', overflow: 'auto' }}>
-      <Box component="div" sx={{ whiteSpace: 'pre-wrap' }}>
-        {highlightedFormula.tokens.map((token: any, index: number) => {
-          let color = '';
-          if (token.type === 'connector') {
-            color = '#a0aec0'; // neutral color for connectors
-          } else if (token.is_satisfied === true) {
-            color = '#4caf50'; // green for satisfied
-          } else if (token.is_satisfied === false) {
-            color = '#f44336'; // red for violated
-          }
-          
-          return (
-            <span 
-              key={index} 
-              style={{ 
-                color: color,
-                fontWeight: token.type === 'predicate' ? 'bold' : 'normal'
-              }}
-            >
-              {token.text}
-            </span>
-          );
-        })}
-      </Box>
-      
-      {highlightedFormula.stats && (
-        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #455a64' }}>
-          <Typography variant="subtitle2" color="#90caf9">Štatistika validácie:</Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-            <Typography variant="body2" color="#4caf50">
-              Splnené predikáty: {highlightedFormula.stats.satisfied_predicates}/{highlightedFormula.stats.total_predicates}
-            </Typography>
-            <Typography variant="body2" color="#f44336">
-              Nesplnené predikáty: {highlightedFormula.stats.total_predicates - highlightedFormula.stats.satisfied_predicates}/{highlightedFormula.stats.total_predicates}
-            </Typography>
-          </Box>
+    <Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Hypotéza modelu:</Typography>
+      <Box sx={{ my: 2, p: 2, backgroundColor: alpha('#263238', 0.4), borderRadius: 2, fontFamily: 'monospace', maxHeight: '400px', overflow: 'auto' }}>
+        <Box component="div" sx={{ whiteSpace: 'pre-wrap' }}>
+          {highlightedFormula.tokens.map((token: any, index: number) => {
+            let color = '';
+            if (token.type === 'connector') {
+              color = '#a0aec0'; // neutral color for connectors
+            } else if (token.is_satisfied === true) {
+              color = '#4caf50'; // green for satisfied
+            } else if (token.is_satisfied === false) {
+              color = '#f44336'; // red for violated
+            }
+            
+            return (
+              <span 
+                key={index} 
+                style={{ 
+                  color: color,
+                  fontWeight: token.type === 'predicate' ? 'bold' : 'normal'
+                }}
+              >
+                {token.text}
+              </span>
+            );
+          })}
         </Box>
+        
+        {highlightedFormula.stats && (
+          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #455a64' }}>
+            <Typography variant="subtitle2" color="#90caf9">Štatistika validácie:</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+              <Typography variant="body2" color="#4caf50">
+                Splnené predikáty: {highlightedFormula.stats.satisfied_predicates}/{highlightedFormula.stats.total_predicates}
+              </Typography>
+              <Typography variant="body2" color="#f44336">
+                Nesplnené predikáty: {highlightedFormula.stats.total_predicates - highlightedFormula.stats.satisfied_predicates}/{highlightedFormula.stats.total_predicates}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* Display the example formula if it has extra components */}
+      {extraComponents.length > 0 && (
+        <>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 3, mb: 1 }}>Formula príkladu s extra komponentmi:</Typography>
+          <Box sx={{ my: 2, p: 2, backgroundColor: alpha('#263238', 0.4), borderRadius: 2, fontFamily: 'monospace', maxHeight: '400px', overflow: 'auto' }}>
+            <Box component="div" sx={{ whiteSpace: 'pre-wrap' }}>
+              {/* Split example formula by conjunction symbol and highlight extra components */}
+              {exampleFormula.split(' ∧ ').map((part, idx) => {
+                // Check if this part contains an extra component
+                const isExtra = extraComponents.some(comp => part.includes(comp));
+                
+                return (
+                  <React.Fragment key={idx}>
+                    {idx > 0 && <span style={{ color: '#a0aec0' }}> ∧ </span>}
+                    <span 
+                      style={{
+                        color: isExtra ? '#2196f3' : 'inherit',
+                        fontWeight: isExtra ? 'bold' : 'normal'
+                      }}
+                    >
+                      {part}
+                    </span>
+                  </React.Fragment>
+                );
+              })}
+            </Box>
+            
+            {extraComponents.length > 0 && (
+              <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #455a64' }}>
+                <Typography variant="subtitle2" color="#90caf9">Extra komponenty v príklade:</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', mt: 1 }}>
+                  {extraComponents.map((comp, idx) => (
+                    <Typography key={idx} variant="body2" color="#2196f3">
+                      • {comp}
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </>
       )}
     </Box>
   );
@@ -137,7 +190,6 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [validateAttrs, setValidateAttrs] = useState(true);
   const [tabValue, setTabValue] = useState(0);
   
   const adaptBackendResponse = (result: ComparisonResult | null) => {
@@ -154,17 +206,15 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
     }
 
     if (result.is_valid) {
-      title = `✅ Príklad je platný pre model ${result.model_type}`;
-      description = `Príklad spĺňa všetkých ${result.satisfied_rules.length} pravidiel pre model ${result.model_type}.`;
+      title = `✅ Príklad je platný`;
+      description = `Príklad spĺňa všetkých ${result.satisfied_rules.length} pravidiel.`;
     }
     else {
-      title = `❌ Príklad nie je platný pre model ${result.model_type}`;
+      title = `❌ Príklad nie je platný`;
       description = `Príklad porušuje ${result.violations.length} z ${result.violations.length + result.satisfied_rules.length} pravidiel.`;
     }
 
     if (result.violations && result.violations.length > 0) {
-      details.push({ text: 'Porušené pravidlá:', color: '#f44336', symbol: '' });
-      
       if (result.categorized_violations) {
         if (result.categorized_violations.component_violations && result.categorized_violations.component_violations.length > 0) {
           details.push({ text: 'Chýbajúce komponenty:', color: '#f44336', symbol: '' });
@@ -187,7 +237,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
           });
         }
         
-        if (result.validate_attributes && result.categorized_violations.attribute_violations && result.categorized_violations.attribute_violations.length > 0) {
+        if (result.categorized_violations.attribute_violations && result.categorized_violations.attribute_violations.length > 0) {
           details.push({ text: 'Neplatné hodnoty atribútov (numerické a iné):', color: '#ff5722', symbol: '' });
           result.categorized_violations.attribute_violations.forEach(violation => {
             if (violation.includes("číselnú hodnotu")) {
@@ -195,6 +245,13 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
             } else {
               details.push({ text: violation, color: '#ff9800', symbol: '⚠️' });
             }
+          });
+        }
+        
+        if ((result.categorized_violations as any)?.extra_components && (result.categorized_violations as any).extra_components.length > 0) {
+          details.push({ text: 'Nadbytočné komponenty (nie sú v modeli):', color: '#2196f3', symbol: '' });
+          (result.categorized_violations as any).extra_components.forEach((component: string) => {
+            details.push({ text: component, color: '#2196f3', symbol: 'ℹ️' });
           });
         }
       } else {
@@ -215,6 +272,15 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
       });
     }
 
+    if ((result as any).extra_components && (result as any).extra_components.length > 0) {
+      if (!result.categorized_violations || !(result.categorized_violations as any)?.extra_components) {
+        details.push({ text: 'Nadbytočné komponenty (nie sú v modeli):', color: '#2196f3', symbol: '' });
+        (result as any).extra_components.forEach((component: string) => {
+          details.push({ text: `Príklad obsahuje nadbytočný komponent: ${component}`, color: '#2196f3', symbol: 'ℹ️' });
+        });
+      }
+    }
+
     return { title, description, details };
   };
   
@@ -223,7 +289,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
     setError(null);
     
     try {
-      const comparisonResult = await onCompare(formula, validateAttrs);
+      const comparisonResult = await onCompare(formula, true);
       console.log("Validation result:", comparisonResult);
       console.log("Satisfied rules:", comparisonResult.satisfied_rules);
       console.log("Violations:", comparisonResult.violations);
@@ -243,10 +309,6 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
   
   const handleEditorChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormula(event.target.value);
-  };
-  
-  const handleValidateAttributesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setValidateAttrs(event.target.checked);
   };
   
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -424,19 +486,6 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                   
                   <Grid item xs={12}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                      <Tooltip title="Kontrolovať aj číselné hodnoty atribútov ako výkon, krútiaci moment, počet valcov...">
-                        <FormControlLabel 
-                          control={
-                            <Switch 
-                              checked={validateAttrs} 
-                              onChange={handleValidateAttributesChange}
-                              color="primary" 
-                            />
-                          } 
-                          label="Validovať hodnoty atribútov" 
-                        />
-                      </Tooltip>
-                      
                       {error && (
                         <Alert 
                           severity="error" 
@@ -502,70 +551,52 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                       }}
                     >
                       {result.is_valid ? 
-                        `Príklad je platný pre model ${result.model_type}` : 
-                        `Príklad nie je platný pre model ${result.model_type}`
+                        `Príklad je platný` : 
+                        `Príklad nie je platný`
                       }
                     </Alert>
                   </Box>
                   
                   <Divider sx={{ mb: 3, bgcolor: alpha('#fff', 0.1) }} />
                   
-                  <Grid container spacing={3}>
-                    <Grid item xs={12}>
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          borderRadius: 2,
-                          bgcolor: alpha('#000', 0.2),
-                          borderColor: alpha('#fff', 0.1),
-                          mb: 3
-                        }}
-                      >
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: '#90caf9' }}>
-                          Detaily validácie:
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      bgcolor: alpha('#000', 0.2),
+                      borderColor: alpha('#fff', 0.1),
+                      mb: 3
+                    }}
+                  >
+                    {adaptedResult.details.map((detail, index) => (
+                      detail.text ? (
+                        <Typography 
+                          key={index} 
+                          variant={detail.symbol === '' ? 'subtitle2' : 'body2'} 
+                          sx={{ 
+                            color: detail.color, 
+                            my: detail.symbol === '' ? 1 : 0.5,
+                            fontWeight: detail.symbol === '' ? 600 : 400,
+                            display: 'flex',
+                            alignItems: 'center',
+                            pl: detail.symbol ? 1 : 0
+                          }}
+                        >
+                          {detail.symbol && <span style={{ marginRight: '8px', fontSize: '1.1rem' }}>{detail.symbol}</span>}
+                          {detail.text}
                         </Typography>
-                        
-                        <Box sx={{ pl: 1 }}>
-                          {adaptedResult.details.map((detail, index) => (
-                            detail.text ? (
-                              <Typography 
-                                key={index} 
-                                variant={detail.symbol === '' ? 'subtitle2' : 'body2'} 
-                                sx={{ 
-                                  color: detail.color, 
-                                  my: detail.symbol === '' ? 1.5 : 0.75,
-                                  fontWeight: detail.symbol === '' ? 600 : 400,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  pl: detail.symbol ? 2 : 0
-                                }}
-                              >
-                                {detail.symbol && <span style={{ marginRight: '8px', fontSize: '1.1rem' }}>{detail.symbol}</span>}
-                                {detail.text}
-                              </Typography>
-                            ) : (
-                              <Divider key={index} sx={{ my: 1.5, bgcolor: alpha('#fff', 0.05) }} />
-                            )
-                          ))}
-                        </Box>
-                      </Paper>
-                    </Grid>
-                  </Grid>
+                      ) : (
+                        <Divider key={index} sx={{ my: 1, bgcolor: alpha('#fff', 0.05) }} />
+                      )
+                    ))}
+                  </Paper>
                   
                   {result && (
                     <Box sx={{ mt: 3 }}>
-                      <Typography variant="h6" color="text.primary" sx={{ mb: 1 }}>
-                        <CodeIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                        Hypotéza s vyznačením validácie
-                      </Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Zelené časti sú splnené, červené časti sú porušené v príklade
+                        Zelené časti sú splnené, červené časti sú porušené v príklade, modré časti sú nadbytočné
                       </Typography>
-                      <HighlightedFormula 
-                        highlightedFormula={result.highlighted_formula} 
-                        modelFormula={result.model_formula || ""}
-                      />
                     </Box>
                   )}
                 </CardContent>
@@ -685,6 +716,12 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#000000' }}></Box>
                               <Typography variant="caption">Chýbajúci v príklade</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2196f3' }}></Box>
+                              <Typography variant="caption">Nadbytočný komponent</Typography>
                             </Box>
                           </Grid>
                         </Grid>
