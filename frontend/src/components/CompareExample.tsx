@@ -291,9 +291,15 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
     try {
       const comparisonResult = await onCompare(formula, true);
       console.log("Validation result:", comparisonResult);
+      console.log("Is valid:", comparisonResult.is_valid);
       console.log("Satisfied rules:", comparisonResult.satisfied_rules);
       console.log("Violations:", comparisonResult.violations);
       console.log("Categorized violations:", comparisonResult.categorized_violations);
+      
+      if (!comparisonResult.is_valid && (!comparisonResult.violations || comparisonResult.violations.length === 0)) {
+        console.warn("WARNING: Example is marked as invalid but no violations were provided!");
+      }
+      
       setResult(comparisonResult);
       // After successful comparison, switch to results tab
       setTabValue(1);
@@ -624,6 +630,16 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                   }}
                 >
                   <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {!result.is_valid && (
+                      <Alert 
+                        severity="error" 
+                        variant="filled"
+                        sx={{ mb: 2, borderRadius: 2 }}
+                      >
+                        Validácia zlyhala: Príklad nezodpovedá požiadavkám modelu
+                      </Alert>
+                    )}
+                    
                     <Paper 
                       elevation={0}
                       sx={{ 
@@ -654,7 +670,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                             color: '#2196f3'
                           }}
                         >
-                          Vizualizacia hypotezy
+                          Vizualizácia validácie príkladu
                         </Typography>
                       </Box>
                       <Box sx={{ 
@@ -667,6 +683,7 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                           formula={formula} 
                           showLayeredVisualization={true}
                           viewType="combined"
+                          key={`network-${result.is_valid}-${formula.length}`}
                         />
                       </Box>
                     </Paper>
@@ -682,6 +699,10 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                           borderColor: alpha('#fff', 0.1)
                         }}
                       >
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          Zelené časti sú splnené, červené časti sú porušené v príklade, modré časti sú nadbytočné. Vizualizácia zobrazuje, či príklad zodpovedá požiadavkám modelu.
+                        </Typography>
+                        
                         <Grid container spacing={1} alignItems="center">
                           <Grid item xs={12} sm="auto">
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#90caf9', mb: { xs: 1, sm: 0 } }}>
@@ -691,37 +712,31 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                           <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '130px' } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#4caf50' }}></Box>
-                              <Typography variant="caption">Platný prvok</Typography>
+                              <Typography variant="caption">Splnená požiadavka</Typography>
                             </Box>
                           </Grid>
                           <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#F44336' }}></Box>
-                              <Typography variant="caption">Chýbajúci prvok</Typography>
+                              <Typography variant="caption">Porušená požiadavka</Typography>
                             </Box>
                           </Grid>
                           <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#FF9800' }}></Box>
-                              <Typography variant="caption">Neplatná hodnota</Typography>
+                              <Typography variant="caption">Nesprávna hodnota</Typography>
                             </Box>
                           </Grid>
                           <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2196f3' }}></Box>
-                              <Typography variant="caption">Prebytočný prvok</Typography>
+                              <Typography variant="caption">Nadbytočný prvok</Typography>
                             </Box>
                           </Grid>
                           <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#000000' }}></Box>
                               <Typography variant="caption">Chýbajúci v príklade</Typography>
-                            </Box>
-                          </Grid>
-                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2196f3' }}></Box>
-                              <Typography variant="caption">Nadbytočný komponent</Typography>
                             </Box>
                           </Grid>
                         </Grid>

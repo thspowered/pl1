@@ -173,6 +173,7 @@ export interface ModelComparisonResult {
       count_a: number;
       count_b: number;
       common_count: number;
+      common_links?: string[];
     };
     model_types: {
       [model_type: string]: {

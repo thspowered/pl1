@@ -37,6 +37,57 @@ interface CompareModelsProps {
   isLoading: boolean;
 }
 
+// Helper to format source, type, target into PL1 notation
+const formatAsPL1 = (source: string, type: string, target: string): string => {
+  const targetName = target.split('_').pop() || target;
+  
+  // Convert to PL1 notation based on type
+  switch (type.toLowerCase()) {
+    case 'must':
+      return `Μ(${source}, ${target})`;
+    case 'must_not':
+      return `Ν(${source}, ${target})`;
+    case 'must_be_a':
+    case 'is_a':
+      return `Ι(${source}, ${target})`;
+    case 'has_part':
+      return `Π(${source}, ${target})`;
+    case 'has_attribute':
+      return `A(${source}, ${targetName})`;
+    case 'regular':
+      return `${source} -regular-> ${target}`;
+    case 'value':
+      return `${source} -VALUE-> ${target}`;
+    default:
+      return `${source} -${type}-> ${target}`;
+  }
+};
+
+// Helper function to convert relationship types to PL1 notation
+const convertToPl1Notation = (link: string): string => {
+  // Case 1: Handle format already in PL1 notation (e.g., "A(e, vykon)")
+  if (link.match(/^[A-ZΑΙΜΝΠ]\([^,]+,\s*[^)]+\)$/)) {
+    return link;
+  }
+  
+  // Case 2: Handle LinkType format
+  const linkTypeMatch = link.match(/(.*)\s+-LinkType\.(\w+)(?:_(\w+))?->\s+(.*)/);
+  if (linkTypeMatch) {
+    const [_, source, mainType, subType, target] = linkTypeMatch;
+    return formatAsPL1(source, mainType, target);
+  }
+  
+  // Case 3: Handle regular format (without LinkType prefix)
+  const regularMatch = link.match(/(.*)\s+-([a-z_]+)->(.+)/);
+  if (regularMatch) {
+    const [_, source, type, target] = regularMatch;
+    return formatAsPL1(source.trim(), type.trim(), target.trim());
+  }
+  
+  // If no patterns match, return the original
+  return link;
+};
+
 const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
   const [modelAType, setModelAType] = useState<string>('current');
   const [modelAId, setModelAId] = useState<string>('');
@@ -48,6 +99,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('differences');
+  const [showCommonRules, setShowCommonRules] = useState<boolean>(false);
 
   // Načítání uložených modelů
   useEffect(() => {
@@ -260,20 +312,110 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                   Statistika
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Typography variant="body2">
-                      Počet pravidel v modelu A: <strong>{result.differences.links.count_a}</strong>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="body2">
-                      Počet pravidel v modelu B: <strong>{result.differences.links.count_b}</strong>
-                    </Typography>
+                  <Grid item xs={12}>
+                    <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Přehled pravidel
+                      </Typography>
+                      
+                      {/* Model A Stats */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                        <Box sx={{ width: '25%', mr: 2 }}>
+                          <Typography variant="body2" sx={{ color: '#90caf9' }}>
+                            Model A: {result.differences.links.count_a}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ width: '75%', display: 'flex' }}>
+                          <Box 
+                            sx={{ 
+                              height: 20, 
+                              bgcolor: '#90caf9', 
+                              width: `${((result.differences.links.count_a - (result.differences.links.only_in_a.length)) / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              borderRadius: '4px 0 0 4px'
+                            }} 
+                          />
+                          <Box 
+                            sx={{ 
+                              height: 20, 
+                              bgcolor: '#4fc3f7',
+                              width: `${(result.differences.links.only_in_a.length / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              borderRadius: '0 4px 4px 0',
+                              borderLeft: '2px solid rgba(0,0,0,0.3)'
+                            }} 
+                          />
+                        </Box>
+                      </Box>
+                      
+                      {/* Model B Stats */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                        <Box sx={{ width: '25%', mr: 2 }}>
+                          <Typography variant="body2" sx={{ color: '#ce93d8' }}>
+                            Model B: {result.differences.links.count_b}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ width: '75%', display: 'flex' }}>
+                          <Box 
+                            sx={{ 
+                              height: 20, 
+                              bgcolor: '#ce93d8', 
+                              width: `${((result.differences.links.count_b - (result.differences.links.only_in_b.length)) / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              borderRadius: '4px 0 0 4px'
+                            }} 
+                          />
+                          <Box 
+                            sx={{ 
+                              height: 20, 
+                              bgcolor: '#ba68c8',
+                              width: `${(result.differences.links.only_in_b.length / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              borderRadius: '0 4px 4px 0',
+                              borderLeft: '2px solid rgba(0,0,0,0.3)'
+                            }} 
+                          />
+                        </Box>
+                      </Box>
+                      
+                      {/* Legend */}
+                      <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ width: 12, height: 12, bgcolor: '#90caf9', mr: 1, borderRadius: 1 }} />
+                          <Typography variant="caption">Společná A ({result.differences.links.count_a - result.differences.links.only_in_a.length})</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ width: 12, height: 12, bgcolor: '#4fc3f7', mr: 1, borderRadius: 1 }} />
+                          <Typography variant="caption">Pouze v A ({result.differences.links.only_in_a.length})</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ width: 12, height: 12, bgcolor: '#ce93d8', mr: 1, borderRadius: 1 }} />
+                          <Typography variant="caption">Společná B ({result.differences.links.count_b - result.differences.links.only_in_b.length})</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box sx={{ width: 12, height: 12, bgcolor: '#ba68c8', mr: 1, borderRadius: 1 }} />
+                          <Typography variant="caption">Pouze v B ({result.differences.links.only_in_b.length})</Typography>
+                        </Box>
+                      </Box>
+                    </Box>
                   </Grid>
                   <Grid item xs={12}>
-                    <Typography variant="body2">
-                      Počet společných pravidel: <strong>{result.differences.links.common_count}</strong>
+                    <Typography variant="body2" fontWeight="bold">
+                      Shrnutí:
                     </Typography>
+                    <Box sx={{ pl: 2, mt: 1 }}>
+                      <Typography variant="body2">
+                        Počet pravidel v modelu A: <strong>{result.differences.links.count_a}</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        Počet pravidel v modelu B: <strong>{result.differences.links.count_b}</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        Počet společných pravidel: <strong>{result.differences.links.common_count}</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        Pravidla pouze v A: <strong>{result.differences.links.only_in_a.length}</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        Pravidla pouze v B: <strong>{result.differences.links.only_in_b.length}</strong>
+                      </Typography>
+                    </Box>
                   </Grid>
                 </Grid>
               </CardContent>
@@ -288,6 +430,154 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
                   Rozdíly v modelech
                 </Typography>
+                
+                {/* Detailní seznam rozdílných spojení mezi modely */}
+                <Card sx={{ mb: 3, backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+                  <CardContent>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                      Rozdíly ve vztazích
+                    </Typography>
+                    
+                    {/* Links pouze v modelu A */}
+                    {result.differences.links.only_in_a.length > 0 ? (
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="h6" sx={{ color: '#90caf9', fontWeight: 600, mb: 1 }}>
+                          Vztahy pouze v modelu A ({result.model_a.name}):
+                        </Typography>
+                        <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
+                          {result.differences.links.only_in_a.map((link, index) => (
+                            <ListItem key={`link-a-${index}`}>
+                              <ListItemIcon sx={{ minWidth: 36 }}>
+                                <span style={{ color: '#90caf9', fontSize: '20px' }}>ⓘ</span>
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary={convertToPl1Notation(link)} 
+                                primaryTypographyProps={{
+                                  variant: 'body2',
+                                  sx: { 
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    fontFamily: 'monospace'
+                                  }
+                                }}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    ) : null}
+                    
+                    {/* Links pouze v modelu B */}
+                    {result.differences.links.only_in_b.length > 0 ? (
+                      <Box>
+                        <Typography variant="h6" sx={{ color: '#ce93d8', fontWeight: 600, mb: 1 }}>
+                          Vztahy pouze v modelu B ({result.model_b.name}):
+                        </Typography>
+                        <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
+                          {result.differences.links.only_in_b.map((link, index) => (
+                            <ListItem key={`link-b-${index}`}>
+                              <ListItemIcon sx={{ minWidth: 36 }}>
+                                <span style={{ color: '#ce93d8', fontSize: '20px' }}>ⓘ</span>
+                              </ListItemIcon>
+                              <ListItemText 
+                                primary={convertToPl1Notation(link)} 
+                                primaryTypographyProps={{
+                                  variant: 'body2',
+                                  sx: { 
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    fontFamily: 'monospace'
+                                  }
+                                }}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Box>
+                    ) : null}
+                    
+                    {/* Pokud nejsou žádné rozdíly ve vztazích */}
+                    {result.differences.links.only_in_a.length === 0 && result.differences.links.only_in_b.length === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        Mezi modely nejsou žádné rozdíly ve vztazích.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Společná pravidla mezi modely */}
+                <Card sx={{ mb: 3, backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Společná pravidla mezi modely ({result.differences.links.common_count})
+                      </Typography>
+                      <Button 
+                        size="small" 
+                        onClick={() => setShowCommonRules(!showCommonRules)}
+                        sx={{ fontSize: '0.75rem' }}
+                      >
+                        {showCommonRules ? 'SKRÝT' : 'ZOBRAZIT'}
+                      </Button>
+                    </Box>
+                    
+                    {showCommonRules && result.differences.links.common_count > 0 ? (
+                      <Box>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          mb: 2, 
+                          backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                          p: 2,
+                          borderRadius: 1
+                        }}>
+                          <span style={{ color: '#2196f3', fontSize: '24px', marginRight: '12px' }}>ⓘ</span>
+                          <Typography variant="body2" color="text.secondary">
+                            Společná pravidla jsou přítomna v obou modelech a představují sdílené vlastnosti modelů.
+                          </Typography>
+                        </Box>
+                        
+                        {/* Zde bychom potřebovali získat seznam společných pravidel z API */}
+                        {/* Jako jednoduchý workaround můžeme extrahovat společné části z vizualizace */}
+                        {result.differences.links.common_links ? (
+                          <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1, maxHeight: '300px', overflow: 'auto' }}>
+                            {result.differences.links.common_links.map((link, index) => (
+                              <ListItem key={`common-link-${index}`}>
+                                <ListItemIcon sx={{ minWidth: 36 }}>
+                                  <span style={{ color: '#66bb6a', fontSize: '20px' }}>✅</span>
+                                </ListItemIcon>
+                                <ListItemText 
+                                  primary={link}
+                                  primaryTypographyProps={{
+                                    variant: 'body2',
+                                    sx: { 
+                                      color: 'rgba(255, 255, 255, 0.8)',
+                                      fontFamily: 'monospace'
+                                    }
+                                  }}
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Detailní informace o společných pravidlech nejsou k dispozici.
+                          </Typography>
+                        )}
+                      </Box>
+                    ) : (
+                      !showCommonRules && result.differences.links.common_count > 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          Klikněte na "ZOBRAZIT" pro zobrazení {result.differences.links.common_count} společných pravidel.
+                        </Typography>
+                      )
+                    )}
+                    
+                    {result.differences.links.common_count === 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        Modely nemají žádná společná pravidla.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
                 
                 {/* Rozdíly v typech modelů */}
                 {Object.keys(result.differences.model_types).length > 0 ? (
@@ -312,7 +602,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                                       <ErrorOutlineIcon sx={{ color: '#90caf9' }} />
                                     </ListItemIcon>
                                     <ListItemText 
-                                      primary={`MUST: ${rule}`} 
+                                      primary={convertToPl1Notation(rule)} 
                                       primaryTypographyProps={{
                                         variant: 'body2',
                                         sx: { 
@@ -329,7 +619,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                                       <ErrorOutlineIcon sx={{ color: '#90caf9' }} />
                                     </ListItemIcon>
                                     <ListItemText 
-                                      primary={`MUST_NOT: ${rule}`} 
+                                      primary={convertToPl1Notation(rule)} 
                                       primaryTypographyProps={{
                                         variant: 'body2',
                                         sx: { 
@@ -357,7 +647,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                                       <ErrorOutlineIcon sx={{ color: '#ce93d8' }} />
                                     </ListItemIcon>
                                     <ListItemText 
-                                      primary={`MUST: ${rule}`} 
+                                      primary={convertToPl1Notation(rule)} 
                                       primaryTypographyProps={{
                                         variant: 'body2',
                                         sx: { 
@@ -374,7 +664,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                                       <ErrorOutlineIcon sx={{ color: '#ce93d8' }} />
                                     </ListItemIcon>
                                     <ListItemText 
-                                      primary={`MUST_NOT: ${rule}`} 
+                                      primary={convertToPl1Notation(rule)} 
                                       primaryTypographyProps={{
                                         variant: 'body2',
                                         sx: { 

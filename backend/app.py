@@ -1594,6 +1594,26 @@ def is_model_trained():
     global current_model
     return current_model is not None and len(current_model.objects) > 0 and len(current_model.links) > 0
 
+# Helper function to convert link tuples to PL1 notation
+def link_tuple_to_pl1(link_tuple):
+    source, link_type, target = link_tuple
+    
+    # Convert to PL1 notation based on link type
+    if link_type == LinkType.MUST.value:
+        return f"Μ({source}, {target})"
+    elif link_type == LinkType.MUST_NOT.value:
+        return f"Ν({source}, {target})"
+    elif link_type == LinkType.MUST_BE_A.value:
+        return f"Ι({source}, {target})"
+    elif link_type == LinkType.REGULAR.value:
+        return f"Π({source}, {target})"
+    elif link_type == "HAS_ATTRIBUTE":
+        # Extract attribute name from target (typically target is like "obj_attrname")
+        attr_name = target.split('_', 1)[1] if '_' in target else target
+        return f"A({source}, {attr_name})"
+    else:
+        return f"{source} -{link_type}-> {target}"
+
 @app.post("/api/compare-models")
 async def compare_models(request: CompareModelsRequest):
     """Porovná dva modely na základě požadavku."""
@@ -1648,8 +1668,18 @@ async def compare_models(request: CompareModelsRequest):
         b_objects = set(obj.name for obj in model_b.objects)
         
         # Porovnání spojení (links)
-        a_links = set((link.source, link.link_type, link.target) for link in model_a.links)
-        b_links = set((link.source, link.link_type, link.target) for link in model_b.links)
+        a_links = set((link.source, link.link_type.value, link.target) for link in model_a.links)
+        b_links = set((link.source, link.link_type.value, link.target) for link in model_b.links)
+        
+        # Convert link differences to PL1 notation
+        only_in_a_links = [link_tuple_to_pl1(link_tuple) for link_tuple in (a_links - b_links)]
+        only_in_b_links = [link_tuple_to_pl1(link_tuple) for link_tuple in (b_links - a_links)]
+        
+        # Get common links in standard notation (not PL1)
+        common_links = []
+        for link_tuple in (a_links & b_links):
+            # Convert to PL1 notation just like with model differences
+            common_links.append(link_tuple_to_pl1(link_tuple))
         
         # Formátování výsledků
         result = {
@@ -1673,11 +1703,12 @@ async def compare_models(request: CompareModelsRequest):
                     "common": list(a_objects & b_objects)
                 },
                 "links": {
-                    "only_in_a": [f"{source} -{link_type}-> {target}" for source, link_type, target in (a_links - b_links)],
-                    "only_in_b": [f"{source} -{link_type}-> {target}" for source, link_type, target in (b_links - a_links)],
+                    "only_in_a": only_in_a_links,
+                    "only_in_b": only_in_b_links,
                     "count_a": len(a_links),
                     "count_b": len(b_links),
-                    "common_count": len(a_links & b_links)
+                    "common_count": len(a_links & b_links),
+                    "common_links": common_links
                 },
                 "model_types": {}
             }
