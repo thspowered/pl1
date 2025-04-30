@@ -176,37 +176,7 @@
 Α(v, sedadla, kozene) ∧
 Α(k, velkost, 22)
 
-# 7. Negatívny príklad - Require link (Must Motor)
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, BenzinovyMotor) ∧ 
-Ι(p, ManualnaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Ι(f, farba) ∧
-Ι(l, biela) ∧
-Ι(v, Vybava) ∧
-Ι(k, Kolesa) ∧
-Π(f, l) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Π(a, f) ∧
-Π(a, v) ∧
-Π(a, k) ∧
-Α(r, oznacenie, X5) ∧
-Α(r, segment, SUV) ∧
-Α(e, vykon, 210) ∧
-Α(e, objem, 3.0) ∧
-Α(e, valce, 6) ∧
-Α(p, rychlosti, 8) ∧
-Α(d, typ, xDrive) ∧
-Α(v, idrive, ano) ∧
-Α(v, navigacia, basic) ∧
-Α(v, sedadla, kozene) ∧
-Α(k, velkost, 22)
-
-# 8. pozitívny príklad - Drop link (oznacenie X5)
+# 7. pozitívny príklad - Drop link (oznacenie X5)
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, BenzinovyMotor) ∧ 
@@ -233,4 +203,234 @@
 Α(v, idrive, ano) ∧
 Α(v, navigacia, basic) ∧
 Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 8. pozitívny príklad - Enlarge set (RWD a xDrive)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 9. pozitívny príklad - Close Interval (rychlosti(6,8))
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 6) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+
+# 10. pozitívny príklad - Close Interval (Vykon(210,300))
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 300) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 11. Negatívny príklad - Require link (MUST Biela )
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 300) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+
+# 12. Negatívny príklad - Forbid link (MUST_not Cierna  )
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, cierna) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 300) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 13. Negatívny príklad - Require link (MUST Pohon )
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(f, farba) ∧
+Ι(l, Biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 300) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 14. pozitívny príklad - Close Interval (valce(6,8))
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 300) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 8) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 15. pozitívny príklad - Enlarge set (sedadla (kozene, alcantara))
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 300) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 8) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, RWD) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, alcantara) ∧
 Α(k, velkost, 22)

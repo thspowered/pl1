@@ -229,24 +229,3 @@ def parse_pl1_formula(text: str) -> Formula:
         raise ValueError("Neboli nájdené žiadne platné predikáty vo formule")
     
     return Formula(predicates=predicates)
-
-def parse_pl1_dataset(text: str) -> List[Formula]:
-    """
-    Parsuje text obsahujuci viacero formul oddelených prázdnymi riadkami.
-    
-    Args:
-        text: Text obsahujuci viacero formul
-        
-    Returns:
-        Zoznam formul
-    """
-    formula_texts = re.split(r'\n\s*\n', text)
-    
-    formulas = []
-    for formula_text in formula_texts:
-        if formula_text.strip():
-            formula = parse_pl1_formula(formula_text)
-            if formula.predicates:
-                formulas.append(formula)
-    
-    return formulas 

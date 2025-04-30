@@ -10,8 +10,8 @@ from datetime import datetime
 import random
 from contextlib import asynccontextmanager
 
-from backend.model import Model, Link, LinkType, Object, ClassificationTree, formula_to_model, is_valid_example
-from backend.pl1_parser import parse_pl1_formula, parse_pl1_dataset, Formula, Predicate
+from backend.model import Model, LinkType, Object, ClassificationTree, formula_to_model, is_valid_example
+from backend.pl1_parser import parse_pl1_formula
 from backend.learner import WinstonLearner
 from backend.example_validator import compare_example
 
