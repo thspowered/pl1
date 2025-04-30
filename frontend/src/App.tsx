@@ -1,39 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { 
   Box, 
-  Container, 
   Typography, 
   Paper, 
-  Button, 
   ThemeProvider, 
   createTheme, 
   CssBaseline,
   Snackbar,
   Alert,
-  Grid,
-  Divider,
   CircularProgress,
-  Card,
-  CardContent,
-  Chip,
-  FormControlLabel,
-  Checkbox,
-  Switch,
   Tabs,
   Tab
 } from '@mui/material';
 import { useApi } from './hooks/useApi';
 import { useExamples } from './hooks/useExamples';
 import { useNotification } from './hooks/useNotification';
-import SigmaNetwork from './components/SigmaNetwork';
-import FileUploader from './components/FileUploader';
-import ExampleList from './components/ExampleList';
-import TrainingPanel from './components/TrainingPanel';
-import TrainingResultDisplay from './components/TrainingResult';
-import { ModelControls } from './components/ModelControls';
 import LandingPage from './components/LandingPage';
 import ExamplesTrainingView from './components/ExamplesTrainingView';
-import TrainingResult from './components/TrainingResult';
 import CompareExample from './components/CompareExample';
 import CompareModels from './components/CompareModels';
 import { NetworkNode, NetworkLink, ApiExample, Example, ModelHistory, TrainingResult as TrainingResultType } from './types';

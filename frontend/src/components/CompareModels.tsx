@@ -20,19 +20,11 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  Tab,
-  Tabs,
-  AppBar,
-  useTheme,
-  useMediaQuery,
   alpha,
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import InfoIcon from '@mui/icons-material/Info';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import TableChartIcon from '@mui/icons-material/TableChart';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import { SavedModel, ModelComparisonResult } from '../types';
 import NetworkGraph from './NetworkGraph';
@@ -665,12 +657,16 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     overflow: 'hidden',
                     border: '1px solid #ddd'
                   }}>
-                    <NetworkGraph 
-                      nodes={comparisonResult.visualization.nodes} 
-                      links={comparisonResult.visualization.links}
-                      showDifferences={true}
-                      modelA={comparisonResult.model_a?.name}
-                      modelB={comparisonResult.model_b?.name}
+                    <NetworkGraph
+                      nodes={comparisonResult.visualization.nodes.map(node => ({
+                        ...node,
+                        status: 'common' // Použít 'common' pro všechny uzly
+                      }))}
+                      links={comparisonResult.visualization.links.map(link => ({
+                        ...link,
+                        status: 'common' // Použít 'common' pro všechny spojení
+                      }))}
+                      formula={comparisonResult.model_a?.pl1_representation}
                     />
                   </Box>
                 )}
@@ -1283,8 +1279,6 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     )
                   )}
                 </Box>
-
-                {/* Grafické zobrazení bude přidáno později */}
               </Paper>
             </>
           ) : (
@@ -1293,6 +1287,155 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                 Vyberte modely a klikněte na "Porovnat modely" pro zobrazení výsledků
               </Typography>
             </Box>
+          )}
+
+          {/* Vizualizace sítí - zobrazujeme dvě sítě vedle seba */}
+          {comparisonResult && (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
+                borderRadius: 2,
+                bgcolor: alpha('#000', 0.2),
+                borderColor: alpha('#fff', 0.1),
+                mt: 3,
+                mb: 3
+              }}
+            >
+              <Typography variant="h6" sx={{ mb: 2, color: 'white' }}>
+                Vizualizace modelů
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Porovnejte grafické znázornění modelů pro lepší pochopení strukturálních rozdílů
+                </Typography>
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {/* Model A Network */}
+                <Grid item xs={12} md={6}>
+                  <Paper 
+                    variant="outlined" 
+                    sx={{ 
+                      height: 600, 
+                      bgcolor: alpha('#000', 0.3), 
+                      borderColor: alpha('#90caf9', 0.3),
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <Box sx={{ p: 1, bgcolor: alpha('#90caf9', 0.1), borderBottom: 1, borderColor: alpha('#90caf9', 0.3) }}>
+                      <Typography variant="subtitle2" sx={{ color: '#90caf9' }}>
+                        Model A: {comparisonResult.model_a.name}
+                      </Typography>
+                    </Box>
+                    
+                    {comparisonResult.visualization && (
+                      <Box sx={{ height: 'calc(100% - 36px)', width: '100%' }}>
+                        <NetworkGraph
+                          nodes={comparisonResult.visualization.nodes.map(node => ({
+                            ...node,
+                            status: 'common' // Použít 'common' pro všechny uzly
+                          }))}
+                          links={comparisonResult.visualization.links.map(link => ({
+                            ...link,
+                            status: 'common' // Použít 'common' pro všechny spojení
+                          }))}
+                          formula={comparisonResult.model_a?.pl1_representation}
+                        />
+                      </Box>
+                    )}
+                  </Paper>
+                </Grid>
+                
+                {/* Model B Network */}
+                <Grid item xs={12} md={6}>
+                  <Paper 
+                    variant="outlined" 
+                    sx={{ 
+                      height: 600, 
+                      bgcolor: alpha('#000', 0.3), 
+                      borderColor: alpha('#ce93d8', 0.3),
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    <Box sx={{ p: 1, bgcolor: alpha('#ce93d8', 0.1), borderBottom: 1, borderColor: alpha('#ce93d8', 0.3) }}>
+                      <Typography variant="subtitle2" sx={{ color: '#ce93d8' }}>
+                        Model B: {comparisonResult.model_b.name}
+                      </Typography>
+                    </Box>
+                    
+                    {comparisonResult.visualization && (
+                      <Box sx={{ height: 'calc(100% - 36px)', width: '100%' }}>
+                        <NetworkGraph
+                          nodes={comparisonResult.visualization.nodes.map(node => ({
+                            ...node,
+                            status: 'common' // Použít 'common' pro všechny uzly
+                          }))}
+                          links={comparisonResult.visualization.links.map(link => ({
+                            ...link,
+                            status: 'common' // Použít 'common' pro všechny spojení
+                          }))}
+                          formula={comparisonResult.model_b?.pl1_representation}
+                        />
+                      </Box>
+                    )}
+                  </Paper>
+                </Grid>
+                
+                {/* Legend */}
+                <Grid item xs={12}>
+                  <Box sx={{ mt: 2, p: 2, borderRadius: 1, bgcolor: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#e0e0e0' }}>
+                      Legenda:
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#DC143C' }}></Box>
+                          <Typography variant="caption">Motor</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#CD5C5C' }}></Box>
+                          <Typography variant="caption">Prevodovka</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#FF6347' }}></Box>
+                          <Typography variant="caption">Pohon</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#4682B4' }}></Box>
+                          <Typography variant="caption">Vozidlo</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#A0522D' }}></Box>
+                          <Typography variant="caption">Komponent</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '0%', bgcolor: '#9370DB' }}></Box>
+                          <Typography variant="caption">Atribút</Typography>
+                        </Box>
+                      </Grid>
+                      <Grid item xs={6} sm={3}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 12, height: 12, borderRadius: '0%', bgcolor: '#FFD700' }}></Box>
+                          <Typography variant="caption">Hodnota</Typography>
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Paper>
           )}
         </Box>
       </Paper>
