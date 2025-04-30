@@ -70,6 +70,65 @@ function a11yProps(index: number) {
   };
 }
 
+interface HighlightedFormulaProps {
+  highlightedFormula: any;
+  modelFormula: string;
+}
+
+const HighlightedFormula: React.FC<HighlightedFormulaProps> = ({ highlightedFormula, modelFormula }) => {
+  // If no tokens are available, display the raw formula
+  if (!highlightedFormula || !highlightedFormula.tokens || highlightedFormula.tokens.length === 0) {
+    return (
+      <Box sx={{ my: 2, p: 2, backgroundColor: alpha('#263238', 0.4), borderRadius: 2, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+        {modelFormula}
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ my: 2, p: 2, backgroundColor: alpha('#263238', 0.4), borderRadius: 2, fontFamily: 'monospace', maxHeight: '400px', overflow: 'auto' }}>
+      <Box component="div" sx={{ whiteSpace: 'pre-wrap' }}>
+        {highlightedFormula.tokens.map((token: any, index: number) => {
+          let color = '';
+          if (token.type === 'connector') {
+            color = '#a0aec0'; // neutral color for connectors
+          } else if (token.is_satisfied === true) {
+            color = '#4caf50'; // green for satisfied
+          } else if (token.is_satisfied === false) {
+            color = '#f44336'; // red for violated
+          }
+          
+          return (
+            <span 
+              key={index} 
+              style={{ 
+                color: color,
+                fontWeight: token.type === 'predicate' ? 'bold' : 'normal'
+              }}
+            >
+              {token.text}
+            </span>
+          );
+        })}
+      </Box>
+      
+      {highlightedFormula.stats && (
+        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #455a64' }}>
+          <Typography variant="subtitle2" color="#90caf9">Štatistika validácie:</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+            <Typography variant="body2" color="#4caf50">
+              Splnené predikáty: {highlightedFormula.stats.satisfied_predicates}/{highlightedFormula.stats.total_predicates}
+            </Typography>
+            <Typography variant="body2" color="#f44336">
+              Nesplnené predikáty: {highlightedFormula.stats.total_predicates - highlightedFormula.stats.satisfied_predicates}/{highlightedFormula.stats.total_predicates}
+            </Typography>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -165,6 +224,10 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
     
     try {
       const comparisonResult = await onCompare(formula, validateAttrs);
+      console.log("Validation result:", comparisonResult);
+      console.log("Satisfied rules:", comparisonResult.satisfied_rules);
+      console.log("Violations:", comparisonResult.violations);
+      console.log("Categorized violations:", comparisonResult.categorized_violations);
       setResult(comparisonResult);
       // After successful comparison, switch to results tab
       setTabValue(1);
@@ -489,6 +552,22 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                       </Paper>
                     </Grid>
                   </Grid>
+                  
+                  {result && (
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="h6" color="text.primary" sx={{ mb: 1 }}>
+                        <CodeIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                        Hypotéza s vyznačením validácie
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Zelené časti sú splnené, červené časti sú porušené v príklade
+                      </Typography>
+                      <HighlightedFormula 
+                        highlightedFormula={result.highlighted_formula} 
+                        modelFormula={result.model_formula || ""}
+                      />
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             ) : (

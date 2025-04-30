@@ -811,18 +811,12 @@ async def train_model(training_request: TrainingRequest):
                     steps.append(f"Chyba pri spracovaní príkladu {example_id}: formula nie je reťazec")
                     continue
                 
-                # Použijeme parse_pl1_formula na vytvorenie objektu Formula
+                # Sparsujeme formulu a vytvoríme model
                 formula = parse_pl1_formula(formula_str)
                 
-                # Pre prvý pozitívny príklad nastavíme is_first_positive=True
-                if current_model is None or not hasattr(current_model, 'objects') or len(current_model.objects) == 0:
-                    if is_positive:
-                        example_model = formula_to_model(formula, is_first_positive=True)
-                        print(f"Vytvorený model z prvého pozitívneho príkladu s MUST spojeniami")
-                    else:
-                        example_model = formula_to_model(formula, is_first_positive=False)
-                else:
-                    example_model = formula_to_model(formula, is_first_positive=False)
+                # Teraz vždy použijeme rovnaký spôsob tvorby modelu bez ohľadu na to, 
+                # či je to prvý pozitívny príklad alebo nie
+                example_model = formula_to_model(formula)
                 
                 print(f"\nSpracovávam príklad {example_id} (pozitívny: {is_positive})")
                 print(f"Príklad obsahuje {len(example_model.objects)} objektov a {len(example_model.links)} spojení")
@@ -984,6 +978,9 @@ async def compare_example_endpoint(example: PL1Example):
         validate_attrs = example.validate_attributes if example.validate_attributes is not None else True
         result = compare_example(current_model, example.formula, validate_attrs)
         
+        # Přidáme formuli modelu pro frontend
+        model_formula = current_model.to_formula() if current_model else ""
+        
         return {
             "is_valid": result["is_valid"],
             "model_type": result["model_type"],
@@ -992,7 +989,12 @@ async def compare_example_endpoint(example: PL1Example):
             "formula": result["formula"],
             "validate_attributes": result.get("validate_attributes", validate_attrs),
             "allowed_alternatives": result.get("allowed_alternatives", {}),
-            "categorized_violations": result.get("categorized_violations", {})
+            "categorized_violations": result.get("categorized_violations", {}),
+            "highlighted_formula": result.get("highlighted_formula", {
+                "highlighted_formula": model_formula,
+                "tokens": []
+            }),
+            "model_formula": model_formula
         }
     except Exception as e:
         traceback.print_exc()

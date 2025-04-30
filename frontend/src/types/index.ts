@@ -111,6 +111,21 @@ export interface ComparisonResult {
     component_violations?: string[];
     attribute_violations?: string[];
   };
+  highlighted_formula?: {
+    highlighted_formula: string;
+    tokens: Array<{
+      text: string;
+      is_satisfied: boolean | null;
+      type: 'predicate' | 'connector';
+    }>;
+    stats?: {
+      matched_components: string[];
+      unmatched_components: string[];
+      total_predicates: number;
+      satisfied_predicates: number;
+    };
+  };
+  model_formula?: string;
 }
 
 // Typy pro uložené modely a porovnávání hypotéz

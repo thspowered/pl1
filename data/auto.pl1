@@ -1,90 +1,4 @@
-# 1. Prvý pozitívny príklad - Inicializácia modelu
-# Očakávanie: Model sa inicializuje na základe tohto príkladu. Žiadna špecifická heuristika sa neaplikuje, ide o štartovací bod.
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, DieselovyMotor) ∧ 
-Ι(d, Pohon) ∧
-Ι(f, farba) ∧
-Ι(l, biela) ∧
-Ι(v, Vybava) ∧
-Ι(k, Kolesa) ∧
-Π(f, l) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, d) ∧
-Π(a, f) ∧
-Π(a, v) ∧
-Π(a, k) ∧
-Α(r, oznacenie, X5) ∧
-
-
-# ----------------------------------------------------
-
-# 2. Negatívny príklad (near miss) - Test Require-Link
-# Očakávanie: V modeli existuje spojenie Auto -> DieselovyMotor. Tento near-miss ho nemá. Heuristika Require-Link by mala toto spojenie v modeli zmeniť na MUST.
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, DieselovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Ι(f, farba) ∧
-Ι(v, Vybava) ∧
-Ι(k, Kolesa) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Π(a, f) ∧
-Π(a, v) ∧
-Π(a, k) ∧
-Α(r, oznacenie, X5) ∧
-Α(r, segment, SUV) ∧
-Α(e, vykon, 210) ∧
-Α(e, objem, 3.0) ∧
-Α(e, valce, 6) ∧
-Α(p, rychlosti, 8) ∧
-Α(d, typ, xDrive) ∧
-Α(v, idrive, ano) ∧
-Α(v, navigacia, profesional) ∧
-Α(v, sedadla, kozene) ∧
-Α(k, velkost, 20)
-
-# ----------------------------------------------------
-
-# 3. Negatívny príklad (near miss) - Test Forbid-Link
-# Očakávanie: Tento near-miss má navyše spojenie Auto -> PrivesnyZaves, ktoré v modeli nie je. Heuristika Forbid-Link by mala pridať pravidlo MUST_NOT pre Auto -> PrivesnyZaves.
-Ι(a, Auto) ∧ 
-Ι(r, ModelovaRada) ∧
-Ι(e, BenzinovyMotor) ∧ 
-Ι(p, AutomatickaPrevodovka) ∧
-Ι(d, Pohon) ∧
-Ι(f, Biela) ∧
-Ι(v, Vybava) ∧
-Ι(k, Kolesa) ∧
-Π(a, r) ∧
-Π(a, e) ∧
-Π(a, p) ∧
-Π(a, d) ∧
-Π(a, f) ∧
-Π(a, v) ∧
-Π(a, k) ∧
-Α(r, oznacenie, X5) ∧
-Α(r, segment, SUV) ∧
-Α(e, vykon, 210) ∧
-Α(e, objem, 3.0) ∧
-Α(e, valce, 6) ∧
-Α(p, rychlosti, 8) ∧
-Α(d, typ, xDrive) ∧
-Α(v, idrive, ano) ∧
-Α(v, navigacia, profesional) ∧
-Α(v, sedadla, kozene) ∧
-Α(k, velkost, 20)
-
-
-# ----------------------------------------------------
-
-# 4. Pozitívny príklad - Test Climb-Tree
-# Očakávanie: Objekt 'e3' má rovnaké meno ('e') ako v modeli, ale inú triedu (BenzinovyMotor vs DieselovyMotor). Heuristika Climb-Tree by mala nájsť spoločného predka (napr. Motor) a zmeniť triedu v modeli.
+# 1. pozitívny príklad - Inicializácia modelu
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, DieselovyMotor) ∧ 
@@ -113,17 +27,45 @@
 Α(v, navigacia, basic) ∧
 Α(v, sedadla, kozene) ∧
 Α(k, velkost, 20)
-# ----------------------------------------------------
 
-# 5. Pozitívny príklad - Test Enlarge-Set
-# Očakávanie: Príklad obsahuje komponent 'StresneOkno', ktorý pravdepodobne nie je v hierarchii s inými komponentmi auta. Ak model už má nejaké MUST spojenia pre Auto a StresneOkno nie je v klas. strome, Enlarge-Set by mal pridať nové MUST spojenie Auto -> StresneOkno (ako alternatívu).
+# 2. pozitívny príklad - Close Interval (velkost kolies)
 Ι(a, Auto) ∧ 
 Ι(r, ModelovaRada) ∧
 Ι(e, DieselovyMotor) ∧ 
 Ι(p, AutomatickaPrevodovka) ∧
 Ι(d, Pohon) ∧
 Ι(f, farba) ∧
-Ι(l, cierna) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 3. pozitívny príklad - Enlarge set (navigacia value)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, DieselovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
 Ι(v, Vybava) ∧
 Ι(k, Kolesa) ∧
 Π(f, l) ∧
@@ -144,58 +86,121 @@
 Α(v, idrive, ano) ∧
 Α(v, navigacia, profesional) ∧
 Α(v, sedadla, kozene) ∧
-Α(k, velkost, 20)
-# ----------------------------------------------------
+Α(k, velkost, 22)
 
-# 6. Pozitívny príklad - Test Drop-Link
-# Očakávanie: Tento príklad nemá spojenie Auto -> Biela (a -> f). Ak toto spojenie v modeli existuje a je typu REGULAR (nie MUST), heuristika Drop-Link by ho mala odstrániť.
-Ι(a5, Auto) ∧ 
-Ι(r5, ModelovaRada) ∧
-Ι(e5, DieselovyMotor) ∧ 
-Ι(p5, AutomatickaPrevodovka) ∧
-Ι(d5, Pohon) ∧
-# CHÝBA: Ι(f5, Biela) ∧
-Ι(v5, Vybava) ∧
-Ι(k5, Kolesa) ∧
-# Možno obsahuje s5 (StresneOkno) ak enlarge-set pridal MUST link
-Π(a5, r5) ∧
-Π(a5, e5) ∧
-Π(a5, p5) ∧
-Π(a5, d5) ∧
-# CHÝBA: Π(a5, f5) ∧
-Π(a5, v5) ∧
-Π(a5, k5) ∧
-# Prípadne Π(a5, s5) ak je MUST
-Α(r5, oznacenie, X5) ∧ Α(r5, segment, SUV) ∧
-Α(e5, vykon, 210) ∧ Α(e5, objem, 3.0) ∧ Α(e5, valce, 6) ∧
-Α(p5, rychlosti, 8) ∧
-Α(d5, typ, xDrive) ∧
-Α(v5, idrive, ano) ∧ Α(v5, navigacia, profesional) ∧ Α(v5, sedadla, kozene) ∧
-Α(k5, velkost, 20)
+# 4. pozitívny príklad - Climb tree (navigacia value)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
 
-# ----------------------------------------------------
+# 5. Negatívny príklad - Forbid link (MUST_NOT ManualnaPrevodovka)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, ManualnaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
 
-# 7. Pozitívny príklad - Test Close-Interval
-# Očakávanie: Atribút 'vykon' motora má hodnotu 230, ktorá sa líši od hodnoty v modeli (predpokladáme 210 alebo interval). Heuristika Close-Interval by mala vytvoriť alebo rozšíriť interval pre 'vykon' v modeli (napr. na [210, 230]).
-Ι(a6, Auto) ∧ 
-Ι(r6, ModelovaRada) ∧
-Ι(e6, DieselovyMotor) ∧ 
-Ι(p6, AutomatickaPrevodovka) ∧
-Ι(d6, Pohon) ∧
-Ι(f6, Biela) ∧ # Farba pridaná späť pre kompletnosť
-Ι(v6, Vybava) ∧
-Ι(k6, Kolesa) ∧
-Π(a6, r6) ∧
-Π(a6, e6) ∧
-Π(a6, p6) ∧
-Π(a6, d6) ∧
-Π(a6, f6) ∧ # Spojenie farby pridané späť
-Π(a6, v6) ∧
-Π(a6, k6) ∧
-Α(r6, oznacenie, X5) ∧ Α(r6, segment, SUV) ∧
-Α(e6, vykon, 230) ∧ # Iná hodnota výkonu
-Α(e6, objem, 3.0) ∧ Α(e6, valce, 6) ∧
-Α(p6, rychlosti, 8) ∧
-Α(d6, typ, xDrive) ∧
-Α(v6, idrive, ano) ∧ Α(v6, navigacia, profesional) ∧ Α(v6, sedadla, kozene) ∧
-Α(k6, velkost, 20)
+# 6. Negatívny príklad - Require link (MUST  Biela)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, ManualnaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, oznacenie, X5) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)
+
+# 7. pozitívny príklad - Drop link (oznacenie X5)
+Ι(a, Auto) ∧ 
+Ι(r, ModelovaRada) ∧
+Ι(e, BenzinovyMotor) ∧ 
+Ι(p, AutomatickaPrevodovka) ∧
+Ι(d, Pohon) ∧
+Ι(f, farba) ∧
+Ι(l, biela) ∧
+Ι(v, Vybava) ∧
+Ι(k, Kolesa) ∧
+Π(f, l) ∧
+Π(a, r) ∧
+Π(a, e) ∧
+Π(a, p) ∧
+Π(a, d) ∧
+Π(a, f) ∧
+Π(a, v) ∧
+Π(a, k) ∧
+Α(r, segment, SUV) ∧
+Α(e, vykon, 210) ∧
+Α(e, objem, 3.0) ∧
+Α(e, valce, 6) ∧
+Α(p, rychlosti, 8) ∧
+Α(d, typ, xDrive) ∧
+Α(v, idrive, ano) ∧
+Α(v, navigacia, basic) ∧
+Α(v, sedadla, kozene) ∧
+Α(k, velkost, 22)

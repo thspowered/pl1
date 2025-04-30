@@ -185,7 +185,7 @@ export const useApi = () => {
       setIsLoading(true);
       setError(null);
       
-      const response = await axios.post(`${API_BASE_URL}/api/reset`);
+      const response = await axios.post(`${API_BASE_URL}/api/model/reset`);
       
       return { success: response.data.success, data: response.data };
     } catch (error) {
@@ -238,6 +238,8 @@ export const useApi = () => {
       setIsLoading(true);
       setError(null);
       
+      console.log(`Sending compare request with formula: ${formula}, validate_attributes: ${validateAttributes}`);
+      
       const response = await axios.post(`${API_BASE_URL}/api/compare`, {
         formula: formula,
         is_positive: true, // pre porovnanie nie je dôležité, či je príklad pozitívny alebo negatívny
@@ -245,11 +247,19 @@ export const useApi = () => {
         validate_attributes: validateAttributes
       });
       
+      console.log("Compare response:", response.data);
       return response.data;
     } catch (error) {
+      console.error("Error in compareExample:", error);
       const errorMessage = error instanceof Error ? error.message : 'Neznáma chyba';
       setError(`Chyba pri porovnávaní príkladu: ${errorMessage}`);
-      throw error;
+      // Return an error object instead of throwing
+      return { 
+        is_valid: false, 
+        violations: [`Chyba pri validácii príkladu: ${errorMessage}`], 
+        satisfied_rules: [],
+        model_type: "Unknown"
+      };
     } finally {
       setIsLoading(false);
     }

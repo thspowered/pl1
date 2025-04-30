@@ -494,10 +494,11 @@ class WinstonLearner:
         if heuristic_applied:
             self.applied_heuristics.append("enlarge_set")
             print("[ENLARGE_SET] Heuristika bola úspešne aplikovaná!")
+            print(f"[ENLARGE_SET] Známe podtriedy: {updated_model.known_subclasses}")
         else:
-            print("[ENLARGE_SET] Heuristika nebola aplikovaná - neboli nájdené nové komponenty alebo atribúty na pridanie")
+            print("[ENLARGE_SET] Heuristika nebola aplikovaná - nenašli sa triedy na generalizáciu")
             
-        return updated_model
+        return updated_model 
 
     def _is_example_valid(self, model: Model, example: Model) -> bool:
         """
@@ -704,39 +705,6 @@ class WinstonLearner:
                 self.applied_heuristics.append("add_link")
                 self._debug_log(f"Přidáno nové spojení: {good_link.source} -> {good_link.target} ({good_link.link_type.value})")
         
-        # Vytvoríme spojenia medzi triedami objektov
-        # Vytvoríme množinu existujúcich spojení medzi triedami, aby sme predišli duplicitám
-        existing_class_links = set()
-        for link in updated_model.links:
-            if link.link_type == LinkType.MUST:
-                existing_class_links.add((link.source, link.target))
-        
-        # Vytvoríme mapu medzi menom objektu a jeho triedou
-        obj_to_class = {}
-        for obj in updated_model.objects:
-            obj_to_class[obj.name] = obj.class_name
-        
-        # Pre každé spojenie v príklade
-        for good_link in good.links:
-            # Získame triedy pre zdrojový a cieľový objekt
-            source_obj = good_link.source
-            target_obj = good_link.target
-            
-            if source_obj in obj_to_class and target_obj in obj_to_class:
-                source_class = obj_to_class[source_obj]
-                target_class = obj_to_class[target_obj]
-                
-                # Kontrola, či už takéto spojenie medzi triedami neexistuje
-                if (source_class, target_class) not in existing_class_links:
-                    # Vytvoríme MUST spojenie medzi triedami
-                    updated_model.add_link(Link(
-                        source=source_class,
-                        target=target_class,
-                        link_type=LinkType.MUST
-                    ))
-                    existing_class_links.add((source_class, target_class))
-                    self._debug_log(f"Vytvorené MUST spojenie medzi triedami: {source_class} -> {target_class}")
-        
         # DEBUG: Vypíšeme všetky spojenia po spracovaní
         print("\n[DEBUG] Spojenia v modeli po spracovaní:")
         for link in updated_model.links:
@@ -820,6 +788,19 @@ class WinstonLearner:
                         model_link.link_type = LinkType.MUST
                         self.applied_heuristics.append("require_link")
                         self._debug_log(f"Konvertované spojenie na MUST: {model_link.source} -> {model_link.target}")
+                        
+                    # Odstránime REGULAR spojenia medzi rovnakými triedami, aby sme zabránili duplicitám
+                    regular_class_links_to_remove = []
+                    for link in updated_model.links:
+                        if (link.source == model_source.class_name and 
+                            link.target == model_target.class_name and 
+                            link.link_type == LinkType.REGULAR):
+                            regular_class_links_to_remove.append(link)
+                            
+                    # Odstránime identifikované REGULAR spojenia
+                    for link_to_remove in regular_class_links_to_remove:
+                        updated_model.remove_link(link_to_remove)
+                        self._debug_log(f"Odstránené REGULAR spojenie (nahradené MUST): {link_to_remove.source} -> {link_to_remove.target}")
             
             return updated_model
 
@@ -1007,7 +988,10 @@ class WinstonLearner:
         drop-link heuristic is also used when an evolving model has a link that 
         is not in the example. The link is dropped from the model."
         
-        Metóda odstráni z modelu spojenia, ktoré nie sú prítomné v príklade (good).
+        Rozšírená verzia heuristiky odstraňuje:
+        1. REGULAR spojenia medzi objektmi, ktoré nie sú v príklade
+        2. MUST pravidlá medzi triedami, ktoré nie sú v príklade
+        3. Atribúty, ktoré nie sú intervaly alebo množiny
         
         Args:
             model: Aktuálný model
@@ -1019,56 +1003,176 @@ class WinstonLearner:
         updated_model = model.copy()
         was_applied = False
         
+        print("\n[DROP_LINK] Skúšam aplikovať drop-link heuristiku...")
+        
+        #-----------------------------------------------------------------
+        # Časť 1: Odstraňovanie REGULAR spojení
+        #-----------------------------------------------------------------
+        
         # Nájdeme všetky REGULAR spojenia v modeli
         regular_links = [link for link in updated_model.links 
                          if link.link_type == LinkType.REGULAR]
+        
+        print(f"[DROP_LINK] Model obsahuje {len(regular_links)} REGULAR spojení")
+        print(f"[DROP_LINK] Príklad obsahuje {len(good.links)} spojení")
         
         # Pre každé spojenie v modeli skontrolujeme, či existuje v príklade
         links_to_remove = []
         
         for model_link in regular_links:
+            print(f"[DROP_LINK] Kontrolujem REGULAR spojenie {model_link.source} -> {model_link.target}")
+            
             # Zistíme, či existuje zodpovedajúce spojenie v príklade
             has_corresponding = False
             
             for good_link in good.links:
                 if model_link.source == good_link.source and model_link.target == good_link.target:
                     has_corresponding = True
+                    print(f"[DROP_LINK] Spojenie {model_link.source} -> {model_link.target} existuje v príklade, ponechávam")
                     break
                     
             # Ak neexistuje zodpovedajúce spojenie, označíme ho na odstránenie
             if not has_corresponding:
+                print(f"[DROP_LINK] Spojenie {model_link.source} -> {model_link.target} neexistuje v príklade, pridávam na odstránenie")
                 links_to_remove.append(model_link)
-                
+        
+        print(f"[DROP_LINK] Našlo sa {len(links_to_remove)} REGULAR kandidátov na odstránenie")
+        
         # Teraz odstránime označené spojenia
         for link_to_remove in links_to_remove:
-            # Získame objekty pre toto spojenie
-            source_obj = next((obj for obj in updated_model.objects if obj.name == link_to_remove.source), None)
-            target_obj = next((obj for obj in updated_model.objects if obj.name == link_to_remove.target), None)
+            # Odstránime spojenie bez ďalších kontrol
+            print(f"[DROP_LINK] Odstraňujem REGULAR spojenie: {link_to_remove.source} -> {link_to_remove.target}")
+            updated_model.remove_link(link_to_remove)
+            self.applied_heuristics.append("drop_link")
+            was_applied = True
+            self._debug_log(f"Odstránené REGULAR spojenie: {link_to_remove.source} -> {link_to_remove.target}")
+        
+        #-----------------------------------------------------------------
+        # Časť 2: Odstraňovanie MUST pravidiel
+        #-----------------------------------------------------------------
+        
+        # Nájdeme všetky MUST spojenia v modeli
+        must_links = [link for link in updated_model.links 
+                     if link.link_type == LinkType.MUST]
+        
+        print(f"[DROP_LINK] Model obsahuje {len(must_links)} MUST spojení")
+        
+        # Pre každé MUST spojenie kontrolujeme, či zodpovedajúce objekty v príklade
+        # majú rovnaké spojenie
+        must_links_to_remove = []
+        
+        # Vytvoríme mapu medzi objektami a ich triedami v príklade
+        example_classes = {}
+        for obj in good.objects:
+            example_classes[obj.name] = obj.class_name
+        
+        # Vytvoríme zoznam všetkých REGULAR spojení v príklade (source, target)
+        example_links = [(link.source, link.target) for link in good.links 
+                        if link.link_type == LinkType.REGULAR]
+        
+        # Skontrolujeme, či každé MUST pravidlo je reprezentované spojením v príklade
+        for must_link in must_links:
+            source_class = must_link.source
+            target_class = must_link.target
             
-            if source_obj and target_obj:
-                # Kontrola, či existuje generické pravidlo medzi triedami objektov
-                has_generic_rule = False
+            print(f"[DROP_LINK] Kontrolujem MUST pravidlo {source_class} -> {target_class}")
+            
+            # Hľadáme objekty v príklade, ktoré patria k týmto triedam
+            source_objects = [name for name, cls in example_classes.items() 
+                             if cls == source_class or self.classification_tree.is_subclass(cls, source_class)]
+            
+            if not source_objects:
+                print(f"[DROP_LINK] Nenašli sa žiadne objekty triedy {source_class} v príklade, nemôžem overiť MUST pravidlo")
+                continue
                 
-                for rule_link in updated_model.links:
-                    # Kontrola pravidiel typu MUST pre tieto triedy
-                    if (rule_link.link_type == LinkType.MUST and 
-                        rule_link.source == source_obj.class_name and 
-                        (rule_link.target == target_obj.class_name or 
-                         self.classification_tree.is_subclass(target_obj.class_name, rule_link.target))):
-                        has_generic_rule = True
-                        self._debug_log(f"Ponechávam spojenie {link_to_remove.source} -> {link_to_remove.target} kvôli generickému pravidlu {rule_link.source} -> {rule_link.target}")
-                        break
+            # Pre každý zdrojový objekt v príklade, ktorý patrí k zdrojovej triede, kontrolujeme,
+            # či má spojenie s objektom cieľovej triedy
+            must_rule_satisfied = False
+            
+            for src_obj in source_objects:
+                for link_src, link_tgt in example_links:
+                    if link_src == src_obj:
+                        # Zistíme triedu cieľového objektu
+                        tgt_class = example_classes.get(link_tgt)
+                        if tgt_class and (tgt_class == target_class or self.classification_tree.is_subclass(tgt_class, target_class)):
+                            print(f"[DROP_LINK] MUST pravidlo {source_class} -> {target_class} je reprezentované spojením {src_obj} -> {link_tgt} v príklade")
+                            must_rule_satisfied = True
+                            break
+                if must_rule_satisfied:
+                    break
+            
+            # Ak pravidlo nie je splnené v príklade, označíme ho na odstránenie
+            if not must_rule_satisfied:
+                print(f"[DROP_LINK] MUST pravidlo {source_class} -> {target_class} nie je reprezentované v príklade, pridávam na odstránenie")
+                must_links_to_remove.append(must_link)
+        
+        print(f"[DROP_LINK] Našlo sa {len(must_links_to_remove)} MUST pravidiel na odstránenie")
+        
+        # Odstránime označené MUST pravidlá
+        for link_to_remove in must_links_to_remove:
+            print(f"[DROP_LINK] Odstraňujem MUST pravidlo: {link_to_remove.source} -> {link_to_remove.target}")
+            updated_model.remove_link(link_to_remove)
+            self.applied_heuristics.append("drop_link")
+            was_applied = True
+            self._debug_log(f"Odstránené MUST pravidlo: {link_to_remove.source} -> {link_to_remove.target}")
+        
+        #-----------------------------------------------------------------
+        # Časť 3: Odstraňovanie jednoduchých atribútov (nie interval/množina)
+        #-----------------------------------------------------------------
+        
+        print("[DROP_LINK] Kontrolujem atribúty objektov...")
+        
+        # Pre každý objekt v modeli
+        for model_obj in updated_model.objects:
+            # Preskočíme objekty bez atribútov
+            if not model_obj.attributes:
+                continue
                 
-                # Ak neexistuje generické pravidlo, môžeme spojenie odstrániť
-                if not has_generic_rule:
-                    updated_model.remove_link(link_to_remove)
-                    self.applied_heuristics.append("drop_link")
-                    was_applied = True
-                    self._debug_log(f"Odstránené spojenie z modelu: {link_to_remove.source} -> {link_to_remove.target}")
+            # Nájdeme zodpovedajúci objekt v príklade
+            matching_example_objs = [obj for obj in good.objects if obj.name == model_obj.name]
+            
+            if not matching_example_objs:
+                print(f"[DROP_LINK] Objekt {model_obj.name} nie je v príklade, nemôžem porovnať atribúty")
+                continue
+                
+            example_obj = matching_example_objs[0]
+            
+            # Zoznam atribútov na odstránenie
+            attrs_to_remove = []
+            
+            # Skontrolujeme každý atribút v objekte
+            for attr_name, attr_value in model_obj.attributes.items():
+                # Preskočíme, ak hodnota je interval alebo množina
+                if isinstance(attr_value, tuple) or isinstance(attr_value, set):
+                    print(f"[DROP_LINK] Atribút {model_obj.name}.{attr_name} je interval alebo množina, ponechávam")
+                    continue
+                    
+                # Ak príklad nemá atribúty alebo tento konkrétny atribút chýba
+                if not example_obj.attributes or attr_name not in example_obj.attributes:
+                    print(f"[DROP_LINK] Atribút {model_obj.name}.{attr_name} nie je v príklade, pridávam na odstránenie")
+                    attrs_to_remove.append(attr_name)
+                    continue
+                    
+                # Ak hodnota atribútu v príklade je iná
+                example_value = example_obj.attributes[attr_name]
+                if attr_value != example_value:
+                    print(f"[DROP_LINK] Atribút {model_obj.name}.{attr_name} má inú hodnotu v príklade ({example_value} vs. {attr_value}), pridávam na odstránenie")
+                    attrs_to_remove.append(attr_name)
+            
+            # Odstránime označené atribúty
+            for attr_name in attrs_to_remove:
+                print(f"[DROP_LINK] Odstraňujem atribút {model_obj.name}.{attr_name} = {model_obj.attributes[attr_name]}")
+                del model_obj.attributes[attr_name]
+                self.applied_heuristics.append("drop_link")
+                was_applied = True
+                self._debug_log(f"Odstránený atribút {model_obj.name}.{attr_name}")
         
         # Zabezpečíme, že heuristika je označená ako aplikovaná, ak nejaké spojenie bolo odstránené
         if was_applied:
+            print("[DROP_LINK] Drop-link heuristika bola úspešne aplikovaná")
             self._debug_log("Drop-link heuristika bola úspešne aplikovaná")
+        else:
+            print("[DROP_LINK] Drop-link heuristika nebola aplikovaná - nenašli sa žiadne spojenia/atribúty na odstránenie")
             
         return updated_model
 
@@ -1124,6 +1228,12 @@ class WinstonLearner:
             if model_obj.class_name != matching_example_obj.class_name:
                 print(f"[CLIMB_TREE] Objekt {model_obj.name} má rôzne triedy v modeli a príklade")
                 
+                # Kontrola, či už poznáme príklad ako podtriedu modelu v known_subclasses
+                if (model_obj.class_name in updated_model.known_subclasses and 
+                    matching_example_obj.class_name in updated_model.known_subclasses[model_obj.class_name]):
+                    print(f"[CLIMB_TREE] Preskakujem generalizáciu, objekt {matching_example_obj.class_name} je už známa podtrieda {model_obj.class_name}")
+                    continue
+                
                 # Hľadáme spoločného predka v klasifikačnom strome
                 common_ancestor = None
                 
@@ -1168,6 +1278,21 @@ class WinstonLearner:
                 
                 # Ak sme našli spoločného predka v ktorejkoľvek metóde, aplikujeme zmeny        
                 if common_ancestor:
+                    # Ak model.class_name už je spoločný predok a príklad je podtrieda, preskočíme zmeny
+                    if model_obj.class_name == common_ancestor:
+                        print(f"[CLIMB_TREE] Model už používa spoločného predka {common_ancestor}, len pridám {matching_example_obj.class_name} do known_subclasses")
+                        
+                        # Stále pridáme podtriedu do known_subclasses
+                        if common_ancestor not in updated_model.known_subclasses:
+                            updated_model.known_subclasses[common_ancestor] = set()
+                            
+                        if matching_example_obj.class_name != common_ancestor:
+                            updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
+                            heuristic_applied = True
+                            
+                        print(f"[CLIMB_TREE] Zaznamenávam známe podtriedy pre {common_ancestor}: {updated_model.known_subclasses[common_ancestor]}")
+                        continue
+                    
                     self._debug_log(f"Nájdený spoločný predok: {common_ancestor} pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
                     
                     # Pôvodná trieda objektu
@@ -1178,6 +1303,7 @@ class WinstonLearner:
                     
                     # Aktualizujeme triedu objektu na spoločného predka
                     model_obj.class_name = common_ancestor
+                    heuristic_applied = True
                                     
                     # Aktualizujeme aj MUST_BE_A spojenia pre tento objekt
                     for link in updated_model.links:
@@ -1197,9 +1323,6 @@ class WinstonLearner:
                         updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
                     
                     print(f"[CLIMB_TREE] Zaznamenávam známe podtriedy pre {common_ancestor}: {updated_model.known_subclasses[common_ancestor]}")
-                    
-                    heuristic_applied = True
-                    self._debug_log(f"Aplikovaná climb-tree heuristika: objekt {model_obj.name} zmenený z {original_class} na {common_ancestor}")
                 else:
                     print(f"[CLIMB_TREE] Nenašiel som spoločného predka pre {model_obj.class_name} a {matching_example_obj.class_name}")
             else:
@@ -1268,6 +1391,7 @@ class WinstonLearner:
                 
                 print(f"[CLIMB_TREE] Pravidlo aktualizované na: {link.source} -> {link.target} ({link.link_type.value})")
                 self._debug_log(f"Aktualizované {link.link_type.value} pravidlo: {original} -> {new}")
+                heuristic_applied = True
                 
                 # Zaznamenáme aj tieto generalizácie do known_subclasses
                 if field == 'source':
@@ -1280,14 +1404,13 @@ class WinstonLearner:
                         updated_model.known_subclasses[new] = set()
                     if original != new:  # Nepridávame triedu ako podtriedu samej seba
                         updated_model.known_subclasses[new].add(original)
-                
-                heuristic_applied = True
         
+        # Výstupný text na konci a pridanie do aplikovaných heuristík
         if heuristic_applied:
             self.applied_heuristics.append("climb_tree")
             print("[CLIMB_TREE] Heuristika bola úspešne aplikovaná!")
             print(f"[CLIMB_TREE] Známe podtriedy: {updated_model.known_subclasses}")
         else:
-            print("[CLIMB_TREE] Heuristika nebola aplikovaná - nenašli sa vhodné objekty")
-        
+            print("[CLIMB_TREE] Heuristika nebola aplikovaná - nenašli sa triedy na generalizáciu")
+            
         return updated_model 

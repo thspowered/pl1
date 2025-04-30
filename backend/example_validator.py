@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from typing import Dict, List, Tuple, Set, Any, Optional
+import traceback
 
 from backend.model import Model, Link, LinkType, Object
 from backend.pl1_parser import parse_pl1_formula, Formula
@@ -35,13 +36,66 @@ class ExampleValidator:
             Slovník s pravidly pro každý model auta
         """
         rules = {}
+        car_models = ["Series3", "Series5", "Series7", "X5", "X7"]
+        
+        # First attempt to extract rules from attributes if they exist
         for obj in self.model.objects:
-            if obj.class_name in ["Series3", "Series5", "Series7", "X5", "X7"]:
+            if obj.class_name in car_models:
                 # Kontrola, že objekt má atributy
-                if obj.attributes is not None:
+                if obj.attributes is not None and "rule" in obj.attributes:
                     rules[obj.class_name] = obj.attributes.get("rule", "")
+        
+        # If we don't have rules yet, generate them dynamically from the model structure
+        for model_type in car_models:
+            if model_type not in rules or not rules[model_type]:
+                # Generate default rules for this model type based on MUST and MUST_NOT relationships
+                rule_parts = []
+                
+                # Add MUST relationships
+                must_components = []
+                for link in self.model.links:
+                    if link.link_type == LinkType.MUST and link.source == model_type:
+                        if link.target not in ["Component", "Engine", "Transmission", "DriveSystem"]:
+                            must_components.append(f"must have {link.target}")
+                
+                # Add MUST_NOT relationships
+                must_not_components = []
+                for link in self.model.links:
+                    if link.link_type == LinkType.MUST_NOT and link.source == model_type:
+                        must_not_components.append(f"must not have {link.target}")
+                
+                # Check component alternatives from component_requirements
+                if hasattr(self, 'component_requirements') and model_type in self.component_requirements:
+                    req = self.component_requirements[model_type]
+                    
+                    if "engines" in req and req["engines"]:
+                        engine_options = ", ".join(req["engines"])
+                        rule_parts.append(f"must have one of these engines: {engine_options}")
+                    
+                    if "transmission" in req and req["transmission"]:
+                        transmission_options = ", ".join(req["transmission"])
+                        rule_parts.append(f"must have one of these transmissions: {transmission_options}")
+                    
+                    if "drive" in req and req["drive"]:
+                        drive_options = ", ".join(req["drive"])
+                        rule_parts.append(f"must have one of these drives: {drive_options}")
+                
+                # Add must components
+                if must_components:
+                    rule_parts.extend(must_components)
+                
+                # Add must_not components
+                if must_not_components:
+                    rule_parts.extend(must_not_components)
+                
+                # Create the final rule
+                if rule_parts:
+                    rules[model_type] = f"The {model_type} {' and '.join(rule_parts)}"
                 else:
-                    rules[obj.class_name] = ""  # Prázdné pravidlo, pokud attributes je None
+                    # Create a default rule if we couldn't extract any specific rules
+                    rules[model_type] = f"The {model_type} must follow BMW specifications"
+        
+        print("Extracted rules for models:", list(rules.keys()))
         return rules
     
     def _extract_component_requirements(self) -> Dict[str, Dict[str, List[str]]]:
@@ -322,13 +376,26 @@ class ExampleValidator:
                 "violations": ["Nepodařilo se identifikovat typ modelu auta v příkladu"],
                 "satisfied_rules": [],
                 "allowed_alternatives": {},
-                "categorized_violations": {}  # Prázdne kategorizované porušenia, keďže validácia nemohla byť vykonaná
+                "categorized_violations": {},  # Prázdne kategorizované porušenia, keďže validácia nemohla byť vykonaná
+                "highlighted_formula": {
+                    "formula": "",
+                    "tokens": []
+                }
             }
         
         print(f"Identifikovaný model auta: {car_model}")
         
         # Validujeme príklad voči pravidlám
         validation_result = self._validate_against_model_rules(example, car_model, validate_attributes)
+        
+        # Získame formuli modelu
+        model_formula = self.model.to_formula() if hasattr(self.model, 'to_formula') else ""
+        
+        # Generujeme zvýrazněnou formuli
+        highlighted_formula = self._generate_highlighted_formula(example, car_model, model_formula)
+        
+        # Přidáme zvýrazněnou formuli do výsledku
+        validation_result["highlighted_formula"] = highlighted_formula
         
         print(f"\n===== Validácia príkladu dokončená =====")
         
@@ -369,14 +436,15 @@ class ExampleValidator:
         """
         print(f"\nValidujem príklad proti pravidlám pre model {model_type}, validate_attributes={validate_attributes}")
         
+        # Generate rules dynamically if they don't exist
         if model_type not in self.rules:
-            return {
-                "is_valid": False,
-                "model_type": model_type,
-                "violations": [f"Pravidla pro model {model_type} nejsou k dispozici"],
-                "satisfied_rules": [],
-                "allowed_alternatives": {}
-            }
+            print(f"Pravidla pro model {model_type} nejsou k dispozici, budu vygenerovány dynamicky")
+            # Extract component requirements if we haven't done so already
+            if not hasattr(self, 'component_requirements') or model_type not in self.component_requirements:
+                self.component_requirements = self._extract_component_requirements()
+            
+            # Re-extract rules now that we have component requirements
+            self.rules = self._extract_rules()
         
         # Kontrola MUST vztahů
         must_violations = self._check_must_relationships(example, model_type)
@@ -786,88 +854,271 @@ class ExampleValidator:
         model_objects = [obj for obj in example.objects if obj.class_name == model_type]
         if not model_objects:
             return satisfied
-            
+        
+        # Check which engines/transmissions/drives are present in the example
+        present_engines = set()
+        present_transmissions = set()
+        present_drives = set()
+        
         for model_obj in model_objects:
-            # Kontrola motorů
+            # Map to track what components we have added satisfied rules for
+            added_component_rules = {
+                "engines": False,
+                "transmission": False,
+                "drive": False
+            }
+            
+            # Check all links from this model object
             for example_link in example.links:
                 if example_link.source == model_obj.name:
                     target_obj = next((obj for obj in example.objects if obj.name == example_link.target), None)
-                    if (target_obj and 
-                        target_obj.class_name in self.component_requirements.get(model_type, {}).get("engines", [])):
+                    if not target_obj:
+                        continue
+                    
+                    # Check engine components
+                    if (target_obj.class_name in self.component_requirements.get(model_type, {}).get("engines", [])):
+                        present_engines.add(target_obj.class_name)
                         engine_rule = f"Model {model_type} má validní motor typu {target_obj.class_name}"
                         if not any(v.startswith(f"Model {model_type} musí mít jeden z motorů") for v in violations):
-                            satisfied.append(engine_rule)
+                            if not added_component_rules["engines"]:
+                                satisfied.append(engine_rule)
+                                added_component_rules["engines"] = True
                     
-                    # Kontrola převodovky
-                    if (target_obj and 
-                        target_obj.class_name in self.component_requirements.get(model_type, {}).get("transmission", [])):
+                    # Check transmission components
+                    if (target_obj.class_name in self.component_requirements.get(model_type, {}).get("transmission", [])):
+                        present_transmissions.add(target_obj.class_name)
                         transmission_rule = f"Model {model_type} má validní převodovku typu {target_obj.class_name}"
                         if not any(v.startswith(f"Model {model_type} musí mít jednu z převodovek") for v in violations):
-                            satisfied.append(transmission_rule)
+                            if not added_component_rules["transmission"]:
+                                satisfied.append(transmission_rule)
+                                added_component_rules["transmission"] = True
                     
-                    # Kontrola pohonu
-                    if (target_obj and 
-                        target_obj.class_name in self.component_requirements.get(model_type, {}).get("drive", [])):
+                    # Check drive components
+                    if (target_obj.class_name in self.component_requirements.get(model_type, {}).get("drive", [])):
+                        present_drives.add(target_obj.class_name)
                         drive_rule = f"Model {model_type} má validní pohon typu {target_obj.class_name}"
                         if not any(v.startswith(f"Model {model_type} musí mít jeden z pohonů") for v in violations):
-                            satisfied.append(drive_rule)
+                            if not added_component_rules["drive"]:
+                                satisfied.append(drive_rule)
+                                added_component_rules["drive"] = True
         
-        # MUST vztahy
+        # Check MUST relationships
         for link in self.model.links:
             if link.link_type == LinkType.MUST and link.source == model_type:
-                # Přeskočíme obecné komponenty
+                # Skip generic components
                 if link.target in ["Component", "Engine", "Transmission", "DriveSystem"]:
                     continue
-                    
-                rule_text = f"Model {model_type} musí mít komponentu {link.target}"
-                if rule_text not in violations and not any(v.startswith(f"Model {model_type} musí mít komponentu {link.target}") for v in violations):
-                    satisfied.append(rule_text)
+                
+                # Try to find if the example satisfies this MUST relationship
+                requirement_satisfied = False
+                for model_obj in model_objects:
+                    for example_link in example.links:
+                        if example_link.source == model_obj.name:
+                            target_obj = next((obj for obj in example.objects if obj.name == example_link.target), None)
+                            if target_obj and target_obj.class_name == link.target:
+                                requirement_satisfied = True
+                                break
+                
+                if requirement_satisfied:
+                    rule_text = f"Model {model_type} obsahuje požadovanou komponentu {link.target}"
+                    if rule_text not in satisfied:
+                        satisfied.append(rule_text)
         
-        # MUST_NOT vztahy
+        # Check MUST_NOT relationships
+        must_not_violations = [v for v in violations if "nesmí mít komponentu" in v]
+        must_not_violation_components = []
+        
+        for violation in must_not_violations:
+            # Extract component name from violation text
+            parts = violation.split("nesmí mít komponentu")
+            if len(parts) > 1:
+                component = parts[1].strip()
+                must_not_violation_components.append(component)
+        
         for link in self.model.links:
             if link.link_type == LinkType.MUST_NOT and link.source == model_type:
-                rule_text = f"Model {model_type} nesmí mít komponentu {link.target}"
-                if rule_text not in violations:
+                if link.target not in must_not_violation_components:
+                    rule_text = f"Model {model_type} správně neobsahuje zakázanou komponentu {link.target}"
                     satisfied.append(rule_text)
+        
+        # Add satisfied rules for engine/transmission/drive requirements
+        if present_engines and not any(v.startswith(f"Model {model_type} musí mít jeden z motorů") for v in violations):
+            options = ", ".join(self.component_requirements.get(model_type, {}).get("engines", []))
+            satisfied.append(f"Model {model_type} splňuje požadavek na motor (povolené: {options})")
+            
+        if present_transmissions and not any(v.startswith(f"Model {model_type} musí mít jednu z převodovek") for v in violations):
+            options = ", ".join(self.component_requirements.get(model_type, {}).get("transmission", []))
+            satisfied.append(f"Model {model_type} splňuje požadavek na převodovku (povolené: {options})")
+            
+        if present_drives and not any(v.startswith(f"Model {model_type} musí mít jeden z pohonů") for v in violations):
+            options = ", ".join(self.component_requirements.get(model_type, {}).get("drive", []))
+            satisfied.append(f"Model {model_type} splňuje požadavek na pohon (povolené: {options})")
         
         return satisfied
 
+    def _generate_highlighted_formula(self, example: Model, model_type: str, model_formula: str) -> Dict[str, Any]:
+        """
+        Generuje zvýrazněnou verzi formule modelu s označením, které části jsou splněny a které porušeny v příkladu.
+        
+        Args:
+            example: Příklad k validaci
+            model_type: Typ modelu auta
+            model_formula: Formule modelu
+            
+        Returns:
+            Slovník obsahující informace o zvýraznění formule
+        """
+        # Parsujeme formuli modelu
+        from backend.pl1_parser import parse_pl1_formula
+        model_predicates = []
+        try:
+            parsed_formula = parse_pl1_formula(model_formula)
+            if hasattr(parsed_formula, 'predicates'):
+                model_predicates = parsed_formula.predicates
+        except Exception as e:
+            print(f"Chyba při parsování formule: {e}")
+            return {"highlighted_formula": model_formula, "tokens": []}
+        
+        # Zpracujeme příklad do seznamu trojic (predikát, objekt1, objekt2/hodnota)
+        example_predicates = []
+        for obj in example.objects:
+            # IS_A vztahy
+            example_predicates.append(("Ι", obj.name, obj.class_name))
+            
+            # HAS_PART vztahy
+            for link in example.links:
+                if link.source == obj.name:
+                    target_obj = next((o for o in example.objects if o.name == link.target), None)
+                    if target_obj:
+                        example_predicates.append(("Π", obj.name, target_obj.name))
+            
+            # Atributy
+            if obj.attributes:
+                for attr_name, attr_value in obj.attributes.items():
+                    example_predicates.append(("Α", obj.name, attr_name, attr_value))
+        
+        # Vytvoříme tokeny pro zvýraznění
+        tokens = []
+        matched_components = set()
+        unmatched_components = set()
+        
+        if not model_predicates:
+            return {"highlighted_formula": model_formula, "tokens": []}
+        
+        # Pro každý predikát v modelu prověříme, zda je splněn v příkladu
+        for pred_idx, pred in enumerate(model_predicates):
+            pred_str = str(pred)
+            pred_type = pred.predicate
+            pred_args = pred.args
+            
+            # Výchozí stav - předpokládáme nesplnění
+            is_satisfied = False
+            
+            # Kontrola podle typu predikátu
+            if pred_type == "Ι":  # IS_A
+                obj_name, class_name = pred_args
+                # Hledáme objekt daného typu
+                if ("Ι", obj_name, class_name) in example_predicates:
+                    is_satisfied = True
+                    matched_components.add(class_name)
+                else:
+                    unmatched_components.add(class_name)
+            
+            elif pred_type == "Π":  # HAS_PART
+                parent, child = pred_args
+                # Hledáme propojení mezi objekty
+                if ("Π", parent, child) in example_predicates:
+                    is_satisfied = True
+                    matched_components.add(parent)
+                    matched_components.add(child)
+                else:
+                    unmatched_components.add(parent)
+                    unmatched_components.add(child)
+            
+            elif pred_type == "Α":  # HAS_ATTRIBUTE
+                obj_name, attr_name, attr_value = pred_args
+                # Hledáme atribut s hodnotou
+                is_satisfied = False
+                for ex_pred in example_predicates:
+                    if len(ex_pred) == 4 and ex_pred[0] == "Α" and ex_pred[1] == obj_name and ex_pred[2] == attr_name:
+                        # Porovnáme hodnoty
+                        if ex_pred[3] == attr_value:
+                            is_satisfied = True
+                            break
+            
+            # Přidáme token pro zvýraznění
+            tokens.append({
+                "text": pred_str,
+                "is_satisfied": is_satisfied,
+                "type": "predicate"
+            })
+            
+            # Přidáme token pro spojku, pokud není poslední predikát
+            if pred_idx < len(model_predicates) - 1:
+                tokens.append({
+                    "text": " ∧ ",
+                    "is_satisfied": None,  # Neutrální barva
+                    "type": "connector"
+                })
+        
+        # Vytvoříme zvýrazněnou formuli
+        highlighted_formula = "".join([token["text"] for token in tokens])
+        
+        # Přidáme statistiky
+        stats = {
+            "matched_components": list(matched_components),
+            "unmatched_components": list(unmatched_components),
+            "total_predicates": len(model_predicates),
+            "satisfied_predicates": sum(1 for token in tokens if token.get("is_satisfied") == True)
+        }
+        
+        return {
+            "highlighted_formula": highlighted_formula,
+            "tokens": tokens,
+            "stats": stats
+        }
+
 def compare_example(model: Model, example_formula: str, validate_attributes: bool = True) -> Dict[str, Any]:
     """
-    Validuje PL1 formuli proti naučenému modelu se zaměřením na konkrétní model auta.
+    Validuje príklad voči aktuálnemu modelu a vráti výsledok.
     
     Args:
-        model: Naučený model
-        example_formula: PL1 formule příkladu k validaci
-        validate_attributes: Zda se mají kontrolovat i hodnoty atributů (výkon, krouticí moment, ...)
+        model: Aktuálny model
+        example_formula: Formula príkladu na validáciu
+        validate_attributes: Či sa majú kontrolovať aj hodnoty atribútov
         
     Returns:
-        Výsledek validace s konkrétním vysvětlením pro daný model auta
+        Výsledok validácie s vysvetlením
     """
-    print(f"\nSpúšťam porovnanie príkladu, validate_attributes={validate_attributes}")
-    
-    # Parsování PL1 formule
-    formula = parse_pl1_formula(example_formula)
-    
-    # Konverze formule na model - explicitně nastavíme is_first_positive=False, protože validační příklad není první pozitivní
-    from backend.model import formula_to_model
-    example_model = formula_to_model(formula, is_first_positive=False)
-    
-    # Pridame explicitný výpis pre kontrolu
-    print(f"Počet objektov v príklade: {len(example_model.objects)}")
-    for obj in example_model.objects:
-        print(f"  - Objekt {obj.name}, Trieda: {obj.class_name}, Atribúty: {obj.attributes}")
-    
-    # Validace
-    validator = ExampleValidator(model)
-    result = validator.validate_example(example_model, validate_attributes)
-    
-    # Přidáme formuli pro lepší kontext
-    result["formula"] = example_formula
-    result["validate_attributes"] = validate_attributes
-    
-    # Skontrolujme, či výsledok obsahuje porušenia validácie atribútov
-    if validate_attributes and "categorized_violations" in result:
-        print(f"Výsledok validácie atribútov: {len(result['categorized_violations'].get('attribute_violations', []))} porušení")
-    
-    return result 
+    try:
+        # Parsujeme formulu a vytvoríme z nej model
+        from backend.pl1_parser import parse_pl1_formula
+        from backend.model import formula_to_model
+        
+        formula = parse_pl1_formula(example_formula)
+        example_model = formula_to_model(formula)
+        
+        # Vytvoríme validátor a validujeme príklad
+        validator = ExampleValidator(model)
+        validation_result = validator.validate_example(example_model, validate_attributes)
+        
+        # Pridáme pôvodnú formulu
+        validation_result["formula"] = example_formula
+        validation_result["validate_attributes"] = validate_attributes
+        
+        return validation_result
+    except Exception as e:
+        print(f"Error in compare_example: {e}")
+        traceback.print_exc()
+        return {
+            "is_valid": False,
+            "model_type": None,
+            "violations": [f"Chyba při validaci příkladu: {str(e)}"],
+            "satisfied_rules": [],
+            "formula": example_formula,
+            "validate_attributes": validate_attributes,
+            "highlighted_formula": {
+                "highlighted_formula": "",
+                "tokens": []
+            }
+        } 

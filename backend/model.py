@@ -992,20 +992,18 @@ class Model:
         # ... existing code ...
         pass
 
-def formula_to_model(formula: Formula, is_first_positive: bool = False) -> Model:
+def formula_to_model(formula: Formula) -> Model:
     """
     Konvertuje formulu na model.
     
     Args:
         formula: Formula v predikátovej logike prvého rádu
-        is_first_positive: Či sa jedná o prvý pozitívny príklad (pre automatické nastavenie MUST spojení)
         
     Returns:
         Model vytvoreny z formuly
     """
     print("\n==================== DEBUG: Starting formula_to_model ====================")
     print(f"Spracovávam formulu: {formula}")
-    print(f"Is first positive example: {is_first_positive}")
     
     objects = []
     links = []
@@ -1096,10 +1094,9 @@ def formula_to_model(formula: Formula, is_first_positive: bool = False) -> Model
             arg2 = predicate.arguments[1]
             
             if predicate.name == "Π":  # PI - has_part
-                # Spojenie HAS (REGULAR alebo MUST pre prvý pozitívny príklad)
-                link_type = LinkType.MUST if is_first_positive else LinkType.REGULAR
-                links.append(Link(arg1, arg2, link_type))
-                print(f"DEBUG: Added {'MUST' if is_first_positive else 'REGULAR'} link {arg1} -> {arg2} (is_first_positive={is_first_positive})")
+                # Spojenie HAS (vždy REGULAR bez ohľadu na prvý pozitívny príklad)
+                links.append(Link(arg1, arg2, LinkType.REGULAR))
+                print(f"DEBUG: Added REGULAR link {arg1} -> {arg2}")
             elif predicate.name == "Ι":  # IOTA - is_a
                 # Spojenie IS_A (objekt je instanciou triedy)
                 # Check if object already exists
