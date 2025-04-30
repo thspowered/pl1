@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -28,7 +28,8 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CodeIcon from '@mui/icons-material/Code';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
-import { ComparisonResult } from '../types';
+import { ComparisonResult, NetworkNode, NetworkLink } from '../types';
+import NetworkGraph from './NetworkGraph';
 import ExampleNetworkGraph from './ExampleNetworkGraph';
 
 interface CompareExampleProps {
@@ -181,6 +182,192 @@ const HighlightedFormula: React.FC<HighlightedFormulaProps> = ({
     </Box>
   );
 }
+
+// Helper function to generate visualization data from formula and result
+const generateVisualizationData = (formula: string, result: ComparisonResult | null, viewType: 'example' | 'model'): { nodes: NetworkNode[], links: NetworkLink[] } => {
+  const nodes: NetworkNode[] = [];
+  const links: NetworkLink[] = [];
+  
+  if (!result) {
+    return { nodes, links };
+  }
+  
+  try {
+    // Basic structure with dummy data that will show a nice semantic network similar to CompareModels
+    // In a full implementation, this would parse the formula properly
+    
+    // Extract the main components from formula
+    const formulaText = viewType === 'example' ? formula : (result.model_formula || '');
+    const components: string[] = formulaText.split(' ∧ ');
+    
+    // Create nodes for car, engine, transmission, drive
+    const componentMap: Record<string, boolean> = {};
+    const relationMap: Record<string, boolean> = {};
+    
+    // Extract information from formula predicates
+    components.forEach(component => {
+      // Simple pattern matching to handle different predicate types
+      if (component.includes('Ι(')) {
+        // IS_A relationship
+        const match = component.match(/Ι\(([^,]+),\s*([^)]+)\)/);
+        if (match) {
+          const [_, objName, className] = match;
+          
+          // Add the object node
+          if (!componentMap[objName]) {
+            componentMap[objName] = true;
+            let category = 'Object';
+            
+            if (className.includes('Engine') || className.includes('Motor')) {
+              category = 'Engine';
+            } else if (className.includes('Transmission') || className.includes('Prevodovka')) {
+              category = 'Transmission';
+            } else if (className.includes('Drive') || className.includes('Pohon')) {
+              category = 'Drive';
+            } else if (className.includes('X5') || className.includes('BMW')) {
+              category = 'Car';
+            }
+            
+            nodes.push({
+              id: objName,
+              name: objName,
+              class: className,
+              category: category
+            });
+          }
+          
+          // Add the class node if not already present
+          if (!componentMap[className]) {
+            componentMap[className] = true;
+            nodes.push({
+              id: className,
+              name: className,
+              class: className,
+              category: 'Class'
+            });
+          }
+          
+          // Add the relationship
+          const relationId = `${objName}_is_a_${className}`;
+          if (!relationMap[relationId]) {
+            relationMap[relationId] = true;
+            links.push({
+              source: objName,
+              target: className,
+              type: 'IS_A'
+            });
+          }
+        }
+      } else if (component.includes('Π(')) {
+        // HAS_PART relationship
+        const match = component.match(/Π\(([^,]+),\s*([^)]+)\)/);
+        if (match) {
+          const [_, objName, partName] = match;
+          
+          // Ensure the nodes exist
+          if (!componentMap[objName]) {
+            componentMap[objName] = true;
+            nodes.push({
+              id: objName,
+              name: objName,
+              category: 'Object',
+              class: 'Object'
+            });
+          }
+          
+          if (!componentMap[partName]) {
+            componentMap[partName] = true;
+            nodes.push({
+              id: partName,
+              name: partName,
+              category: 'Object',
+              class: 'Object'
+            });
+          }
+          
+          // Add the relationship
+          const relationId = `${objName}_has_part_${partName}`;
+          if (!relationMap[relationId]) {
+            relationMap[relationId] = true;
+            links.push({
+              source: objName,
+              target: partName,
+              type: 'HAS_PART'
+            });
+          }
+        }
+      } else if (component.includes('Α(')) {
+        // Attribute relationship
+        const match = component.match(/Α\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+        if (match) {
+          const [_, objName, attrName, attrValue] = match;
+          
+          // Ensure the object node exists
+          if (!componentMap[objName]) {
+            componentMap[objName] = true;
+            nodes.push({
+              id: objName,
+              name: objName,
+              category: 'Object',
+              class: 'Object'
+            });
+          }
+          
+          // Add attribute node
+          const attrNodeId = `${objName}_${attrName}`;
+          if (!componentMap[attrNodeId]) {
+            componentMap[attrNodeId] = true;
+            nodes.push({
+              id: attrNodeId,
+              name: attrName,
+              category: 'Attribute',
+              class: 'Attribute'
+            });
+          }
+          
+          // Add the relationship from object to attribute
+          const relationId = `${objName}_has_attr_${attrName}`;
+          if (!relationMap[relationId]) {
+            relationMap[relationId] = true;
+            links.push({
+              source: objName,
+              target: attrNodeId,
+              type: 'HAS_ATTRIBUTE'
+            });
+          }
+          
+          // Add value node
+          const valueNodeId = `${attrNodeId}_value_${attrValue}`;
+          if (!componentMap[valueNodeId]) {
+            componentMap[valueNodeId] = true;
+            nodes.push({
+              id: valueNodeId,
+              name: attrValue,
+              category: 'Value',
+              class: 'Value'
+            });
+          }
+          
+          // Add the relationship from attribute to value
+          const valueRelationId = `${attrNodeId}_has_value_${attrValue}`;
+          if (!relationMap[valueRelationId]) {
+            relationMap[valueRelationId] = true;
+            links.push({
+              source: attrNodeId,
+              target: valueNodeId,
+              type: 'VALUE'
+            });
+          }
+        }
+      }
+    });
+    
+    return { nodes, links };
+  } catch (error) {
+    console.error('Error generating visualization data:', error);
+    return { nodes, links };
+  }
+};
 
 const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare }) => {
   const theme = useTheme();
@@ -640,53 +827,97 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                       </Alert>
                     )}
                     
-                    <Paper 
-                      elevation={0}
-                      sx={{ 
-                        height: '100%',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        border: '1px solid',
-                        borderColor: alpha('#fff', 0.1),
-                        display: 'flex',
-                        flexDirection: 'column',
-                        flexGrow: 1
-                      }}
-                    >
-                      <Box sx={{ 
-                        p: 1.5, 
-                        borderBottom: '1px solid',
-                        borderColor: alpha('#fff', 0.1), 
-                        bgcolor: alpha('#000', 0.3),
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Typography 
-                          variant="subtitle1" 
-                          sx={{ 
-                            fontWeight: 600, 
-                            textAlign: 'center',
-                            color: '#2196f3'
+                    <Grid container spacing={3}>
+                      {/* Příklad uživatele */}
+                      <Grid item xs={12} md={6}>
+                        <Paper
+                          elevation={2}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            background: 'linear-gradient(145deg, rgba(30,30,30,0.6) 0%, rgba(18,18,18,0.6) 100%)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column'
                           }}
                         >
-                          Vizualizácia validácie príkladu
-                        </Typography>
-                      </Box>
-                      <Box sx={{ 
-                        flexGrow: 1, 
-                        minHeight: 0,
-                        height: { xs: '650px', sm: '700px', md: '800px' }
-                      }}>
-                        <ExampleNetworkGraph 
-                          comparisonResult={result} 
-                          formula={formula} 
-                          showLayeredVisualization={true}
-                          viewType="combined"
-                          key={`network-${result.is_valid}-${formula.length}`}
-                        />
-                      </Box>
-                    </Paper>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#90caf9' }}>
+                              Vizualizácia príkladu
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Box sx={{ 
+                              height: '500px',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                              position: 'relative'
+                            }}>
+                              <NetworkGraph 
+                                nodes={generateVisualizationData(formula, result, 'example').nodes.map(node => ({
+                                  ...node,
+                                  status: 'common' // Použít common pro všechny uzly
+                                }))}
+                                links={generateVisualizationData(formula, result, 'example').links.map(link => ({
+                                  ...link,
+                                  status: 'common' // Použít common pro všechny spojení
+                                }))}
+                                formula={formula}
+                                key={`example-network-${result?.is_valid}-${formula.length}`}
+                              />
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Grid>
+
+                      {/* Model */}
+                      <Grid item xs={12} md={6}>
+                        <Paper
+                          elevation={2}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            background: 'linear-gradient(145deg, rgba(30,30,30,0.6) 0%, rgba(18,18,18,0.6) 100%)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#90caf9' }}>
+                              Vizualizácia modelu
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Box sx={{ 
+                              height: '500px',
+                              border: '1px solid rgba(255, 255, 255, 0.08)',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                              position: 'relative'
+                            }}>
+                              <NetworkGraph 
+                                nodes={generateVisualizationData(formula, result, 'model').nodes.map(node => ({
+                                  ...node,
+                                  status: 'common' // Použít common pro všechny uzly
+                                }))}
+                                links={generateVisualizationData(formula, result, 'model').links.map(link => ({
+                                  ...link,
+                                  status: 'common' // Použít common pro všechny spojení
+                                }))}
+                                formula={result?.model_formula || ''}
+                                key={`model-network-${result.is_valid}-${formula.length}`}
+                              />
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    </Grid>
                     
                     <Box sx={{ pt: 2 }}>
                       <Paper 
@@ -699,44 +930,50 @@ const CompareExample: React.FC<CompareExampleProps> = ({ isLoading, onCompare })
                           borderColor: alpha('#fff', 0.1)
                         }}
                       >
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          Zelené časti sú splnené, červené časti sú porušené v príklade, modré časti sú nadbytočné. Vizualizácia zobrazuje, či príklad zodpovedá požiadavkám modelu.
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#e0e0e0' }}>
+                          Legenda:
                         </Typography>
-                        
-                        <Grid container spacing={1} alignItems="center">
-                          <Grid item xs={12} sm="auto">
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#90caf9', mb: { xs: 1, sm: 0 } }}>
-                              Legenda:
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '130px' } }}>
+                        <Grid container spacing={2}>
+                          <Grid item xs={6} sm={3}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#4caf50' }}></Box>
-                              <Typography variant="caption">Splnená požiadavka</Typography>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#DC143C' }}></Box>
+                              <Typography variant="caption">Motor</Typography>
                             </Box>
                           </Grid>
-                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                          <Grid item xs={6} sm={3}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#F44336' }}></Box>
-                              <Typography variant="caption">Porušená požiadavka</Typography>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#CD5C5C' }}></Box>
+                              <Typography variant="caption">Prevodovka</Typography>
                             </Box>
                           </Grid>
-                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                          <Grid item xs={6} sm={3}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#FF9800' }}></Box>
-                              <Typography variant="caption">Nesprávna hodnota</Typography>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#FF6347' }}></Box>
+                              <Typography variant="caption">Pohon</Typography>
                             </Box>
                           </Grid>
-                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                          <Grid item xs={6} sm={3}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#2196f3' }}></Box>
-                              <Typography variant="caption">Nadbytočný prvok</Typography>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#4682B4' }}></Box>
+                              <Typography variant="caption">Vozidlo</Typography>
                             </Box>
                           </Grid>
-                          <Grid item xs={6} sm="auto" sx={{ minWidth: { sm: '150px' } }}>
+                          <Grid item xs={6} sm={3}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#000000' }}></Box>
-                              <Typography variant="caption">Chýbajúci v príklade</Typography>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#A0522D' }}></Box>
+                              <Typography variant="caption">Komponent</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm={3}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '0%', bgcolor: '#9370DB' }}></Box>
+                              <Typography variant="caption">Atribút</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6} sm={3}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ width: 12, height: 12, borderRadius: '0%', bgcolor: '#FFD700' }}></Box>
+                              <Typography variant="caption">Hodnota</Typography>
                             </Box>
                           </Grid>
                         </Grid>

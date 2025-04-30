@@ -783,7 +783,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                 }}
               >
                 <CompareArrowsIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
-                Porovnání modelů
+                Porovnání hypotéz
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                 Porovnejte dva modely (hypotézy) a zjistěte rozdíly mezi nimi.
