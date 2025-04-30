@@ -113,104 +113,6 @@ def initialize_classification_tree():
     for child, parent in classification_tree.parent_map.items():
         print(f"  {child} -> {parent or 'ROOT'}")
 
-def formula_to_model(formula: Formula) -> Model:
-    """Konvertuje PL1 formulu na model."""
-    objects = []
-    links = []
-    object_classes = {}
-    
-    # Kontrola prázdnej formuly
-    if not formula or not formula.get_all_predicates():
-        print("Warning: Empty formula or no predicates found")
-        return Model(objects=[], links=[])
-    
-    # Extrahuj všetky predikáty z formuly
-    predicates = formula.get_all_predicates()
-    print(f"Processing {len(predicates)} predicates")
-    
-    # Najprv spracuj predikáty typu "Ι" (is_a) na identifikáciu objektov a ich tried
-    for predicate in predicates:
-        if predicate.name == "Ι" and len(predicate.arguments) == 2:
-            obj_name = predicate.arguments[0]
-            class_name = predicate.arguments[1]
-            object_classes[obj_name] = class_name
-    
-    # Vytvor objekty
-    for obj_name, class_name in object_classes.items():
-        objects.append(Object(name=obj_name, class_name=class_name))
-    
-    # Spracuj ostatné predikáty na vytvorenie spojení a atribútov
-    for predicate in predicates:
-        if predicate.name == "Π" and len(predicate.arguments) == 2:  # has_part
-            source = predicate.arguments[0]
-            target = predicate.arguments[1]
-            
-            # Skontroluj, či objekty existujú
-            if source not in object_classes or target not in object_classes:
-                print(f"Warning: Missing object definition for link {source} -> {target}")
-                continue
-            
-            links.append(Link(source=source, target=target, link_type=LinkType.REGULAR))
-        
-        elif predicate.name == "Μ" and len(predicate.arguments) == 2:  # must_have_part
-            source = predicate.arguments[0]
-            target = predicate.arguments[1]
-            
-            # Skontroluj, či objekty existujú
-            if source not in object_classes or target not in object_classes:
-                print(f"Warning: Missing object definition for link {source} -> {target}")
-                continue
-            
-            links.append(Link(source=source, target=target, link_type=LinkType.MUST))
-        
-        elif predicate.name == "Ν" and len(predicate.arguments) == 2:  # must_not_have_part
-            source = predicate.arguments[0]
-            target = predicate.arguments[1]
-            
-            # Skontroluj, či objekty existujú
-            if source not in object_classes or target not in object_classes:
-                print(f"Warning: Missing object definition for link {source} -> {target}")
-                continue
-            
-            links.append(Link(source=source, target=target, link_type=LinkType.MUST_NOT))
-        
-        elif predicate.name == "Α" and len(predicate.arguments) >= 3:  # has_attribute
-            obj_name = predicate.arguments[0]
-            attr_name = predicate.arguments[1]
-            attr_value = predicate.arguments[2]
-            
-            # Skontroluj, či objekt existuje
-            if obj_name not in object_classes:
-                print(f"Warning: Missing object definition for attribute {obj_name}.{attr_name}")
-                continue
-            
-            # Nájdi objekt a pridaj mu atribút
-            for obj in objects:
-                if obj.name == obj_name:
-                    if not obj.attributes:
-                        obj.attributes = {}
-                    
-                    # Konvertuj hodnotu na správny typ
-                    try:
-                        # Skús konvertovať na číslo
-                        if isinstance(attr_value, str) and attr_value.replace('.', '', 1).isdigit():
-                            if '.' in attr_value:
-                                attr_value = float(attr_value)
-                            else:
-                                attr_value = int(attr_value)
-                    except:
-                        # Ak konverzia zlyhá, ponechaj ako string
-                        pass
-                    
-                    obj.attributes[attr_name] = attr_value
-                    break
-    
-    # Pridaj MUST_BE_A spojenia pre triedy objektov
-    for obj in objects:
-        links.append(Link(source=obj.name, target=obj.class_name, link_type=LinkType.MUST_BE_A))
-    
-    return Model(objects=objects, links=links)
-
 def generate_model_visualization(model: Model):
     """
     Generuje vizualizaci modelu pro frontend.
@@ -911,7 +813,16 @@ async def train_model(training_request: TrainingRequest):
                 
                 # Použijeme parse_pl1_formula na vytvorenie objektu Formula
                 formula = parse_pl1_formula(formula_str)
-                example_model = formula_to_model(formula)
+                
+                # Pre prvý pozitívny príklad nastavíme is_first_positive=True
+                if current_model is None or not hasattr(current_model, 'objects') or len(current_model.objects) == 0:
+                    if is_positive:
+                        example_model = formula_to_model(formula, is_first_positive=True)
+                        print(f"Vytvorený model z prvého pozitívneho príkladu s MUST spojeniami")
+                    else:
+                        example_model = formula_to_model(formula, is_first_positive=False)
+                else:
+                    example_model = formula_to_model(formula, is_first_positive=False)
                 
                 print(f"\nSpracovávam príklad {example_id} (pozitívny: {is_positive})")
                 print(f"Príklad obsahuje {len(example_model.objects)} objektov a {len(example_model.links)} spojení")
@@ -1186,10 +1097,10 @@ async def get_training_history():
     
     return {"history": history_with_details}
 
-@app.post("/api/reset")
+@app.post("/api/model/reset")
 async def reset_model():
     """Resetuje naučený model a históriu trénovania."""
-    global current_model, training_history, model_history, current_history_index, dataset_examples
+    global current_model, training_history, model_history, current_history_index, dataset_examples, tracker
     
     # Resetujeme model
     current_model = Model(objects=[], links=[])
@@ -1205,12 +1116,13 @@ async def reset_model():
     model_history = []
     current_history_index = -1
     
-    return {"success": True, "message": "Model a historie byly úplně resetovány."}
+    # Resetujeme log heuristík
+    if tracker:
+        tracker.heuristics = []
+    
+    return {"success": True, "message": "Model, historie a log heuristik byly úplně resetovány."}
 
-@app.post("/api/model/reset")
-async def model_reset():
-    """API endpoint pre reset modelu na ceste /api/model/reset, ktorý používa frontend."""
-    return await reset_model()
+
 
 @app.get("/api/model-history")
 async def get_model_history():
@@ -1235,8 +1147,7 @@ async def get_model_history():
         "history_entries": history_entries,
         "total_entries": len(model_history)
     }
-
-@app.post("/api/model-history/step-back")
+@app.post("/api/model/history/step_back")
 async def step_back_in_history():
     """Krok zpět v historii modelu."""
     global current_model, model_history, current_history_index, dataset_examples
@@ -1286,12 +1197,7 @@ async def step_back_in_history():
         "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 
-@app.post("/api/model/history/step_back")
-async def model_step_back():
-    """API endpoint pre krok späť v histórii modelu na ceste /api/model/history/step_back, ktorý používa frontend."""
-    return await step_back_in_history()
-
-@app.post("/api/model-history/step-forward")
+@app.post("/api/model/history/step_forward")
 async def step_forward_in_history():
     """Krok vpřed v historii modelu."""
     global current_model, model_history, current_history_index, dataset_examples
@@ -1341,34 +1247,46 @@ async def step_forward_in_history():
         "model_updated": True  # Signalizácia, že model bol aktualizovaný
     }
 
-@app.post("/api/model/history/step_forward")
-async def model_step_forward():
-    """API endpoint pre krok vpred v histórii modelu na ceste /api/model/history/step_forward, ktorý používa frontend."""
-    return await step_forward_in_history()
 
 @app.get("/api/model-status")
 async def get_model_status():
-    """Získa aktuálny stav modelu a trénovania."""
-    global current_model
-    global dataset_examples
-    global training_history
+    """Vráti informácie o aktuálnom stave modelu a trénovania"""
+    global current_model, dataset_examples, training_history
     
-    # Vypočítaj počet použitých príkladov celkom
+    # Počty príkladov
     used_examples = sum(1 for example in dataset_examples if example.get("used_in_training", False))
-    
-    # Vypočítaj počet použitých pozitívnych a negatívnych príkladov
-    positive_used = sum(1 for example in dataset_examples 
-                      if example.get("is_positive", True) and example.get("used_in_training", False))
-    negative_used = sum(1 for example in dataset_examples 
-                      if not example.get("is_positive", True) and example.get("used_in_training", False))
-    
-    # Celkový počet príkladov podľa typu
     total_positive = sum(1 for example in dataset_examples if example.get("is_positive", True))
     total_negative = sum(1 for example in dataset_examples if not example.get("is_positive", True))
+    positive_used = sum(1 for example in dataset_examples if example.get("used_in_training", False) and example.get("is_positive", True))
+    negative_used = sum(1 for example in dataset_examples if example.get("used_in_training", False) and not example.get("is_positive", True))
     
-    # Určí trénovací režim
+    # Mód trénovania
     training_mode = "none"
-    if current_model and len(current_model.objects) > 0:
+    
+    # Kontrola či model existuje
+    if current_model is None:
+        print("Model status: Model nie je inicializovaný")
+        # Vrátime predvolené hodnoty pre neinicializovaný model
+        return {
+            "object_count": 0,
+            "link_count": 0,
+            "total_examples": len(dataset_examples),
+            "used_examples": used_examples,
+            "positive_examples": {
+                "used": positive_used,
+                "total": total_positive
+            },
+            "negative_examples": {
+                "used": negative_used,
+                "total": total_negative
+            },
+            "training_mode": training_mode,
+            "training_steps": len(training_history),
+            "current_hypothesis": "",
+            "has_model": False
+        }
+    
+    if len(current_model.objects) > 0:
         training_mode = "single"  # Používame len jeden mód - sekvenčné trénovanie
     
     # Počet krokov trénovania
@@ -1376,7 +1294,7 @@ async def get_model_status():
     
     # Hypotéza modelu
     pl1_representation = ""
-    if current_model and len(current_model.objects) > 0:
+    if len(current_model.objects) > 0:
         pl1_representation = current_model.to_formula()
     
     print(f"Model status: {len(current_model.objects)} objects, {len(current_model.links)} links")

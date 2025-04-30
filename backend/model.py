@@ -27,11 +27,11 @@ class Link:
     Atributy:
         source: Nazov zdrojoveho objektu spojenia
         target: Nazov cieloveho objektu spojenia
-        link_type: Typ spojenia (predvolene REGULAR)
+        link_type: Typ spojenia (predvolene MUST, nie REGULAR)
     """
     source: str
     target: str
-    link_type: LinkType = LinkType.REGULAR
+    link_type: LinkType = LinkType.MUST
 
     def __eq__(self, other):
         if not isinstance(other, Link):
@@ -140,7 +140,7 @@ class Model:
             for link_data in data["links"]:
                 # Konverzia string hodnoty link_type na enum
                 link_type_value = link_data["link_type"]
-                link_type = LinkType.REGULAR  # default
+                link_type = LinkType.MUST  # default
                 
                 # Nájdi príslušnú enum hodnotu
                 for lt in LinkType:
@@ -454,7 +454,7 @@ class Model:
                     else:
                         predicates.append(f"Μ({source}, {target})")
             
-            # Vytvorenie disjunkcií pre komponenty rovnakej kategórie
+            # Vytvoríme disjunkciu pre komponenty rovnakej kategórie
             for category, components in by_category.items():
                 if len(components) > 1:
                     # Skontrolujeme, či niektorá z týchto komponentov má známe podtriedy
@@ -992,18 +992,20 @@ class Model:
         # ... existing code ...
         pass
 
-def formula_to_model(formula: Formula) -> Model:
+def formula_to_model(formula: Formula, is_first_positive: bool = False) -> Model:
     """
     Konvertuje formulu na model.
     
     Args:
         formula: Formula v predikátovej logike prvého rádu
+        is_first_positive: Či sa jedná o prvý pozitívny príklad (pre automatické nastavenie MUST spojení)
         
     Returns:
         Model vytvoreny z formuly
     """
     print("\n==================== DEBUG: Starting formula_to_model ====================")
     print(f"Spracovávam formulu: {formula}")
+    print(f"Is first positive example: {is_first_positive}")
     
     objects = []
     links = []
@@ -1094,9 +1096,10 @@ def formula_to_model(formula: Formula) -> Model:
             arg2 = predicate.arguments[1]
             
             if predicate.name == "Π":  # PI - has_part
-                # Spojenie HAS (REGULAR)
-                links.append(Link(arg1, arg2, LinkType.REGULAR))
-                print(f"DEBUG: Added REGULAR link {arg1} -> {arg2}")
+                # Spojenie HAS (REGULAR alebo MUST pre prvý pozitívny príklad)
+                link_type = LinkType.MUST if is_first_positive else LinkType.REGULAR
+                links.append(Link(arg1, arg2, link_type))
+                print(f"DEBUG: Added {'MUST' if is_first_positive else 'REGULAR'} link {arg1} -> {arg2} (is_first_positive={is_first_positive})")
             elif predicate.name == "Ι":  # IOTA - is_a
                 # Spojenie IS_A (objekt je instanciou triedy)
                 # Check if object already exists

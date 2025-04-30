@@ -58,11 +58,13 @@ class WinstonLearner:
         # 1. Inicializácia prázdneho modelu prvým pozitívnym príkladom
         if example_type == "first_positive":
             self._debug_log("Prázdny model, inicializujem s prvým pozitívnym príkladom")
+            print(f"[DEBUG] Spracúvam PRVÝ POZITÍVNY príklad!")
             updated_model = self._add_missing_objects(updated_model, example)
         
         # 2. GENERALIZE - spracovanie pozitívneho príkladu
         elif example_type == "positive":
             self._debug_log("GENERALIZE: Spracovávam pozitívny príklad")
+            print(f"[DEBUG] Spracúvam bežný pozitívny príklad")
             
             # Najprv kontrola konzistentnosti
             updated_model = self._check_consistency(updated_model, example)
@@ -276,6 +278,10 @@ class WinstonLearner:
         component that does not match a constraint in an example. The constraint is 
         broadened to include the example's constraint."
         
+        Táto heuristika sa aplikuje na:
+        1. Objekty - rozširuje množinu povolených komponentov
+        2. Atribúty - rozširuje povolené hodnoty atribútov (na množiny alebo intervaly)
+        
         V našej implementácii sa enlarge-set neaplikuje na prvky, ktoré sú 
         v klasifikačnom strome - pre tie sa používa climb-tree heuristika.
         
@@ -284,12 +290,15 @@ class WinstonLearner:
             good: Pozitívny príklad
             
         Returns:
-            Aktualizovaný model s rozšírenými množinami povolených komponentov
+            Aktualizovaný model s rozšírenými množinami povolených komponentov a atribútov
         """
         updated_model = model.copy()
         heuristic_applied = False
         
         print("\n[ENLARGE_SET] Skúšam aplikovať enlarge-set heuristiku...")
+        
+        # ------------ ČASŤ 1: APLIKÁCIA NA OBJEKTY ------------
+        print("[ENLARGE_SET] Aplikujem na objekty...")
         print(f"[ENLARGE_SET] Spojenia v modeli: {[(link.source, link.target, link.link_type) for link in updated_model.links]}")
         print(f"[ENLARGE_SET] Spojenia v príklade: {[(link.source, link.target, link.link_type) for link in good.links]}")
         
@@ -389,11 +398,104 @@ class WinstonLearner:
                         heuristic_applied = True
                         self._debug_log(f"Pridané nové MUST pravidlo: {parent_class} -> {component_class}")
         
+        # ------------ ČASŤ 2: APLIKÁCIA NA ATRIBÚTY ------------
+        print("[ENLARGE_SET] Aplikujem na atribúty...")
+        
+        # Vytvoríme mapy objektov podľa tried pre rýchlejší prístup
+        model_objects_by_class = {}
+        for obj in updated_model.objects:
+            if obj.class_name not in model_objects_by_class:
+                model_objects_by_class[obj.class_name] = []
+            model_objects_by_class[obj.class_name].append(obj)
+            
+        example_objects_by_class = {}
+        for obj in good.objects:
+            if obj.class_name not in example_objects_by_class:
+                example_objects_by_class[obj.class_name] = []
+            example_objects_by_class[obj.class_name].append(obj)
+        
+        # Pre každú triedu objektov v príklade
+        for class_name, example_objs in example_objects_by_class.items():
+            # Ak táto trieda existuje aj v modeli
+            if class_name in model_objects_by_class:
+                model_objs = model_objects_by_class[class_name]
+                
+                # Pre každý objekt v príklade tejto triedy
+                for example_obj in example_objs:
+                    # Ak objekt nemá atribúty, preskočíme ho
+                    if not example_obj.attributes:
+                        continue
+                        
+                    # Nájdeme zodpovedajúci objekt v modeli (rovnakej triedy)
+                    matching_model_objs = [obj for obj in model_objs if obj.name == example_obj.name]
+                    
+                    # Ak nenájdeme presne podľa mena, vezmeme prvý objekt rovnakej triedy
+                    if not matching_model_objs and model_objs:
+                        matching_model_objs = [model_objs[0]]
+                    
+                    for model_obj in matching_model_objs:
+                        # Inicializujeme atribúty, ak neexistujú
+                        if model_obj.attributes is None:
+                            model_obj.attributes = {}
+                            
+                        # Porovnáme a rozšírime atribúty
+                        for attr_name, example_value in example_obj.attributes.items():
+                            # Preskočíme atribúty, ktoré začínajú s "allowed_" - tie sú špecifické pre model
+                            if attr_name.startswith("allowed_"):
+                                continue
+                                
+                            # Ak atribút existuje v modeli, porovnáme hodnoty
+                            if attr_name in model_obj.attributes:
+                                model_value = model_obj.attributes[attr_name]
+                                
+                                # Aplikácia enlarge-set na rôzne typy hodnôt
+                                if isinstance(model_value, (int, float)) and isinstance(example_value, (int, float)):
+                                    # Pre číselné hodnoty vytvoríme interval
+                                    min_val = min(model_value, example_value)
+                                    max_val = max(model_value, example_value)
+                                    if min_val != max_val:  # Len ak sú hodnoty rôzne
+                                        model_obj.attributes[attr_name] = (min_val, max_val)
+                                        print(f"[ENLARGE_SET] Rozširujem číselný atribút {attr_name} objektu {model_obj.name} z {model_value} na interval {(min_val, max_val)}")
+                                        heuristic_applied = True
+                                        
+                                elif isinstance(model_value, tuple) and len(model_value) == 2 and isinstance(example_value, (int, float)):
+                                    # Ak už máme interval a dostaneme novú číselnú hodnotu
+                                    min_val, max_val = model_value
+                                    if example_value < min_val:
+                                        min_val = example_value
+                                        model_obj.attributes[attr_name] = (min_val, max_val)
+                                        print(f"[ENLARGE_SET] Rozširujem interval atribútu {attr_name} objektu {model_obj.name} na {(min_val, max_val)}")
+                                        heuristic_applied = True
+                                    elif example_value > max_val:
+                                        max_val = example_value
+                                        model_obj.attributes[attr_name] = (min_val, max_val)
+                                        print(f"[ENLARGE_SET] Rozširujem interval atribútu {attr_name} objektu {model_obj.name} na {(min_val, max_val)}")
+                                        heuristic_applied = True
+                                
+                                elif isinstance(model_value, set):
+                                    # Ak je hodnota modelu množina, pridáme novú hodnotu do množiny
+                                    if example_value not in model_value:
+                                        model_obj.attributes[attr_name].add(example_value)
+                                        print(f"[ENLARGE_SET] Pridávam novú hodnotu {example_value} do množiny atribútu {attr_name} objektu {model_obj.name}")
+                                        heuristic_applied = True
+                                        
+                                elif model_value != example_value:
+                                    # Ak hodnoty nie sú rovnaké a nie sú čísla ani množina, vytvoríme množinu
+                                    model_obj.attributes[attr_name] = {model_value, example_value}
+                                    print(f"[ENLARGE_SET] Vytváram množinu hodnôt {{{model_value}, {example_value}}} pre atribút {attr_name} objektu {model_obj.name}")
+                                    heuristic_applied = True
+                            else:
+                                # Ak atribút neexistuje v modeli, pridáme ho
+                                model_obj.attributes[attr_name] = example_value
+                                print(f"[ENLARGE_SET] Pridávam nový atribút {attr_name} s hodnotou {example_value} objektu {model_obj.name}")
+                                heuristic_applied = True
+        
+        # Hlásenie o aplikácii heuristiky
         if heuristic_applied:
             self.applied_heuristics.append("enlarge_set")
             print("[ENLARGE_SET] Heuristika bola úspešne aplikovaná!")
         else:
-            print("[ENLARGE_SET] Heuristika nebola aplikovaná - neboli nájdené nové komponenty na pridanie")
+            print("[ENLARGE_SET] Heuristika nebola aplikovaná - neboli nájdené nové komponenty alebo atribúty na pridanie")
             
         return updated_model
 
@@ -576,6 +678,11 @@ class WinstonLearner:
         """
         updated_model = model.copy()
         
+        # DEBUG: Vypíšeme všetky spojenia v príklade
+        print("\n[DEBUG] Spojenia v príklade pred spracovaním:")
+        for link in good.links:
+            print(f"[DEBUG] {link.source} -> {link.target} ({link.link_type.value})")
+        
         # Kontrola, zda objekty z příkladu existují v modelu
         for good_obj in good.objects:
             if not any(obj.name == good_obj.name for obj in updated_model.objects):
@@ -592,14 +699,48 @@ class WinstonLearner:
         for good_link in good.links:
             if not any(link.source == good_link.source and link.target == good_link.target 
                       for link in updated_model.links):
-                # Přidání nového spojení
-                updated_model.add_link(Link(
-                    source=good_link.source,
-                    target=good_link.target,
-                    link_type=good_link.link_type
-                ))
+                # Přidání nového spojení (typ spojení je již nastaven správně v good_link)
+                updated_model.add_link(good_link)
                 self.applied_heuristics.append("add_link")
-                self._debug_log(f"Přidáno nové spojení: {good_link.source} -> {good_link.target}")
+                self._debug_log(f"Přidáno nové spojení: {good_link.source} -> {good_link.target} ({good_link.link_type.value})")
+        
+        # Vytvoríme spojenia medzi triedami objektov
+        # Vytvoríme množinu existujúcich spojení medzi triedami, aby sme predišli duplicitám
+        existing_class_links = set()
+        for link in updated_model.links:
+            if link.link_type == LinkType.MUST:
+                existing_class_links.add((link.source, link.target))
+        
+        # Vytvoríme mapu medzi menom objektu a jeho triedou
+        obj_to_class = {}
+        for obj in updated_model.objects:
+            obj_to_class[obj.name] = obj.class_name
+        
+        # Pre každé spojenie v príklade
+        for good_link in good.links:
+            # Získame triedy pre zdrojový a cieľový objekt
+            source_obj = good_link.source
+            target_obj = good_link.target
+            
+            if source_obj in obj_to_class and target_obj in obj_to_class:
+                source_class = obj_to_class[source_obj]
+                target_class = obj_to_class[target_obj]
+                
+                # Kontrola, či už takéto spojenie medzi triedami neexistuje
+                if (source_class, target_class) not in existing_class_links:
+                    # Vytvoríme MUST spojenie medzi triedami
+                    updated_model.add_link(Link(
+                        source=source_class,
+                        target=target_class,
+                        link_type=LinkType.MUST
+                    ))
+                    existing_class_links.add((source_class, target_class))
+                    self._debug_log(f"Vytvorené MUST spojenie medzi triedami: {source_class} -> {target_class}")
+        
+        # DEBUG: Vypíšeme všetky spojenia po spracovaní
+        print("\n[DEBUG] Spojenia v modeli po spracovaní:")
+        for link in updated_model.links:
+            print(f"[DEBUG] {link.source} -> {link.target} ({link.link_type.value})")
             
         return updated_model
 
@@ -999,6 +1140,7 @@ class WinstonLearner:
                         model_obj.class_name, 
                         matching_example_obj.class_name
                     )
+                    print(f"[CLIMB_TREE] Hľadám spoločného predka cez find_common_ancestor: {common_ancestor}")
                     
                     # 3. Ak metóda find_common_ancestor nenašla predka, skúsime to vlastnou logikou
                     if not common_ancestor:
@@ -1023,42 +1165,43 @@ class WinstonLearner:
                                 common_ancestor = model_parent
                                 print(f"[CLIMB_TREE] Našiel som spoločného predka cez predkov: {common_ancestor}")
                                 break
-                        
-                        if common_ancestor:
-                            self._debug_log(f"Nájdený spoločný predok: {common_ancestor} pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
-                            
-                            # Pôvodná trieda objektu
-                            original_class = model_obj.class_name
-                            
-                            # Pridáme informáciu o generalizácii triedy pre neskoršie použitie
-                            generalized_classes[original_class] = common_ancestor
-                            
-                            # Aktualizujeme triedu objektu na spoločného predka
-                            model_obj.class_name = common_ancestor
-                                                
-                            # Aktualizujeme aj MUST_BE_A spojenia pre tento objekt
-                            for link in updated_model.links:
-                                if link.source == model_obj.name and link.link_type == LinkType.MUST_BE_A:
-                                    link.target = common_ancestor
-                                    self._debug_log(f"Aktualizované MUST_BE_A spojenie: {link.source} -> {common_ancestor}")
-                            
-                            # Zaznamenáme podtriedu do known_subclasses
-                            if common_ancestor not in updated_model.known_subclasses:
-                                updated_model.known_subclasses[common_ancestor] = set()
-                            
-                            # Pridaj obe triedy ako známe podtriedy, ale len ak nie sú identické so spoločným predkom
-                            if original_class != common_ancestor:
-                                updated_model.known_subclasses[common_ancestor].add(original_class)
-                            
-                            if matching_example_obj.class_name != common_ancestor:
-                                updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
-                            
-                            print(f"[CLIMB_TREE] Zaznamenávam známe podtriedy pre {common_ancestor}: {updated_model.known_subclasses[common_ancestor]}")
-                            
-                            heuristic_applied = True
-                            self._debug_log(f"Aplikovaná climb-tree heuristika: objekt {model_obj.name} zmenený z {original_class} na {common_ancestor}")
-                        else:
-                            print(f"[CLIMB_TREE] Nenašiel som spoločného predka pre {model_obj.class_name} a {matching_example_obj.class_name}")
+                
+                # Ak sme našli spoločného predka v ktorejkoľvek metóde, aplikujeme zmeny        
+                if common_ancestor:
+                    self._debug_log(f"Nájdený spoločný predok: {common_ancestor} pre triedy {model_obj.class_name} a {matching_example_obj.class_name}")
+                    
+                    # Pôvodná trieda objektu
+                    original_class = model_obj.class_name
+                    
+                    # Pridáme informáciu o generalizácii triedy pre neskoršie použitie
+                    generalized_classes[original_class] = common_ancestor
+                    
+                    # Aktualizujeme triedu objektu na spoločného predka
+                    model_obj.class_name = common_ancestor
+                                    
+                    # Aktualizujeme aj MUST_BE_A spojenia pre tento objekt
+                    for link in updated_model.links:
+                        if link.source == model_obj.name and link.link_type == LinkType.MUST_BE_A:
+                            link.target = common_ancestor
+                            self._debug_log(f"Aktualizované MUST_BE_A spojenie: {link.source} -> {common_ancestor}")
+                    
+                    # Zaznamenáme podtriedu do known_subclasses
+                    if common_ancestor not in updated_model.known_subclasses:
+                        updated_model.known_subclasses[common_ancestor] = set()
+                    
+                    # Pridaj obe triedy ako známe podtriedy, ale len ak nie sú identické so spoločným predkom
+                    if original_class != common_ancestor:
+                        updated_model.known_subclasses[common_ancestor].add(original_class)
+                    
+                    if matching_example_obj.class_name != common_ancestor:
+                        updated_model.known_subclasses[common_ancestor].add(matching_example_obj.class_name)
+                    
+                    print(f"[CLIMB_TREE] Zaznamenávam známe podtriedy pre {common_ancestor}: {updated_model.known_subclasses[common_ancestor]}")
+                    
+                    heuristic_applied = True
+                    self._debug_log(f"Aplikovaná climb-tree heuristika: objekt {model_obj.name} zmenený z {original_class} na {common_ancestor}")
+                else:
+                    print(f"[CLIMB_TREE] Nenašiel som spoločného predka pre {model_obj.class_name} a {matching_example_obj.class_name}")
             else:
                 print(f"[CLIMB_TREE] Objekt {model_obj.name} má rovnakú triedu {model_obj.class_name} v oboch modeloch, nič nerobím")
         

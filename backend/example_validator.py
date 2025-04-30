@@ -849,9 +849,9 @@ def compare_example(model: Model, example_formula: str, validate_attributes: boo
     # Parsování PL1 formule
     formula = parse_pl1_formula(example_formula)
     
-    # Konverze formule na model
+    # Konverze formule na model - explicitně nastavíme is_first_positive=False, protože validační příklad není první pozitivní
     from backend.model import formula_to_model
-    example_model = formula_to_model(formula)
+    example_model = formula_to_model(formula, is_first_positive=False)
     
     # Pridame explicitný výpis pre kontrolu
     print(f"Počet objektov v príklade: {len(example_model.objects)}")
