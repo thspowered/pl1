@@ -21,7 +21,11 @@ import {
   MenuItem,
   SelectChangeEvent,
   Tab,
-  Tabs
+  Tabs,
+  AppBar,
+  useTheme,
+  useMediaQuery,
+  alpha,
 } from '@mui/material';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -29,6 +33,7 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import InfoIcon from '@mui/icons-material/Info';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import TableChartIcon from '@mui/icons-material/TableChart';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import { SavedModel, ModelComparisonResult } from '../types';
 import NetworkGraph from './NetworkGraph';
 import axios from 'axios';
@@ -89,16 +94,14 @@ const convertToPl1Notation = (link: string): string => {
 };
 
 const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
-  const [modelAType, setModelAType] = useState<string>('current');
+  const [modelA, setModelA] = useState<string>('current');
+  const [modelB, setModelB] = useState<string>('saved');
   const [modelAId, setModelAId] = useState<string>('');
-  const [modelBType, setModelBType] = useState<string>('current');
   const [modelBId, setModelBId] = useState<string>('');
-  
-  const [savedModels, setSavedModels] = useState<SavedModel[]>([]);
-  const [result, setResult] = useState<ModelComparisonResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>('differences');
+  const [error, setError] = useState<string | null>(null);
+  const [comparisonResult, setComparisonResult] = useState<ModelComparisonResult | null>(null);
+  const [savedModels, setSavedModels] = useState<SavedModel[]>([]);
   const [showCommonRules, setShowCommonRules] = useState<boolean>(false);
 
   // Načítání uložených modelů
@@ -148,14 +151,14 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
   };
 
   const handleModelATypeChange = (event: SelectChangeEvent) => {
-    setModelAType(event.target.value);
+    setModelA(event.target.value);
     if (event.target.value === 'current') {
       setModelAId('');
     }
   };
 
   const handleModelBTypeChange = (event: SelectChangeEvent) => {
-    setModelBType(event.target.value);
+    setModelB(event.target.value);
     if (event.target.value === 'current') {
       setModelBId('');
     }
@@ -170,7 +173,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
   };
 
   const handleCompare = async () => {
-    if ((modelAType === 'saved' && !modelAId) || (modelBType === 'saved' && !modelBId)) {
+    if ((modelA === 'saved' && !modelAId) || (modelB === 'saved' && !modelBId)) {
       setError('Prosím, vyberte oba modely pro porovnání');
       return;
     }
@@ -180,31 +183,31 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
       setError(null);
 
       const requestData = {
-        model_a_type: modelAType,
-        model_a_id: modelAType === 'saved' ? parseInt(modelAId) : undefined,
-        model_b_type: modelBType,
-        model_b_id: modelBType === 'saved' ? parseInt(modelBId) : undefined
+        model_a_type: modelA,
+        model_a_id: modelA === 'saved' ? parseInt(modelAId) : undefined,
+        model_b_type: modelB,
+        model_b_id: modelB === 'saved' ? parseInt(modelBId) : undefined
       };
 
       const response = await axios.post('/api/compare-models', requestData);
       
       if (response.data.success) {
-        setResult(response.data);
+        setComparisonResult(response.data);
       } else {
         setError('Nastala chyba při porovnávání modelů: ' + response.data.message);
-        setResult(null);
+        setComparisonResult(null);
       }
     } catch (err: any) {
       console.error('Chyba při porovnávání modelů', err);
       setError('Nastala neočekávaná chyba při porovnávání modelů: ' + (err.response?.data?.detail || err.message));
-      setResult(null);
+      setComparisonResult(null);
     } finally {
       setLoading(false);
     }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: string) => {
-    setActiveTab(newValue);
+    // Handle tab change
   };
 
   const renderResultContent = () => {
@@ -216,7 +219,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
       );
     }
     
-    if (!result) {
+    if (!comparisonResult) {
       return (
         <Box sx={{ 
           height: '400px', 
@@ -238,68 +241,8 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
     
     return (
       <Box sx={{ mt: 2 }}>
-        {/* Základní informace o modelech */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
-            <Card sx={{ 
-              backgroundColor: 'rgba(0, 0, 0, 0.2)', 
-              height: '100%',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-            }}>
-              <CardContent>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#90caf9' }}>
-                  Model A: {result.model_a.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Typ: {result.model_a.type === 'current' ? 'Aktuální model' : 'Uložený model'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Card sx={{ 
-              backgroundColor: 'rgba(0, 0, 0, 0.2)', 
-              height: '100%',
-              border: '1px solid rgba(255, 255, 255, 0.05)',
-            }}>
-              <CardContent>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#ce93d8' }}>
-                  Model B: {result.model_b.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Typ: {result.model_b.type === 'current' ? 'Aktuální model' : 'Uložený model'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Záložky pro přepínání mezi tabulkou a vizualizací */}
-        <Box sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs 
-            value={activeTab} 
-            onChange={handleTabChange} 
-            textColor="primary"
-            indicatorColor="primary"
-          >
-            <Tab 
-              icon={<TableChartIcon />} 
-              iconPosition="start" 
-              label="Tabulkové zobrazení" 
-              value="differences"
-            />
-            <Tab 
-              icon={<VisibilityIcon />} 
-              iconPosition="start" 
-              label="Vizualizace rozdílů" 
-              value="visualization"
-              disabled={!result.visualization}
-            />
-          </Tabs>
-        </Box>
-
         {/* Obsah podle aktivní záložky */}
-        {activeTab === 'differences' ? (
+        {''} === 'differences' ? (
           <>
             {/* Statistiky */}
             <Card sx={{ 
@@ -322,7 +265,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                         <Box sx={{ width: '25%', mr: 2 }}>
                           <Typography variant="body2" sx={{ color: '#90caf9' }}>
-                            Model A: {result.differences.links.count_a}
+                            Model A: {comparisonResult.differences.links.count_a}
                           </Typography>
                         </Box>
                         <Box sx={{ width: '75%', display: 'flex' }}>
@@ -330,7 +273,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                             sx={{ 
                               height: 20, 
                               bgcolor: '#90caf9', 
-                              width: `${((result.differences.links.count_a - (result.differences.links.only_in_a.length)) / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              width: `${((comparisonResult.differences.links.count_a - (comparisonResult.differences.links.only_in_a.length)) / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
                               borderRadius: '4px 0 0 4px'
                             }} 
                           />
@@ -338,7 +281,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                             sx={{ 
                               height: 20, 
                               bgcolor: '#4fc3f7',
-                              width: `${(result.differences.links.only_in_a.length / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              width: `${(comparisonResult.differences.links.only_in_a.length / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
                               borderRadius: '0 4px 4px 0',
                               borderLeft: '2px solid rgba(0,0,0,0.3)'
                             }} 
@@ -350,7 +293,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
                         <Box sx={{ width: '25%', mr: 2 }}>
                           <Typography variant="body2" sx={{ color: '#ce93d8' }}>
-                            Model B: {result.differences.links.count_b}
+                            Model B: {comparisonResult.differences.links.count_b}
                           </Typography>
                         </Box>
                         <Box sx={{ width: '75%', display: 'flex' }}>
@@ -358,7 +301,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                             sx={{ 
                               height: 20, 
                               bgcolor: '#ce93d8', 
-                              width: `${((result.differences.links.count_b - (result.differences.links.only_in_b.length)) / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              width: `${((comparisonResult.differences.links.count_b - (comparisonResult.differences.links.only_in_b.length)) / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
                               borderRadius: '4px 0 0 4px'
                             }} 
                           />
@@ -366,7 +309,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                             sx={{ 
                               height: 20, 
                               bgcolor: '#ba68c8',
-                              width: `${(result.differences.links.only_in_b.length / Math.max(result.differences.links.count_a, result.differences.links.count_b)) * 100}%`,
+                              width: `${(comparisonResult.differences.links.only_in_b.length / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
                               borderRadius: '0 4px 4px 0',
                               borderLeft: '2px solid rgba(0,0,0,0.3)'
                             }} 
@@ -378,19 +321,19 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                       <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Box sx={{ width: 12, height: 12, bgcolor: '#90caf9', mr: 1, borderRadius: 1 }} />
-                          <Typography variant="caption">Společná A ({result.differences.links.count_a - result.differences.links.only_in_a.length})</Typography>
+                          <Typography variant="caption">Společná A ({comparisonResult.differences.links.count_a - comparisonResult.differences.links.only_in_a.length})</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Box sx={{ width: 12, height: 12, bgcolor: '#4fc3f7', mr: 1, borderRadius: 1 }} />
-                          <Typography variant="caption">Pouze v A ({result.differences.links.only_in_a.length})</Typography>
+                          <Typography variant="caption">Pouze v A ({comparisonResult.differences.links.only_in_a.length})</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Box sx={{ width: 12, height: 12, bgcolor: '#ce93d8', mr: 1, borderRadius: 1 }} />
-                          <Typography variant="caption">Společná B ({result.differences.links.count_b - result.differences.links.only_in_b.length})</Typography>
+                          <Typography variant="caption">Společná B ({comparisonResult.differences.links.count_b - comparisonResult.differences.links.only_in_b.length})</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Box sx={{ width: 12, height: 12, bgcolor: '#ba68c8', mr: 1, borderRadius: 1 }} />
-                          <Typography variant="caption">Pouze v B ({result.differences.links.only_in_b.length})</Typography>
+                          <Typography variant="caption">Pouze v B ({comparisonResult.differences.links.only_in_b.length})</Typography>
                         </Box>
                       </Box>
                     </Box>
@@ -401,19 +344,19 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     </Typography>
                     <Box sx={{ pl: 2, mt: 1 }}>
                       <Typography variant="body2">
-                        Počet pravidel v modelu A: <strong>{result.differences.links.count_a}</strong>
+                        Počet pravidel v modelu A: <strong>{comparisonResult.differences.links.count_a}</strong>
                       </Typography>
                       <Typography variant="body2">
-                        Počet pravidel v modelu B: <strong>{result.differences.links.count_b}</strong>
+                        Počet pravidel v modelu B: <strong>{comparisonResult.differences.links.count_b}</strong>
                       </Typography>
                       <Typography variant="body2">
-                        Počet společných pravidel: <strong>{result.differences.links.common_count}</strong>
+                        Počet společných pravidel: <strong>{comparisonResult.differences.links.common_count}</strong>
                       </Typography>
                       <Typography variant="body2">
-                        Pravidla pouze v A: <strong>{result.differences.links.only_in_a.length}</strong>
+                        Pravidla pouze v A: <strong>{comparisonResult.differences.links.only_in_a.length}</strong>
                       </Typography>
                       <Typography variant="body2">
-                        Pravidla pouze v B: <strong>{result.differences.links.only_in_b.length}</strong>
+                        Pravidla pouze v B: <strong>{comparisonResult.differences.links.only_in_b.length}</strong>
                       </Typography>
                     </Box>
                   </Grid>
@@ -439,13 +382,13 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     </Typography>
                     
                     {/* Links pouze v modelu A */}
-                    {result.differences.links.only_in_a.length > 0 ? (
+                    {comparisonResult.differences.links.only_in_a.length > 0 ? (
                       <Box sx={{ mb: 2 }}>
                         <Typography variant="h6" sx={{ color: '#90caf9', fontWeight: 600, mb: 1 }}>
-                          Vztahy pouze v modelu A ({result.model_a.name}):
+                          Vztahy pouze v modelu A ({comparisonResult.model_a.name}):
                         </Typography>
                         <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
-                          {result.differences.links.only_in_a.map((link, index) => (
+                          {comparisonResult.differences.links.only_in_a.map((link, index) => (
                             <ListItem key={`link-a-${index}`}>
                               <ListItemIcon sx={{ minWidth: 36 }}>
                                 <span style={{ color: '#90caf9', fontSize: '20px' }}>ⓘ</span>
@@ -467,13 +410,13 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     ) : null}
                     
                     {/* Links pouze v modelu B */}
-                    {result.differences.links.only_in_b.length > 0 ? (
+                    {comparisonResult.differences.links.only_in_b.length > 0 ? (
                       <Box>
                         <Typography variant="h6" sx={{ color: '#ce93d8', fontWeight: 600, mb: 1 }}>
-                          Vztahy pouze v modelu B ({result.model_b.name}):
+                          Vztahy pouze v modelu B ({comparisonResult.model_b.name}):
                         </Typography>
                         <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
-                          {result.differences.links.only_in_b.map((link, index) => (
+                          {comparisonResult.differences.links.only_in_b.map((link, index) => (
                             <ListItem key={`link-b-${index}`}>
                               <ListItemIcon sx={{ minWidth: 36 }}>
                                 <span style={{ color: '#ce93d8', fontSize: '20px' }}>ⓘ</span>
@@ -495,7 +438,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     ) : null}
                     
                     {/* Pokud nejsou žádné rozdíly ve vztazích */}
-                    {result.differences.links.only_in_a.length === 0 && result.differences.links.only_in_b.length === 0 && (
+                    {comparisonResult.differences.links.only_in_a.length === 0 && comparisonResult.differences.links.only_in_b.length === 0 && (
                       <Typography variant="body2" color="text.secondary">
                         Mezi modely nejsou žádné rozdíly ve vztazích.
                       </Typography>
@@ -508,7 +451,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                        Společná pravidla mezi modely ({result.differences.links.common_count})
+                        Společná pravidla mezi modely ({comparisonResult.differences.links.common_count})
                       </Typography>
                       <Button 
                         size="small" 
@@ -519,7 +462,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                       </Button>
                     </Box>
                     
-                    {showCommonRules && result.differences.links.common_count > 0 ? (
+                    {showCommonRules && comparisonResult.differences.links.common_count > 0 ? (
                       <Box>
                         <Box sx={{ 
                           display: 'flex', 
@@ -537,9 +480,9 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                         
                         {/* Zde bychom potřebovali získat seznam společných pravidel z API */}
                         {/* Jako jednoduchý workaround můžeme extrahovat společné části z vizualizace */}
-                        {result.differences.links.common_links ? (
+                        {comparisonResult.differences.links.common_links ? (
                           <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1, maxHeight: '300px', overflow: 'auto' }}>
-                            {result.differences.links.common_links.map((link, index) => (
+                            {comparisonResult.differences.links.common_links.map((link, index) => (
                               <ListItem key={`common-link-${index}`}>
                                 <ListItemIcon sx={{ minWidth: 36 }}>
                                   <span style={{ color: '#66bb6a', fontSize: '20px' }}>✅</span>
@@ -564,14 +507,14 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                         )}
                       </Box>
                     ) : (
-                      !showCommonRules && result.differences.links.common_count > 0 && (
+                      !showCommonRules && comparisonResult.differences.links.common_count > 0 && (
                         <Typography variant="body2" color="text.secondary">
-                          Klikněte na "ZOBRAZIT" pro zobrazení {result.differences.links.common_count} společných pravidel.
+                          Klikněte na "ZOBRAZIT" pro zobrazení {comparisonResult.differences.links.common_count} společných pravidel.
                         </Typography>
                       )
                     )}
                     
-                    {result.differences.links.common_count === 0 && (
+                    {comparisonResult.differences.links.common_count === 0 && (
                       <Typography variant="body2" color="text.secondary">
                         Modely nemají žádná společná pravidla.
                       </Typography>
@@ -580,9 +523,9 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                 </Card>
                 
                 {/* Rozdíly v typech modelů */}
-                {Object.keys(result.differences.model_types).length > 0 ? (
+                {Object.keys(comparisonResult.differences.model_types).length > 0 ? (
                   <>
-                    {Object.entries(result.differences.model_types).map(([modelType, differences]) => (
+                    {Object.entries(comparisonResult.differences.model_types).map(([modelType, differences]) => (
                       <Card key={modelType} sx={{ mb: 3, backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
                         <CardContent>
                           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
@@ -593,7 +536,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                           {differences.only_in_a.must.length > 0 || differences.only_in_a.must_not.length > 0 ? (
                             <Box sx={{ mb: 2 }}>
                               <Typography variant="body2" sx={{ color: '#90caf9', fontWeight: 600, mb: 1 }}>
-                                Pravidla pouze v modelu A ({result.model_a.name}):
+                                Pravidla pouze v modelu A ({comparisonResult.model_a.name}):
                               </Typography>
                               <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
                                 {differences.only_in_a.must.map((rule, index) => (
@@ -638,7 +581,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                           {differences.only_in_b.must.length > 0 || differences.only_in_b.must_not.length > 0 ? (
                             <Box>
                               <Typography variant="body2" sx={{ color: '#ce93d8', fontWeight: 600, mb: 1 }}>
-                                Pravidla pouze v modelu B ({result.model_b.name}):
+                                Pravidla pouze v modelu B ({comparisonResult.model_b.name}):
                               </Typography>
                               <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
                                 {differences.only_in_b.must.map((rule, index) => (
@@ -711,7 +654,7 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
                   Vizualizace rozdílů mezi modely
                 </Typography>
-                {result.visualization && (
+                {comparisonResult.visualization && (
                   <Box sx={{ 
                     height: '850px',
                     width: '100%',
@@ -723,24 +666,24 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                     border: '1px solid #ddd'
                   }}>
                     <NetworkGraph 
-                      nodes={result.visualization.nodes} 
-                      links={result.visualization.links}
+                      nodes={comparisonResult.visualization.nodes} 
+                      links={comparisonResult.visualization.links}
                       showDifferences={true}
-                      modelA={result.model_a?.name}
-                      modelB={result.model_b?.name}
+                      modelA={comparisonResult.model_a?.name}
+                      modelB={comparisonResult.model_b?.name}
                     />
                   </Box>
                 )}
               </CardContent>
             </Card>
-            {result.visualization && (
+            {comparisonResult.visualization && (
               <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Zobrazeno {result.visualization.nodes.length} uzlů a {result.visualization.links.length} spojení mezi nimi.
+                  Zobrazeno {comparisonResult.visualization.nodes.length} uzlů a {comparisonResult.visualization.links.length} spojení mezi nimi.
                   Pro lepší zobrazení můžete použít kolečko myši pro přiblížení nebo oddálení. Najetím na uzel zobrazíte detailní informace.
                 </Typography>
 
-                {result.visualization_stats && (
+                {comparisonResult.visualization_stats && (
                   <Box sx={{ mt: 1, borderTop: '1px solid rgba(255, 255, 255, 0.1)', pt: 1 }}>
                     <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
                       Statistiky vizualizace:
@@ -749,21 +692,21 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
                       <Grid item xs={12} sm={6}>
                         <Box sx={{ pl: 1, borderLeft: '2px solid #4a90e2' }}>
                           <Typography variant="body2" color="text.secondary">
-                            Pouze v modelu A: {result.visualization_stats.nodes_only_in_a} uzlů, {result.visualization_stats.links_only_in_a} spojení
+                            Pouze v modelu A: {comparisonResult.visualization_stats.nodes_only_in_a} uzlů, {comparisonResult.visualization_stats.links_only_in_a} spojení
                           </Typography>
                         </Box>
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Box sx={{ pl: 1, borderLeft: '2px solid #9c27b0' }}>
                           <Typography variant="body2" color="text.secondary">
-                            Pouze v modelu B: {result.visualization_stats.nodes_only_in_b} uzlů, {result.visualization_stats.links_only_in_b} spojení
+                            Pouze v modelu B: {comparisonResult.visualization_stats.nodes_only_in_b} uzlů, {comparisonResult.visualization_stats.links_only_in_b} spojení
                           </Typography>
                         </Box>
                       </Grid>
                       <Grid item xs={12}>
                         <Box sx={{ pl: 1, borderLeft: '2px solid #888888' }}>
                           <Typography variant="body2" color="text.secondary">
-                            Společné: {result.visualization_stats.nodes_common} uzlů, {result.visualization_stats.links_common} spojení
+                            Společné: {comparisonResult.visualization_stats.nodes_common} uzlů, {comparisonResult.visualization_stats.links_common} spojení
                           </Typography>
                         </Box>
                       </Grid>
@@ -773,230 +716,585 @@ const CompareModels: React.FC<CompareModelsProps> = ({ isLoading }) => {
               </Box>
             )}
           </Box>
-        )}
+        )
+      </Box>
+    );
+  };
+
+  // Funkce pro získání jména modelu
+  const getModelName = (modelType: string, modelId: number | null): string => {
+    if (modelType === 'current') {
+      return 'Aktuální model';
+    } else if (modelType === 'saved' && modelId) {
+      // Zde by mělo být získání jména uloženého modelu z cache nebo znovu z API
+      return `Uložený model #${modelId}`;
+    }
+    return 'Neznámý model';
+  };
+
+  // Funkce pro zobrazení seznamu rozdílů
+  const renderDifferenceList = (title: string, items: string[], color: string, icon: string = '•') => {
+    if (!items || items.length === 0) return null;
+    
+    return (
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, color, mb: 1 }}>
+          {title} ({items.length})
+        </Typography>
+        <Box sx={{ ml: 2 }}>
+          {items.map((item, index) => (
+            <Typography key={index} variant="body2" sx={{ color, my: 0.5 }}>
+              <span style={{ marginRight: '8px' }}>{icon}</span>
+              {item}
+            </Typography>
+          ))}
+        </Box>
       </Box>
     );
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 3, mb: 4 }}>
+    <Container maxWidth="xl" sx={{ mt: 3, mb: 4, px: { xs: 1, sm: 3 } }}>
       <Paper
-        elevation={6}
+        elevation={4}
         sx={{
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: 'hidden',
           height: '100%',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-          background: 'linear-gradient(145deg, rgba(18,18,18,1) 0%, rgba(30,30,30,1) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
+          backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(30,41,59,1) 0%, rgba(17,24,39,1) 81%)',
+          border: '1px solid',
+          borderColor: 'divider'
         }}
       >
         <Box sx={{ 
-          p: 3,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-        }}>
-          <Typography 
-            variant="h4" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 600,
-              color: '#90caf9',
-              mb: 1,
-              display: 'flex',
-              alignItems: 'center',
-              '&::after': {
-                content: '""',
-                flexGrow: 1,
-                height: '1px',
-                ml: 2,
-                background: 'linear-gradient(90deg, rgba(144, 202, 249, 0.5) 0%, rgba(144, 202, 249, 0) 100%)'
-              }
-            }}
-          >
-            <CompareArrowsIcon sx={{ mr: 1 }} />
-            Porovnání modelů
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Porovnejte dva modely (hypotézy) a zjistěte rozdíly mezi nimi.
-          </Typography>
-        </Box>
-
-        <Grid container spacing={0}>
-          {/* Sekce výběru modelů */}
-          <Grid item xs={12} md={5} sx={{ 
-            p: 3,
-            borderRight: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.05)' }
+            p: 2, 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            gap: 2
           }}>
-            <Typography 
-              variant="h6" 
-              component="h2" 
-              sx={{ 
-                mb: 3, 
-                fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.8)',
-                display: 'flex',
-                alignItems: 'center',
-                '&::after': {
-                  content: '""',
-                  flexGrow: 1,
-                  height: '1px',
-                  ml: 2,
-                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%)'
-                }
-              }}
-            >
-              <InfoIcon sx={{ mr: 1, color: '#90caf9' }} />
-              Výběr modelů pro porovnání
-            </Typography>
-
-            <Box sx={{ mb: 4 }}>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={handleSaveCurrentModel}
-                disabled={loading}
-                fullWidth
-                sx={{ mb: 3 }}
-              >
-                Uložit aktuální model
-              </Button>
-            </Box>
-
-            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>Model A:</Typography>
-            <Grid container spacing={2} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Typ modelu A</InputLabel>
-                  <Select
-                    value={modelAType}
-                    label="Typ modelu A"
-                    onChange={handleModelATypeChange}
-                  >
-                    <MenuItem value="current">Aktuální model</MenuItem>
-                    <MenuItem value="saved">Uložený model</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth disabled={modelAType !== 'saved'}>
-                  <InputLabel>Vyberte uložený model A</InputLabel>
-                  <Select
-                    value={modelAId}
-                    label="Vyberte uložený model A"
-                    onChange={handleModelAIdChange}
-                    disabled={modelAType !== 'saved'}
-                  >
-                    {savedModels.map(model => (
-                      <MenuItem key={`model-a-${model.id}`} value={model.id.toString()}>
-                        {model.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>Model B:</Typography>
-            <Grid container spacing={2} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Typ modelu B</InputLabel>
-                  <Select
-                    value={modelBType}
-                    label="Typ modelu B"
-                    onChange={handleModelBTypeChange}
-                  >
-                    <MenuItem value="current">Aktuální model</MenuItem>
-                    <MenuItem value="saved">Uložený model</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth disabled={modelBType !== 'saved'}>
-                  <InputLabel>Vyberte uložený model B</InputLabel>
-                  <Select
-                    value={modelBId}
-                    label="Vyberte uložený model B"
-                    onChange={handleModelBIdChange}
-                    disabled={modelBType !== 'saved'}
-                  >
-                    {savedModels.map(model => (
-                      <MenuItem key={`model-b-${model.id}`} value={model.id.toString()}>
-                        {model.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-
-            <Button
-              variant="contained"
-              color="primary"
-              fullWidth
-              onClick={handleCompare}
-              disabled={loading}
-              sx={{
-                py: 1.5,
-                boxShadow: '0 4px 10px rgba(25, 118, 210, 0.3)',
-                fontWeight: 600,
-                borderRadius: 2,
-                textTransform: 'none',
-                '&:hover': {
-                  boxShadow: '0 6px 12px rgba(25, 118, 210, 0.4)',
-                }
-              }}
-            >
-              {loading ? (
-                <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-              ) : null}
-              Porovnat modely
-            </Button>
-
-            {error && (
-              <Alert 
-                severity="error" 
+            <Box>
+              <Typography 
+                variant="h4" 
+                component="h1"
                 sx={{ 
-                  mt: 3, 
-                  borderRadius: 1,
-                  background: 'rgba(244, 67, 54, 0.15)',
-                  border: '1px solid rgba(244, 67, 54, 0.3)',
-                  color: 'white',
-                  '& .MuiAlert-icon': { color: '#f44336' },
+                  fontWeight: 700,
+                  color: '#90caf9',
+                  fontSize: { xs: '1.5rem', sm: '2rem' }
                 }}
               >
-                {error}
-              </Alert>
-            )}
-          </Grid>
-
-          {/* Výsledek sekce */}
-          <Grid item xs={12} md={7} sx={{ p: 3 }}>
+                <CompareArrowsIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                Porovnání modelů
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Porovnejte dva modely (hypotézy) a zjistěte rozdíly mezi nimi.
+              </Typography>
+            </Box>
+        </Box>
+        
+        <Box sx={{ p: { xs: 2, md: 3 } }}>
+          {/* Výběr modelů - nyní na celou šířku nahoře */}
+          <Box sx={{ mb: 3 }}>
             <Typography 
               variant="h6" 
-              component="h2" 
               sx={{ 
-                mb: 3, 
+                mb: 2, 
                 fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.8)',
+                color: 'white',
                 display: 'flex',
-                alignItems: 'center',
-                '&::after': {
-                  content: '""',
-                  flexGrow: 1,
-                  height: '1px',
-                  ml: 2,
-                  background: 'linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%)'
-                }
+                alignItems: 'center'
               }}
             >
-              <InfoIcon sx={{ mr: 1, color: '#90caf9' }} />
-              Výsledek porovnání
+              <FactCheckIcon sx={{ mr: 1, color: '#90caf9' }} />
+              Výběr modelů pro porovnání
             </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Model A selection */}
+              <Grid item xs={12} md={6}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: alpha('#fff', 0.05),
+                    borderColor: alpha('#fff', 0.1)
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 2, color: '#90caf9' }}>
+                    Model A:
+                  </Typography>
+                  
+                  <FormControl fullWidth variant="outlined" sx={{ mb: 2 }}>
+                    <InputLabel id="model-a-type-label">Typ modelu A</InputLabel>
+                    <Select
+                      labelId="model-a-type-label"
+                      id="model-a-type"
+                      value={modelA}
+                      onChange={handleModelATypeChange}
+                      label="Typ modelu A"
+                    >
+                      <MenuItem value="current">Aktuální model</MenuItem>
+                      <MenuItem value="saved">Uložený model</MenuItem>
+                    </Select>
+                  </FormControl>
+                  
+                  {modelA === 'saved' && (
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel id="model-a-id-label">Vyberte uložený model</InputLabel>
+                      <Select
+                        labelId="model-a-id-label"
+                        id="model-a-id"
+                        value={modelAId}
+                        onChange={handleModelAIdChange}
+                        label="Vyberte uložený model"
+                      >
+                        {savedModels.map(model => (
+                          <MenuItem key={model.id} value={model.id.toString()}>
+                            {model.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+                </Paper>
+              </Grid>
 
-            {renderResultContent()}
-          </Grid>
-        </Grid>
+              {/* Model B selection */}
+              <Grid item xs={12} md={6}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    bgcolor: alpha('#fff', 0.05),
+                    borderColor: alpha('#fff', 0.1)
+                  }}
+                >
+                  <Typography variant="h6" sx={{ mb: 2, color: '#90caf9' }}>
+                    Model B:
+                  </Typography>
+                  
+                  <FormControl fullWidth variant="outlined" sx={{ mb: 2 }}>
+                    <InputLabel id="model-b-type-label">Typ modelu B</InputLabel>
+                    <Select
+                      labelId="model-b-type-label"
+                      id="model-b-type"
+                      value={modelB}
+                      onChange={handleModelBTypeChange}
+                      label="Typ modelu B"
+                    >
+                      <MenuItem value="current">Aktuální model</MenuItem>
+                      <MenuItem value="saved">Uložený model</MenuItem>
+                    </Select>
+                  </FormControl>
+                  
+                  {modelB === 'saved' && (
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel id="model-b-id-label">Vyberte uložený model</InputLabel>
+                      <Select
+                        labelId="model-b-id-label"
+                        id="model-b-id"
+                        value={modelBId}
+                        onChange={handleModelBIdChange}
+                        label="Vyberte uložený model"
+                      >
+                        {savedModels.map(model => (
+                          <MenuItem key={model.id} value={model.id.toString()}>
+                            {model.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={handleSaveCurrentModel}
+                    disabled={loading}
+                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                    sx={{ mr: 2 }}
+                  >
+                    Uložit aktuální model
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleCompare}
+                    disabled={loading || (modelA === 'saved' && !modelAId) || (modelB === 'saved' && !modelBId)}
+                    sx={{
+                      py: 1,
+                      px: 3,
+                      fontWeight: 600,
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)',
+                      background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                      '&:hover': {
+                        boxShadow: '0 6px 20px rgba(0,118,255,0.4)',
+                      },
+                      minWidth: '140px'
+                    }}
+                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                  >
+                    {loading ? "Porovnávam..." : "Porovnat modely"}
+                  </Button>
+                </Box>
+                
+                {error && (
+                  <Alert 
+                    severity="error" 
+                    variant="filled"
+                    sx={{ borderRadius: 2, mt: 2 }}
+                  >
+                    {error}
+                  </Alert>
+                )}
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Výsledek porovnání - zobrazuje se pouze když máme výsledek */}
+          {comparisonResult ? (
+            <>
+              {/* Model summary boxes */}
+              <Box sx={{ mb: 3 }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    mb: 2, 
+                    fontWeight: 600,
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  <FactCheckIcon sx={{ mr: 1, color: '#90caf9' }} />
+                  Výsledek porovnání
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: alpha('#fff', 0.05),
+                        borderColor: alpha('#fff', 0.1)
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ color: '#90caf9', mb: 1 }}>
+                        Model A: {comparisonResult.model_a.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {comparisonResult.model_a.pl1_representation || 'Žádná formula k dispozici'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: alpha('#fff', 0.05),
+                        borderColor: alpha('#fff', 0.1)
+                      }}
+                    >
+                      <Typography variant="h6" sx={{ color: '#90caf9', mb: 1 }}>
+                        Model B: {comparisonResult.model_b.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {comparisonResult.model_b.pl1_representation || 'Žádná formula k dispozici'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              {/* Statistika */}
+              <Paper
+                variant="outlined"
+                sx={{ 
+                  p: 3,
+                  borderRadius: 2,
+                  bgcolor: alpha('#000', 0.2),
+                  borderColor: alpha('#fff', 0.1),
+                  mb: 3
+                }}
+              >
+                <Typography variant="h6" sx={{ mb: 2, color: 'white' }}>
+                  Statistika
+                </Typography>
+                <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Přehled pravidel
+                  </Typography>
+                  
+                  {/* Model A Stats */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                    <Box sx={{ width: '25%', mr: 2 }}>
+                      <Typography variant="body2" sx={{ color: '#90caf9' }}>
+                        Model A: {comparisonResult.differences.links.count_a}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ width: '75%', display: 'flex' }}>
+                      <Box 
+                        sx={{ 
+                          height: 20, 
+                          bgcolor: '#90caf9', 
+                          width: `${((comparisonResult.differences.links.count_a - (comparisonResult.differences.links.only_in_a.length)) / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
+                          borderRadius: '4px 0 0 4px'
+                        }} 
+                      />
+                      <Box 
+                        sx={{ 
+                          height: 20, 
+                          bgcolor: '#4fc3f7',
+                          width: `${(comparisonResult.differences.links.only_in_a.length / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
+                          borderRadius: '0 4px 4px 0',
+                          borderLeft: '2px solid rgba(0,0,0,0.3)'
+                        }} 
+                      />
+                    </Box>
+                  </Box>
+                  
+                  {/* Model B Stats */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                    <Box sx={{ width: '25%', mr: 2 }}>
+                      <Typography variant="body2" sx={{ color: '#ce93d8' }}>
+                        Model B: {comparisonResult.differences.links.count_b}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ width: '75%', display: 'flex' }}>
+                      <Box 
+                        sx={{ 
+                          height: 20, 
+                          bgcolor: '#ce93d8', 
+                          width: `${((comparisonResult.differences.links.count_b - (comparisonResult.differences.links.only_in_b.length)) / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
+                          borderRadius: '4px 0 0 4px'
+                        }} 
+                      />
+                      <Box 
+                        sx={{ 
+                          height: 20, 
+                          bgcolor: '#ba68c8',
+                          width: `${(comparisonResult.differences.links.only_in_b.length / Math.max(comparisonResult.differences.links.count_a, comparisonResult.differences.links.count_b)) * 100}%`,
+                          borderRadius: '0 4px 4px 0',
+                          borderLeft: '2px solid rgba(0,0,0,0.3)'
+                        }} 
+                      />
+                    </Box>
+                  </Box>
+                  
+                  {/* Legend */}
+                  <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 12, height: 12, bgcolor: '#90caf9', mr: 1, borderRadius: 1 }} />
+                      <Typography variant="caption">Společná A ({comparisonResult.differences.links.count_a - comparisonResult.differences.links.only_in_a.length})</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 12, height: 12, bgcolor: '#4fc3f7', mr: 1, borderRadius: 1 }} />
+                      <Typography variant="caption">Pouze v A ({comparisonResult.differences.links.only_in_a.length})</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 12, height: 12, bgcolor: '#ce93d8', mr: 1, borderRadius: 1 }} />
+                      <Typography variant="caption">Společná B ({comparisonResult.differences.links.count_b - comparisonResult.differences.links.only_in_b.length})</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 12, height: 12, bgcolor: '#ba68c8', mr: 1, borderRadius: 1 }} />
+                      <Typography variant="caption">Pouze v B ({comparisonResult.differences.links.only_in_b.length})</Typography>
+                    </Box>
+                  </Box>
+                </Box>
+
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="body2" fontWeight="bold">
+                    Shrnutí:
+                  </Typography>
+                  <Box sx={{ pl: 2, mt: 1 }}>
+                    <Typography variant="body2">
+                      Počet pravidel v modelu A: <strong>{comparisonResult.differences.links.count_a}</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      Počet pravidel v modelu B: <strong>{comparisonResult.differences.links.count_b}</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      Počet společných pravidel: <strong>{comparisonResult.differences.links.common_count}</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      Pravidla pouze v A: <strong>{comparisonResult.differences.links.only_in_a.length}</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      Pravidla pouze v B: <strong>{comparisonResult.differences.links.only_in_b.length}</strong>
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+
+              {/* Rozdíly v modelech */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  bgcolor: alpha('#000', 0.2),
+                  borderColor: alpha('#fff', 0.1),
+                  mb: 3
+                }}
+              >
+                <Typography variant="h6" sx={{ mb: 2, color: 'white' }}>
+                  Rozdíly v modelech
+                </Typography>
+                
+                {/* Detailní seznam rozdílných spojení mezi modely */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                    Rozdíly ve vztazích
+                  </Typography>
+                  
+                  {/* Links pouze v modelu A */}
+                  {comparisonResult.differences.links.only_in_a.length > 0 ? (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="h6" sx={{ color: '#90caf9', fontWeight: 600, mb: 1 }}>
+                        Vztahy pouze v modelu A ({comparisonResult.model_a.name}):
+                      </Typography>
+                      <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
+                        {comparisonResult.differences.links.only_in_a.map((link, index) => (
+                          <ListItem key={`link-a-${index}`}>
+                            <ListItemIcon sx={{ minWidth: 36 }}>
+                              <span style={{ color: '#90caf9', fontSize: '20px' }}>ⓘ</span>
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={convertToPl1Notation(link)} 
+                              primaryTypographyProps={{
+                                variant: 'body2',
+                                sx: { 
+                                  color: 'rgba(255, 255, 255, 0.8)',
+                                  fontFamily: 'monospace'
+                                }
+                              }}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  ) : null}
+                  
+                  {/* Links pouze v modelu B */}
+                  {comparisonResult.differences.links.only_in_b.length > 0 ? (
+                    <Box>
+                      <Typography variant="h6" sx={{ color: '#ce93d8', fontWeight: 600, mb: 1 }}>
+                        Vztahy pouze v modelu B ({comparisonResult.model_b.name}):
+                      </Typography>
+                      <List dense sx={{ bgcolor: 'rgba(0, 0, 0, 0.2)', borderRadius: 1 }}>
+                        {comparisonResult.differences.links.only_in_b.map((link, index) => (
+                          <ListItem key={`link-b-${index}`}>
+                            <ListItemIcon sx={{ minWidth: 36 }}>
+                              <span style={{ color: '#ce93d8', fontSize: '20px' }}>ⓘ</span>
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={convertToPl1Notation(link)} 
+                              primaryTypographyProps={{
+                                variant: 'body2',
+                                sx: { 
+                                  color: 'rgba(255, 255, 255, 0.8)',
+                                  fontFamily: 'monospace'
+                                }
+                              }}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  ) : null}
+                  
+                  {/* Pokud nejsou žádné rozdíly ve vztazích */}
+                  {comparisonResult.differences.links.only_in_a.length === 0 && comparisonResult.differences.links.only_in_b.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                      Mezi modely nejsou žádné rozdíly ve vztazích.
+                    </Typography>
+                  )}
+                </Box>
+                
+                <Divider sx={{ my: 2, bgcolor: alpha('#fff', 0.1) }} />
+                
+                {/* Společná pravidla mezi modely */}
+                <Box sx={{ mb: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      Společná pravidla mezi modely ({comparisonResult.differences.links.common_count})
+                    </Typography>
+                    <Button 
+                      size="small" 
+                      onClick={() => setShowCommonRules(!showCommonRules)}
+                      sx={{ fontSize: '0.75rem' }}
+                    >
+                      {showCommonRules ? 'SKRÝT' : 'ZOBRAZIT'}
+                    </Button>
+                  </Box>
+                  
+                  {showCommonRules && comparisonResult.differences.links.common_count > 0 ? (
+                    <Box>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        mb: 2, 
+                        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                        p: 2,
+                        borderRadius: 1
+                      }}>
+                        <span style={{ color: '#2196f3', fontSize: '24px', marginRight: '12px' }}>ⓘ</span>
+                        <Typography variant="body2" color="text.secondary">
+                          Společná pravidla jsou přítomna v obou modelech a představují sdílené vlastnosti modelů.
+                        </Typography>
+                      </Box>
+                      
+                      {/* Seznam společných pravidel */}
+                      {comparisonResult.differences.links.common_links ? (
+                        <Box sx={{ pl: 2 }}>
+                          {comparisonResult.differences.links.common_links.map((link, index) => (
+                            <Typography key={index} variant="body2" sx={{ color: '#9e9e9e', my: 0.5 }}>
+                              <span style={{ marginRight: '8px', color: '#66bb6a' }}>✓</span>
+                              {link}
+                            </Typography>
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          Detailní informace o společných pravidlech nejsou k dispozici.
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    !showCommonRules && comparisonResult.differences.links.common_count > 0 && (
+                      <Typography variant="body2" color="text.secondary">
+                        Klikněte na "ZOBRAZIT" pro zobrazení {comparisonResult.differences.links.common_count} společných pravidel.
+                      </Typography>
+                    )
+                  )}
+                </Box>
+
+                {/* Grafické zobrazení bude přidáno později */}
+              </Paper>
+            </>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px' }}>
+              <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                Vyberte modely a klikněte na "Porovnat modely" pro zobrazení výsledků
+              </Typography>
+            </Box>
+          )}
+        </Box>
       </Paper>
     </Container>
   );
